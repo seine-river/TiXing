@@ -92,52 +92,30 @@ struct CapturePage {
   StepSourceSelect() {
     Scroll() {
       Column() {
-        Text('选择图片来源，系统将自动识别题目并判断学科')
-          .fontSize(14)
-          .fontColor(AppColors.TEXT_SECONDARY)
-          .width('100%')
-          .padding({ left: 16, right: 16, top: 12 })
-
         Column() {
-          Button({ type: ButtonType.Normal }) {
-            Column() {
-              Text('📷')
-                .fontSize(48)
-              Text(AppStrings.CAPTURE_PHOTO)
-                .fontSize(18)
-                .fontColor(AppColors.TEXT_PRIMARY)
-                .margin({ top: 8 })
-            }
-          }
-          .width('100%')
-          .height(120)
-          .backgroundColor(AppColors.BG_CARD)
-          .borderRadius(AppSizes.CORNER_RADIUS)
-          .margin({ left: 16, right: 16, top: 16 })
-          .onClick(() => {
-            this.startCapture(true);
-          })
-
-          Button({ type: ButtonType.Normal }) {
-            Column() {
-              Text('🖼️')
-                .fontSize(48)
-              Text(AppStrings.CAPTURE_ALBUM)
-                .fontSize(18)
-                .fontColor(AppColors.TEXT_PRIMARY)
-                .margin({ top: 8 })
-            }
-          }
-          .width('100%')
-          .height(120)
-          .backgroundColor(AppColors.BG_CARD)
-          .borderRadius(AppSizes.CORNER_RADIUS)
-          .margin({ left: 16, right: 16, top: 12 })
-          .onClick(() => {
-            this.startCapture(false);
-          })
+          Text('📷')
+            .fontSize(40)
+          Text('录入错题')
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.TEXT_PRIMARY)
+            .margin({ top: 8 })
+          Text('选择图片来源，系统将自动识别题目并判断学科')
+            .fontSize(13)
+            .fontColor(AppColors.TEXT_SECONDARY)
+            .margin({ top: 6 })
+            .textAlign(TextAlign.Center)
         }
         .width('100%')
+        .padding({ left: 20, right: 20, top: 32, bottom: 24 })
+        .alignItems(HorizontalAlign.Center)
+
+        Row() {
+          this.SourceTile('📷', AppStrings.CAPTURE_PHOTO, '拍摄试卷或练习册', true)
+          this.SourceTile('🖼️', AppStrings.CAPTURE_ALBUM, '从相册选取已有图片', false)
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16 })
 
         if (this.qualityIssue.length > 0) {
           Text(this.qualityHint(this.qualityIssue))
@@ -149,6 +127,35 @@ struct CapturePage {
       .width('100%')
     }
     .scrollBar(BarState.Auto)
+  }
+
+  @Builder
+  SourceTile(icon: string, title: string, subtitle: string, fromCamera: boolean) {
+    Column() {
+      Text(icon)
+        .fontSize(40)
+      Text(title)
+        .fontSize(16)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.TEXT_PRIMARY)
+        .margin({ top: 10 })
+      Text(subtitle)
+        .fontSize(11)
+        .fontColor(AppColors.TEXT_SECONDARY)
+        .margin({ top: 4 })
+        .textAlign(TextAlign.Center)
+    }
+    .layoutWeight(1)
+    .height(150)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .backgroundColor(AppColors.BG_CARD)
+    .borderRadius(AppSizes.CORNER_RADIUS)
+    .margin({ left: 4, right: 4 })
+    .shadow({ radius: 8, color: '#14223640', offsetY: 2 })
+    .onClick(() => {
+      this.startCapture(fromCamera);
+    })
   }
 
   @Builder

@@ -1,20 +1,25 @@
 export class AppColors {
-  static readonly PRIMARY: string = '#4A90D9';
-  static readonly PRIMARY_LIGHT: string = '#6BAAE7';
-  static readonly SECONDARY: string = '#67C23A';
-  static readonly WARNING: string = '#E6A23C';
-  static readonly DANGER: string = '#F56C6C';
-  static readonly BG_PAGE: string = '#F5F7FA';
+  static readonly PRIMARY: string = '#3A7BD5';
+  static readonly PRIMARY_LIGHT: string = '#5B9BE8';
+  static readonly PRIMARY_DARK: string = '#2E64A8';
+  static readonly GRADIENT_START: string = '#3A7BD5';
+  static readonly GRADIENT_END: string = '#5BB6F0';
+  static readonly SECONDARY: string = '#34C759';
+  static readonly WARNING: string = '#FF9F0A';
+  static readonly DANGER: string = '#FF3B30';
+  static readonly BG_PAGE: string = '#F2F4F8';
   static readonly BG_CARD: string = '#FFFFFF';
-  static readonly TEXT_PRIMARY: string = '#303133';
-  static readonly TEXT_REGULAR: string = '#606266';
-  static readonly TEXT_SECONDARY: string = '#909399';
-  static readonly TEXT_PLACEHOLDER: string = '#C0C4CC';
-  static readonly BORDER: string = '#DCDFE6';
-  static readonly DIVIDER: string = '#EBEEF5';
-  static readonly MASTERY_MASTERED: string = '#67C23A';
-  static readonly MASTERY_REVIEWING: string = '#409EFF';
-  static readonly MASTERY_UNMASTERED: string = '#F56C6C';
+  static readonly BG_CHIP: string = '#EEF2F7';
+  static readonly TEXT_PRIMARY: string = '#1D2129';
+  static readonly TEXT_REGULAR: string = '#4E5969';
+  static readonly TEXT_SECONDARY: string = '#86909C';
+  static readonly TEXT_PLACEHOLDER: string = '#C9CDD4';
+  static readonly BORDER: string = '#E5E6EB';
+  static readonly DIVIDER: string = '#F2F3F5';
+  static readonly SHADOW: string = '#1F2A3D';
+  static readonly MASTERY_MASTERED: string = '#34C759';
+  static readonly MASTERY_REVIEWING: string = '#3A7BD5';
+  static readonly MASTERY_UNMASTERED: string = '#FF3B30';
 }
 
 export class AppSizes {
@@ -23,10 +28,11 @@ export class AppSizes {
   static readonly FONT_BODY: number = 16;
   static readonly FONT_CAPTION: number = 14;
   static readonly FONT_SMALL: number = 12;
-  static readonly CORNER_RADIUS: number = 12;
-  static readonly CORNER_RADIUS_SM: number = 8;
+  static readonly CORNER_RADIUS: number = 16;
+  static readonly CORNER_RADIUS_SM: number = 12;
+  static readonly CORNER_RADIUS_XS: number = 8;
   static readonly PADDING_PAGE: number = 16;
-  static readonly PADDING_CARD: number = 12;
+  static readonly PADDING_CARD: number = 14;
   static readonly TOUCH_TARGET: number = 44;
 }
 

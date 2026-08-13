@@ -29,7 +29,7 @@ struct OpsOverviewPage {
 
   build() {
     Column() {
-      PageHeader({ title: '运营指标概览' })
+      PageHeader({ title: '家长中心' })
       Scroll() {
         Column() {
           Text('本地聚合统计（脱敏），对应 FR-OPS 基础运营看板')

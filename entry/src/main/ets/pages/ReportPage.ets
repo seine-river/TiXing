@@ -66,6 +66,7 @@ export struct ReportPage {
         this.SubjectSection()
         this.WeakPointsSection()
       }
+      .padding({ top: 8, bottom: 24 })
       .width('100%')
     }
     .width('100%')
@@ -117,6 +118,7 @@ export struct ReportPage {
     .backgroundColor(AppColors.BG_CARD)
     .borderRadius(AppSizes.CORNER_RADIUS)
     .margin({ left: 16, right: 16, top: 8 })
+    .shadow({ radius: 8, color: '#101F2E26', offsetY: 2 })
   }
 
   @Builder
@@ -175,6 +177,7 @@ export struct ReportPage {
     .backgroundColor(AppColors.BG_CARD)
     .borderRadius(AppSizes.CORNER_RADIUS)
     .margin({ left: 16, right: 16, top: 12 })
+    .shadow({ radius: 8, color: '#101F2E26', offsetY: 2 })
   }
 
   @Builder
@@ -227,6 +230,7 @@ export struct ReportPage {
     .backgroundColor(AppColors.BG_CARD)
     .borderRadius(AppSizes.CORNER_RADIUS)
     .margin({ left: 16, right: 16, top: 12, bottom: 24 })
+    .shadow({ radius: 8, color: '#101F2E26', offsetY: 2 })
   }
 }
 

@@ -64,7 +64,7 @@ export struct MistakesPage {
       .scrollable(ScrollDirection.Horizontal)
       .scrollBar(BarState.Off)
       .width('100%')
-      .padding({ left: 16, right: 16, top: 4, bottom: 8 })
+      .padding({ left: 16, right: 16, top: 12, bottom: 4 })
 
       Row() {
         TextInput({ text: this.searchKeyword, placeholder: '🔍 搜索错题内容' })
@@ -145,15 +145,28 @@ export struct MistakesPage {
 
                 if (item.imageUrl.length > 0) {
                   Image(item.imageUrl)
-                    .width(64).height(64).borderRadius(8)
+                    .width(64).height(64).borderRadius(AppSizes.CORNER_RADIUS_XS)
                     .objectFit(ImageFit.Cover)
-                    .margin({ left: 8 })
+                    .margin({ left: 10 })
+                } else {
+                  Column() {
+                    Text('📷')
+                      .fontSize(28)
+                  }
+                  .width(64)
+                  .height(64)
+                  .borderRadius(AppSizes.CORNER_RADIUS_XS)
+                  .backgroundColor(AppColors.BG_CHIP)
+                  .justifyContent(FlexAlign.Center)
+                  .alignItems(HorizontalAlign.Center)
+                  .margin({ left: 10 })
                 }
               }
               .width('100%')
-              .padding(12)
+              .padding(14)
               .backgroundColor(AppColors.BG_CARD)
               .borderRadius(AppSizes.CORNER_RADIUS_SM)
+              .shadow({ radius: 6, color: '#101F2E26', offsetY: 2 })
               .onClick(() => {
                 this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeDetailPage', params: { mistakeId: item.id } });
               })

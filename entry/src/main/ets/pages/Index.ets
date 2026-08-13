@@ -55,6 +55,7 @@ struct Index {
     .width('100%')
     .height('100%')
     .backgroundColor(AppColors.BG_PAGE)
+    .barHeight(60)
     .onChange((index: number) => {
       this.currentTab = index;
     })
@@ -65,10 +66,12 @@ struct Index {
     Column() {
       Text(icon)
         .fontSize(22)
+        .opacity(this.currentTab === index ? 1 : 0.5)
       Text(label)
         .fontSize(11)
+        .fontWeight(this.currentTab === index ? FontWeight.Bold : FontWeight.Normal)
         .fontColor(this.currentTab === index ? AppColors.PRIMARY : AppColors.TEXT_SECONDARY)
-        .margin({ top: 2 })
+        .margin({ top: 3 })
     }
     .width('100%')
     .height('100%')

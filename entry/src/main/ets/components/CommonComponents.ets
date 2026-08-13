@@ -1,30 +1,30 @@
 @Component
 export struct StatusTag {
   @Prop statusText: string = '';
-  @Prop statusColor: string = '#909399';
+  @Prop statusColor: string = '#86909C';
 
   build() {
     Text(this.statusText)
-      .fontSize(12)
-      .fontColor(Color.White)
-      .backgroundColor(this.statusColor)
-      .borderRadius(10)
-      .padding({ left: 8, right: 8, top: 2, bottom: 2 })
+      .fontSize(11)
+      .fontColor(this.statusColor)
+      .backgroundColor(this.statusColor + '1A')
+      .borderRadius(8)
+      .padding({ left: 8, right: 8, top: 3, bottom: 3 })
   }
 }
 
 @Component
 export struct SubjectTag {
   @Prop subjectText: string = '';
-  @Prop subjectColor: string = '#4A90D9';
+  @Prop subjectColor: string = '#3A7BD5';
 
   build() {
     Text(this.subjectText)
-      .fontSize(12)
+      .fontSize(11)
       .fontColor(Color.White)
       .backgroundColor(this.subjectColor)
-      .borderRadius(10)
-      .padding({ left: 8, right: 8, top: 2, bottom: 2 })
+      .borderRadius(8)
+      .padding({ left: 8, right: 8, top: 3, bottom: 3 })
   }
 }
 
@@ -35,11 +35,11 @@ export struct EmptyPlaceholder {
   build() {
     Column() {
       Text('📭')
-        .fontSize(48)
-        .margin({ bottom: 12 })
+        .fontSize(56)
+        .margin({ bottom: 14 })
       Text(this.message)
-        .fontSize(16)
-        .fontColor('#909399')
+        .fontSize(15)
+        .fontColor('#86909C')
     }
     .width('100%')
     .height('100%')
@@ -56,7 +56,7 @@ export struct PageTitle {
     Text(this.title)
       .fontSize(22)
       .fontWeight(FontWeight.Bold)
-      .fontColor('#303133')
+      .fontColor('#1D2129')
       .width('100%')
       .padding({ left: 16, right: 16, top: 12, bottom: 8 })
   }
@@ -71,7 +71,7 @@ export struct PageHeader {
       Text('‹')
         .fontSize(34)
         .fontWeight(FontWeight.Bold)
-        .fontColor('#303133')
+        .fontColor('#1D2129')
         .width(40)
         .height(40)
         .textAlign(TextAlign.Center)
@@ -79,16 +79,16 @@ export struct PageHeader {
           this.getUIContext().getRouter().back();
         })
       Text(this.title)
-        .fontSize(20)
+        .fontSize(19)
         .fontWeight(FontWeight.Bold)
-        .fontColor('#303133')
+        .fontColor('#1D2129')
         .layoutWeight(1)
       Column() {
       }
       .width(40)
     }
     .width('100%')
-    .height(48)
+    .height(50)
     .padding({ left: 4, right: 12 })
     .alignItems(VerticalAlign.Center)
   }
