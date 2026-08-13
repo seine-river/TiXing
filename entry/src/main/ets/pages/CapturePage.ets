@@ -8,7 +8,9 @@ import { KnowledgeProfileAggregator } from '../usecases/KnowledgeProfileAggregat
 import { AnalyticsTracker } from '../usecases/AnalyticsTracker';
 import { PointsCalculator } from '../usecases/PointsCalculator';
 import { MediaService } from '../services/MediaService';
+import { PerformanceMonitor } from '../services/PerformanceMonitor';
 import { AppColors, AppSizes, AppStrings, subjectLabel, generateId } from '../common/Constants';
+import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
 
 class AnswerTypeOption {
@@ -498,6 +500,7 @@ struct CapturePage {
     const path = fromCamera ? await MediaService.capturePhoto() : await MediaService.pickFromAlbum();
     this.capturing = false;
     if (path === undefined || path.length === 0) {
+      Toast.show(fromCamera ? '相机不可用或未拍照，请改用相册选取' : '未选取图片，请重试');
       this.qualityIssue = '';
       return;
     }
@@ -550,6 +553,9 @@ struct CapturePage {
     await this.loadTags();
     this.ocrBusy = false;
     this.currentStep = 2;
+    if (this.questionText.length === 0) {
+      Toast.show('未识别到文字内容，请手动输入或重新圈选区域');
+    }
   }
 
   private toggleTag(tagId: string): void {
@@ -571,30 +577,37 @@ struct CapturePage {
   }
 
   private async saveMistake(): Promise<void> {
-    const mistake = Mistake.create(
-      generateId(),
-      'stu_default',
-      this.imagePath,
-      this.questionText,
-      this.selectedSubject,
-      this.selectedTagIds.slice(),
-      this.answerType,
-      this.standardAnswer
-    );
-    mistake.isConfirmed = true;
-    mistake.errorType = this.selectedErrorType;
-    mistake.ocrConfidence = this.ocrResult.questionText.confidence;
-    await dbHelper.insertMistake(mistake);
+    try {
+      const mistake = Mistake.create(
+        generateId(),
+        'stu_default',
+        this.imagePath,
+        this.questionText,
+        this.selectedSubject,
+        this.selectedTagIds.slice(),
+        this.answerType,
+        this.standardAnswer
+      );
+      mistake.isConfirmed = true;
+      mistake.errorType = this.selectedErrorType;
+      mistake.ocrConfidence = this.ocrResult.questionText.confidence;
+      await dbHelper.insertMistake(mistake);
 
-    const pointsLog = PointsCalculator.createPointsLog(generateId(), mistake.studentId, PointsActionType.CAPTURE);
-    await dbHelper.insertPointsLog(pointsLog);
+      const pointsLog = PointsCalculator.createPointsLog(generateId(), mistake.studentId, PointsActionType.CAPTURE);
+      await dbHelper.insertPointsLog(pointsLog);
 
-    await KnowledgeProfileAggregator.recomputeForStudent(mistake.studentId);
-    AnalyticsTracker.trackCapture(mistake.studentId);
-    AnalyticsTracker.trackOcrConfirm(mistake.studentId, mistake.ocrConfidence,
-      CaptureOrchestrator.isLowConfidence(this.ocrResult.questionText));
+      await KnowledgeProfileAggregator.recomputeForStudent(mistake.studentId);
+      AnalyticsTracker.trackCapture(mistake.studentId);
+      AnalyticsTracker.trackOcrConfirm(mistake.studentId, mistake.ocrConfidence,
+        CaptureOrchestrator.isLowConfidence(this.ocrResult.questionText));
+      PerformanceMonitor.writeBehavior('capture_mistake', {
+        'subject': mistake.subject, 'answer_type': mistake.answerType
+      });
 
-    this.currentStep = 3;
+      this.currentStep = 3;
+    } catch (e) {
+      Toast.show('保存失败，请重试');
+    }
   }
 
   private resetFlow(): void {

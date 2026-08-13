@@ -2,6 +2,7 @@ import { dbHelper } from '../repository/DatabaseHelper';
 import { ReminderSettings } from '../models/ReminderSettings';
 import { ReminderService } from '../services/ReminderService';
 import { AppColors, AppSizes } from '../common/Constants';
+import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
 
 @Entry
@@ -213,8 +214,13 @@ struct ReminderSettingPage {
     s.scienceEnabled = this.scienceEnabled;
     s.doNotDisturb = this.doNotDisturb;
     s.notificationEnabled = this.notificationEnabled;
-    await dbHelper.saveReminderSettings(s);
-    await ReminderService.applySettings(s);
-    this.saved = true;
+    try {
+      await dbHelper.saveReminderSettings(s);
+      await ReminderService.applySettings(s);
+      this.saved = true;
+      Toast.show('提醒设置已保存');
+    } catch (e) {
+      Toast.show('保存失败，请重试');
+    }
   }
 }

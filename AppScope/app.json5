@@ -1,7 +1,7 @@
 {
   "app": {
     "bundleName": "com.tixing.me",
-    "vendor": "example",
+    "vendor": "TiXing",
     "versionCode": 1000000,
     "versionName": "1.0.0",
     "buildVersion": "1",

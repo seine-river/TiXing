@@ -7,6 +7,7 @@ import { MasteryEvaluator } from '../usecases/MasteryEvaluator';
 import { PointsCalculator } from '../usecases/PointsCalculator';
 import { MediaService } from '../services/MediaService';
 import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor, formatDate, generateId } from '../common/Constants';
+import { Toast } from '../common/Toast';
 import { StatusTag, SubjectTag, PageTitle, EmptyPlaceholder, PageHeader } from '../components/CommonComponents';
 import { MistakeDetailParams } from '../common/RouteParams';
 
@@ -217,14 +218,26 @@ struct MistakeDetailPage {
 
   private async saveNotes(): Promise<void> {
     this.mistake.notes = this.notesText;
-    await dbHelper.updateMistake(this.mistake);
+    try {
+      await dbHelper.updateMistake(this.mistake);
+      Toast.show('笔记已保存');
+    } catch (e) {
+      Toast.show('保存失败，请重试');
+    }
   }
 
   private async attachNotePhoto(): Promise<void> {
     const path = await MediaService.pickFromAlbum();
-    if (path !== undefined && path.length > 0) {
-      this.mistake.notesAttachmentUrl = path;
+    if (path === undefined || path.length === 0) {
+      Toast.show('未选取图片');
+      return;
+    }
+    this.mistake.notesAttachmentUrl = path;
+    try {
       await dbHelper.updateMistake(this.mistake);
+      Toast.show('已添加拍照笔记');
+    } catch (e) {
+      Toast.show('附件保存失败，请重试');
     }
   }
 }

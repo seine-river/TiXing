@@ -3,6 +3,7 @@ import { RedeemableItem, RedeemableCategory } from '../models/RedeemableItem';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { PreferenceService } from '../services/PreferenceService';
 import { AppColors, AppSizes, AppStrings } from '../common/Constants';
+import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
 
 @Entry
@@ -250,12 +251,18 @@ struct PointsCenterPage {
 
   private async redeem(item: RedeemableItem): Promise<void> {
     if (this.availablePoints() < item.cost) {
+      Toast.show('积分不足，无法兑换');
       return;
     }
-    await dbHelper.insertRedemption(this.studentId, item.id, item.cost);
-    this.spentTotal = await dbHelper.queryTotalSpent(this.studentId);
-    this.ownedIds = await dbHelper.queryRedeemedItemIds(this.studentId);
-    this.statusMsg = `✅ 兑换成功：${item.name}`;
+    try {
+      await dbHelper.insertRedemption(this.studentId, item.id, item.cost);
+      this.spentTotal = await dbHelper.queryTotalSpent(this.studentId);
+      this.ownedIds = await dbHelper.queryRedeemedItemIds(this.studentId);
+      this.statusMsg = `✅ 兑换成功：${item.name}`;
+      Toast.show(`兑换成功：${item.name}`);
+    } catch (e) {
+      Toast.show('兑换失败，请重试');
+    }
   }
 
   private categoryLabel(category: RedeemableCategory): string {

@@ -7,6 +7,7 @@ import { MasteryEvaluator } from '../usecases/MasteryEvaluator';
 import { PointsCalculator } from '../usecases/PointsCalculator';
 import { KnowledgeProfileAggregator } from '../usecases/KnowledgeProfileAggregator';
 import { AnalyticsTracker } from '../usecases/AnalyticsTracker';
+import { PerformanceMonitor } from '../services/PerformanceMonitor';
 import { AppColors, AppSizes, AppStrings, subjectLabel, generateId } from '../common/Constants';
 import { PageHeader } from '../components/CommonComponents';
 
@@ -414,6 +415,9 @@ struct ReviewPage {
     dbHelper.updateMistake(mistake);
 
     AnalyticsTracker.trackReviewSubmit(mistake.studentId, correct, inputMethod);
+    PerformanceMonitor.writeBehavior('review_submit', {
+      'correct': correct, 'input_method': inputMethod, 'duration': durationSeconds
+    });
 
     const existingLogs = dbHelper.queryReviewLogs(mistake.id);
     existingLogs.then((logs: ReviewLog[]) => {

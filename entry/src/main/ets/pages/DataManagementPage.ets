@@ -4,6 +4,7 @@ import { dbHelper } from '../repository/DatabaseHelper';
 import { DataPortabilityService, ImportPreview } from '../services/DataPortabilityService';
 import { KnowledgeProfileAggregator } from '../usecases/KnowledgeProfileAggregator';
 import { AppColors, AppSizes, subjectLabel, formatDate } from '../common/Constants';
+import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
 
 @Entry
@@ -133,8 +134,10 @@ struct DataManagementPage {
     try {
       const path = await DataPortabilityService.exportToJson('stu_default');
       this.statusMsg = `✅ 已导出到：${path}`;
+      Toast.show('导出成功');
     } catch (e) {
       this.statusMsg = '❌ 导出失败';
+      Toast.show('导出失败，请重试');
     }
     this.busy = false;
   }
@@ -145,19 +148,31 @@ struct DataManagementPage {
     this.busy = false;
     if (path === undefined) {
       this.statusMsg = '未选择文件';
+      Toast.show('未选择文件');
       return;
     }
     this.importPath = path;
     this.importPreview = DataPortabilityService.parsePreview(path);
-    this.statusMsg = `已解析 ${this.importPreview.mistakes.length} 道错题，请核对后确认导入`;
+    if (this.importPreview.mistakes.length === 0) {
+      this.statusMsg = '解析失败或文件为空';
+      Toast.show('解析失败，请确认是本应用的备份文件');
+    } else {
+      this.statusMsg = `已解析 ${this.importPreview.mistakes.length} 道错题，请核对后确认导入`;
+    }
   }
 
   private async doImport(): Promise<void> {
     this.busy = true;
-    const count = await DataPortabilityService.applyImport(this.importPreview);
-    await KnowledgeProfileAggregator.recomputeForStudent('stu_default');
-    this.statusMsg = `✅ 成功导入 ${count} 道错题`;
-    this.importPreview = new ImportPreview();
+    try {
+      const count = await DataPortabilityService.applyImport(this.importPreview);
+      await KnowledgeProfileAggregator.recomputeForStudent('stu_default');
+      this.statusMsg = `✅ 成功导入 ${count} 道错题`;
+      Toast.show(`成功导入 ${count} 道错题`);
+      this.importPreview = new ImportPreview();
+    } catch (e) {
+      this.statusMsg = '❌ 导入失败';
+      Toast.show('导入失败，请重试');
+    }
     this.busy = false;
   }
 }

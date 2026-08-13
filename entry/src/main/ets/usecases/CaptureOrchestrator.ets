@@ -3,14 +3,17 @@ import { textRecognition } from '@kit.CoreVisionKit';
 import { OcrFieldResult, OcrRecognitionResult, ImageQualityResult, ImageRegion } from '../models/Mistake';
 import { ImageQualityIssue, ContentType } from '../models/Enums';
 import { MediaService } from '../services/MediaService';
+import { PerformanceMonitor } from '../services/PerformanceMonitor';
 
 const CONFIDENCE_THRESHOLD: number = 0.85;
 const BLUR_VARIANCE_THRESHOLD: number = 100;
 
 export class CaptureOrchestrator {
   static async checkImageQuality(path: string): Promise<ImageQualityResult> {
+    const traceStart: number = PerformanceMonitor.startTrace('image_quality_check');
     const pixelMap = await MediaService.loadScaledPixelMap(path, 512);
     if (pixelMap === undefined) {
+      PerformanceMonitor.endTrace('image_quality_check', traceStart);
       return ImageQualityResult.ok();
     }
     try {
@@ -20,28 +23,37 @@ export class CaptureOrchestrator {
       const buffer = await MediaService.readRgbaBuffer(pixelMap, w, h);
       await pixelMap.release();
       if (buffer === undefined) {
+        PerformanceMonitor.endTrace('image_quality_check', traceStart);
         return ImageQualityResult.ok();
       }
       const variance: number = computeLaplacianVariance(buffer, w, h);
+      PerformanceMonitor.writeStatistic('image_quality', { 'variance': Math.round(variance) });
+      PerformanceMonitor.endTrace('image_quality_check', traceStart);
       if (variance < BLUR_VARIANCE_THRESHOLD) {
         return ImageQualityResult.fail(ImageQualityIssue.BLUR);
       }
       return ImageQualityResult.ok();
     } catch (e) {
+      PerformanceMonitor.writeFault('image_quality_error', { 'reason': 'exception' });
+      PerformanceMonitor.endTrace('image_quality_check', traceStart);
       return ImageQualityResult.ok();
     }
   }
 
   static async performOcr(path: string, region: ImageRegion | undefined): Promise<OcrRecognitionResult> {
     const result = new OcrRecognitionResult();
+    const traceStart: number = PerformanceMonitor.startTrace('ocr_recognize');
     const pixelMap = await MediaService.loadScaledPixelMap(path, 1280);
     if (pixelMap === undefined) {
+      PerformanceMonitor.endTrace('ocr_recognize', traceStart);
+      PerformanceMonitor.writeFault('ocr_no_pixelmap', { 'reason': 'decode_failed' });
       return result;
     }
     if (region !== undefined && region.width > 0 && region.height > 0) {
       try {
         await pixelMap.crop({ x: region.x, y: region.y, size: { width: region.width, height: region.height } });
       } catch (e) {
+        PerformanceMonitor.warn('pixelMap crop failed');
       }
     }
     try {
@@ -51,12 +63,15 @@ export class CaptureOrchestrator {
       const confidence: number = text.length > 0 ? 0.9 : 0;
       result.questionText = new OcrFieldResult(text, confidence, ContentType.PRINTED_TEXT);
       result.contentType = ContentType.PRINTED_TEXT;
+      PerformanceMonitor.writeStatistic('ocr_result', { 'length': text.length });
     } catch (e) {
+      PerformanceMonitor.writeFault('ocr_recognize_error', { 'reason': 'recognize_failed' });
     } finally {
       try {
         await pixelMap.release();
       } catch (e) {
       }
+      PerformanceMonitor.endTrace('ocr_recognize', traceStart);
     }
     return result;
   }

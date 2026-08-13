@@ -1,6 +1,6 @@
 {
   "modelVersion": "26.0.0",
-  "description": "Please describe the basic information.",
+  "description": "题醒 - 小学生智能错题记录与科学复习工具（HarmonyOS）",
   "dependencies": {
   },
   "devDependencies": {

@@ -2,6 +2,7 @@ import { Student } from '../models/Student';
 import { Grade, TextbookVersion } from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { AppColors, AppSizes, AppStrings } from '../common/Constants';
+import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
 
 @Entry
@@ -177,7 +178,12 @@ struct ProfileSettingPage {
   private async saveProfile(): Promise<void> {
     this.student.communityBrowseEnabled = this.communityBrowseEnabled;
     this.student.communityShareEnabled = this.communityShareEnabled;
-    await dbHelper.updateStudent(this.student);
-    this.getUIContext().getRouter().back();
+    try {
+      await dbHelper.updateStudent(this.student);
+      Toast.show('档案已保存');
+      this.getUIContext().getRouter().back();
+    } catch (e) {
+      Toast.show('保存失败，请重试');
+    }
   }
 }
