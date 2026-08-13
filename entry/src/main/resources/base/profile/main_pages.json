@@ -1,5 +1,12 @@
 {
   "src": [
-    "pages/Index"
+    "pages/Index",
+    "pages/MistakeDetailPage",
+    "pages/ReviewPage",
+    "pages/ProfileSettingPage",
+    "pages/ReminderSettingPage",
+    "pages/PointsCenterPage",
+    "pages/DataManagementPage",
+    "pages/OpsOverviewPage"
   ]
 }

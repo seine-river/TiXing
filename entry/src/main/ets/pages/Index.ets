@@ -1,23 +1,84 @@
+import { HomePage } from './HomePage';
+import { CapturePage } from './CapturePage';
+import { MistakesPage } from './MistakesPage';
+import { ReportPage } from './ReportPage';
+import { ProfilePage } from './ProfilePage';
+import { dbHelper } from '../repository/DatabaseHelper';
+import { AppColors, AppStrings } from '../common/Constants';
+import { AppContextHolder } from '../common/AppContext';
+import { ReminderService } from '../services/ReminderService';
+import { ReminderSettings } from '../models/ReminderSettings';
+
 @Entry
 @Component
 struct Index {
-  @State message: string = 'Hello World';
+  @State currentTab: number = 0;
+  @State dbInitialized: boolean = false;
+
+  aboutToAppear(): void {
+    if (!this.dbInitialized) {
+      const ctx = this.getUIContext().getHostContext() as Context;
+      AppContextHolder.set(ctx);
+      dbHelper.init(ctx).then(() => {
+        this.applyReminder();
+      });
+      this.dbInitialized = true;
+    }
+  }
+
+  private async applyReminder(): Promise<void> {
+    const s: ReminderSettings = await dbHelper.queryReminderSettings('stu_default');
+    await ReminderService.applySettings(s);
+  }
 
   build() {
-    RelativeContainer() {
-      Text(this.message)
-        .id('HelloWorld')
-        .fontSize($r('app.float.page_text_font_size'))
-        .fontWeight(FontWeight.Bold)
-        .alignRules({
-          center: { anchor: '__container__', align: VerticalAlign.Center },
-          middle: { anchor: '__container__', align: HorizontalAlign.Center }
-        })
-        .onClick(() => {
-          this.message = 'Welcome';
-        })
+    Tabs({ barPosition: BarPosition.End, index: this.currentTab }) {
+      TabContent() {
+        HomePage()
+      }
+      .tabBar(this.TabBuilder(0, '🏠', AppStrings.TAB_HOME))
+
+      TabContent() {
+        CapturePage()
+      }
+      .tabBar(this.TabBuilder(1, '📷', AppStrings.TAB_CAPTURE))
+
+      TabContent() {
+        MistakesPage()
+      }
+      .tabBar(this.TabBuilder(2, '📒', AppStrings.TAB_MISTAKES))
+
+      TabContent() {
+        ReportPage()
+      }
+      .tabBar(this.TabBuilder(3, '📊', AppStrings.TAB_REPORT))
+
+      TabContent() {
+        ProfilePage()
+      }
+      .tabBar(this.TabBuilder(4, '👤', AppStrings.TAB_PROFILE))
     }
-    .height('100%')
     .width('100%')
+    .height('100%')
+    .backgroundColor(AppColors.BG_PAGE)
+    .onChange((index: number) => {
+      this.currentTab = index;
+    })
+  }
+
+  @Builder
+  TabBuilder(index: number, icon: string, label: string) {
+    Column() {
+      Text(icon)
+        .fontSize(22)
+      Text(label)
+        .fontSize(11)
+        .fontColor(this.currentTab === index ? AppColors.PRIMARY : AppColors.TEXT_SECONDARY)
+        .margin({ top: 2 })
+    }
+    .width('100%')
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
   }
 }

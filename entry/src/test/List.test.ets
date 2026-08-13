@@ -1,5 +1,5 @@
-import localUnitTest from './LocalUnit.test';
+import coreAlgorithmTest from './LocalUnit.test';
 
 export default function testsuite() {
-  localUnitTest();
+  coreAlgorithmTest();
 }

@@ -2,7 +2,15 @@
   "color": [
     {
       "name": "start_window_background",
-      "value": "#FFFFFF"
+      "value": "#F5F7FA"
+    },
+    {
+      "name": "primary",
+      "value": "#4A90D9"
+    },
+    {
+      "name": "text_primary",
+      "value": "#303133"
     }
   ]
 }

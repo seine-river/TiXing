@@ -2,15 +2,27 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "module description"
+      "value": "题醒 - 智能错题记录与科学复习工具"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "题醒主界面"
     },
     {
       "name": "EntryAbility_label",
-      "value": "label"
+      "value": "题醒"
+    },
+    {
+      "name": "app_name",
+      "value": "题醒"
+    },
+    {
+      "name": "reason_reminder",
+      "value": "用于在设定时间推送复习提醒通知"
+    },
+    {
+      "name": "reason_media",
+      "value": "用于拍照或从相册选取错题图片"
     }
   ]
 }
