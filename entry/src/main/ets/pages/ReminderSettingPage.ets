@@ -2,6 +2,7 @@ import { dbHelper } from '../repository/DatabaseHelper';
 import { ReminderSettings } from '../models/ReminderSettings';
 import { ReminderService } from '../services/ReminderService';
 import { AppColors, AppSizes } from '../common/Constants';
+import { PageHeader } from '../components/CommonComponents';
 
 @Entry
 @Component
@@ -36,16 +37,11 @@ struct ReminderSettingPage {
   }
 
   build() {
-    Scroll() {
-      Column() {
-        Text('复习提醒设置')
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.TEXT_PRIMARY)
-          .width('100%')
-          .padding({ left: 16, top: 12, bottom: 8 })
-
+    Column() {
+      PageHeader({ title: '复习提醒设置' })
+      Scroll() {
         Column() {
+          Column() {
           Row() {
             Text('开启复习提醒')
               .fontSize(15)
@@ -181,13 +177,15 @@ struct ReminderSettingPage {
           .onClick(() => {
             this.saveSettings();
           })
+        }
+        .width('100%')
       }
-      .width('100%')
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
     }
     .width('100%')
     .height('100%')
     .backgroundColor(AppColors.BG_PAGE)
-    .scrollBar(BarState.Auto)
   }
 
   @Builder

@@ -7,7 +7,7 @@ import { MasteryEvaluator } from '../usecases/MasteryEvaluator';
 import { PointsCalculator } from '../usecases/PointsCalculator';
 import { MediaService } from '../services/MediaService';
 import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor, formatDate, generateId } from '../common/Constants';
-import { StatusTag, SubjectTag, PageTitle, EmptyPlaceholder } from '../components/CommonComponents';
+import { StatusTag, SubjectTag, PageTitle, EmptyPlaceholder, PageHeader } from '../components/CommonComponents';
 import { MistakeDetailParams } from '../common/RouteParams';
 
 @Entry
@@ -38,16 +38,18 @@ struct MistakeDetailPage {
   }
 
   build() {
-    Scroll() {
-      Column() {
-        Row({ space: 6 }) {
-          SubjectTag({ subjectText: subjectLabel(this.mistake.subject), subjectColor: AppColors.PRIMARY })
-          StatusTag({ statusText: statusLabel(this.mistake.status), statusColor: statusColor(this.mistake.status) })
-          Text(formatDate(this.mistake.createdAt))
-            .fontSize(12)
-            .fontColor(AppColors.TEXT_SECONDARY)
-        }
-        .padding({ left: 16, right: 16, top: 12 })
+    Column() {
+      PageHeader({ title: '错题详情' })
+      Scroll() {
+        Column() {
+          Row({ space: 6 }) {
+            SubjectTag({ subjectText: subjectLabel(this.mistake.subject), subjectColor: AppColors.PRIMARY })
+            StatusTag({ statusText: statusLabel(this.mistake.status), statusColor: statusColor(this.mistake.status) })
+            Text(formatDate(this.mistake.createdAt))
+              .fontSize(12)
+              .fontColor(AppColors.TEXT_SECONDARY)
+          }
+          .padding({ left: 16, right: 16, top: 4 })
 
         Column() {
           Text('题目内容')
@@ -201,11 +203,16 @@ struct MistakeDetailPage {
           .onClick(() => {
             this.saveNotes();
           })
+        }
+        .width('100%')
       }
-      .width('100%')
+      .layoutWeight(1)
+      .backgroundColor(AppColors.BG_PAGE)
+      .scrollBar(BarState.Auto)
     }
+    .width('100%')
+    .height('100%')
     .backgroundColor(AppColors.BG_PAGE)
-    .scrollBar(BarState.Auto)
   }
 
   private async saveNotes(): Promise<void> {

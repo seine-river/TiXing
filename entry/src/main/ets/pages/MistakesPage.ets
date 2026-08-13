@@ -27,15 +27,6 @@ export struct MistakesPage {
 
   build() {
     Column() {
-      Row() {
-        Text('错题本')
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.TEXT_PRIMARY)
-          .padding({ left: 16, top: 12, bottom: 8 })
-      }
-      .width('100%')
-
       Scroll() {
         Row({ space: 8 }) {
           Button('全部')

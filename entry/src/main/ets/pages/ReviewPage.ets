@@ -8,7 +8,7 @@ import { PointsCalculator } from '../usecases/PointsCalculator';
 import { KnowledgeProfileAggregator } from '../usecases/KnowledgeProfileAggregator';
 import { AnalyticsTracker } from '../usecases/AnalyticsTracker';
 import { AppColors, AppSizes, AppStrings, subjectLabel, generateId } from '../common/Constants';
-import { PageTitle, EmptyPlaceholder } from '../components/CommonComponents';
+import { PageHeader } from '../components/CommonComponents';
 
 @Entry
 @Component
@@ -41,12 +41,26 @@ struct ReviewPage {
     Column() {
       if (this.isFinished) {
         this.SummaryView()
-      } else if (this.reviewList.length === 0) {
-        EmptyPlaceholder({ message: AppStrings.NO_REVIEW_TODAY })
-      } else if (this.currentIndex < this.reviewList.length) {
-        this.ReviewQuestionView()
       } else {
-        this.SummaryView()
+        PageHeader({ title: '复习错题' })
+        if (this.reviewList.length === 0) {
+          Column() {
+            Text('📭')
+              .fontSize(48)
+              .margin({ bottom: 12 })
+            Text(AppStrings.NO_REVIEW_TODAY)
+              .fontSize(16)
+              .fontColor('#909399')
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .justifyContent(FlexAlign.Center)
+          .alignItems(HorizontalAlign.Center)
+        } else if (this.currentIndex < this.reviewList.length) {
+          this.ReviewQuestionView()
+        } else {
+          this.SummaryView()
+        }
       }
     }
     .width('100%')
@@ -89,7 +103,7 @@ struct ReviewPage {
       }
     }
     .width('100%')
-    .height('100%')
+    .layoutWeight(1)
   }
 
   @Builder

@@ -5,6 +5,7 @@ import { MistakeStatus, AnswerType, GradingMethod, InputMethod, Subject, ErrorTy
 import { ReviewScheduler } from '../main/ets/usecases/ReviewScheduler';
 import { MasteryEvaluator } from '../main/ets/usecases/MasteryEvaluator';
 import { PointsCalculator } from '../main/ets/usecases/PointsCalculator';
+import { SubjectDetector } from '../main/ets/usecases/SubjectDetector';
 
 export default function coreAlgorithmTest() {
   describe('ReviewScheduler', () => {
@@ -131,6 +132,21 @@ export default function coreAlgorithmTest() {
     it('Mistake_default_status_is_unmastered', 0, () => {
       const m = new Mistake();
       expect(m.status).assertEqual(MistakeStatus.UNMASTERED);
+    });
+  });
+
+  describe('SubjectDetector', () => {
+    it('detect_math_for_formula', 0, () => {
+      expect(SubjectDetector.detect('计算：3/8 + 1/4 = ?')).assertEqual(Subject.MATH);
+    });
+    it('detect_math_for_pure_numbers', 0, () => {
+      expect(SubjectDetector.detect('25 + 17 = 42')).assertEqual(Subject.MATH);
+    });
+    it('detect_chinese_for_reading', 0, () => {
+      expect(SubjectDetector.detect('阅读下面短文，回答问题')).assertEqual(Subject.CHINESE);
+    });
+    it('detect_english_for_latin', 0, () => {
+      expect(SubjectDetector.detect('Choose the correct answer')).assertEqual(Subject.ENGLISH);
     });
   });
 }

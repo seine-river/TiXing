@@ -3,12 +3,13 @@ import { Subject, AnswerType, ErrorType, ContentType, Grade, ImageQualityIssue, 
 import { KnowledgeTag } from '../models/KnowledgeTag';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { CaptureOrchestrator } from '../usecases/CaptureOrchestrator';
+import { SubjectDetector } from '../usecases/SubjectDetector';
 import { KnowledgeProfileAggregator } from '../usecases/KnowledgeProfileAggregator';
 import { AnalyticsTracker } from '../usecases/AnalyticsTracker';
 import { PointsCalculator } from '../usecases/PointsCalculator';
 import { MediaService } from '../services/MediaService';
 import { AppColors, AppSizes, AppStrings, subjectLabel, generateId } from '../common/Constants';
-import { PageTitle } from '../components/CommonComponents';
+import { PageHeader } from '../components/CommonComponents';
 
 class AnswerTypeOption {
   type: AnswerType = AnswerType.TEXT;
@@ -20,8 +21,9 @@ class ErrorTypeOption {
   label: string = '';
 }
 
+@Entry
 @Component
-export struct CapturePage {
+struct CapturePage {
   @State currentStep: number = 0;
   @State selectedSubject: Subject = Subject.MATH;
   @State ocrResult: OcrRecognitionResult = new OcrRecognitionResult();
@@ -67,7 +69,7 @@ export struct CapturePage {
 
   build() {
     Column() {
-      PageTitle({ title: '录入错题' })
+      PageHeader({ title: '录入错题' })
 
       if (this.currentStep === 0) {
         this.StepSourceSelect()
@@ -88,33 +90,11 @@ export struct CapturePage {
   StepSourceSelect() {
     Scroll() {
       Column() {
-        Column() {
-          Text('选择学科')
-            .fontSize(16)
-            .fontColor(AppColors.TEXT_PRIMARY)
-            .margin({ bottom: 12 })
-          Row() {
-            ForEach([Subject.MATH, Subject.CHINESE, Subject.ENGLISH], (sub: Subject) => {
-              Button(subjectLabel(sub))
-                .backgroundColor(this.selectedSubject === sub ? AppColors.PRIMARY : '#E8EAED')
-                .fontColor(this.selectedSubject === sub ? Color.White : AppColors.TEXT_REGULAR)
-                .borderRadius(20)
-                .height(36)
-                .layoutWeight(1)
-                .margin({ left: 4, right: 4 })
-                .onClick(() => {
-                  this.selectedSubject = sub;
-                  this.loadTags();
-                })
-            }, (sub: Subject) => sub)
-          }
+        Text('选择图片来源，系统将自动识别题目并判断学科')
+          .fontSize(14)
+          .fontColor(AppColors.TEXT_SECONDARY)
           .width('100%')
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS)
-        .margin({ left: 16, right: 16, top: 16 })
+          .padding({ left: 16, right: 16, top: 12 })
 
         Column() {
           Button({ type: ButtonType.Normal }) {
@@ -283,6 +263,42 @@ export struct CapturePage {
           .fontWeight(FontWeight.Medium)
           .fontColor(AppColors.TEXT_PRIMARY)
           .padding({ left: 16, right: 16, bottom: 12 })
+
+        Column() {
+          Row() {
+            Text('识别学科（自动）')
+              .fontSize(14)
+              .fontColor(AppColors.TEXT_SECONDARY)
+              .layoutWeight(1)
+            Text('识别有误可点击修改')
+              .fontSize(11)
+              .fontColor(AppColors.TEXT_PLACEHOLDER)
+          }
+          .width('100%')
+          .margin({ bottom: 8 })
+          Row() {
+            ForEach([Subject.MATH, Subject.CHINESE, Subject.ENGLISH], (sub: Subject) => {
+              Button(subjectLabel(sub))
+                .backgroundColor(this.selectedSubject === sub ? AppColors.PRIMARY : '#E8EAED')
+                .fontColor(this.selectedSubject === sub ? Color.White : AppColors.TEXT_REGULAR)
+                .borderRadius(16)
+                .height(32)
+                .fontSize(13)
+                .margin({ left: 2, right: 2 })
+                .layoutWeight(1)
+                .onClick(() => {
+                  this.selectedSubject = sub;
+                  this.loadTags();
+                })
+            }, (sub: Subject) => sub)
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor(AppColors.BG_CARD)
+        .borderRadius(AppSizes.CORNER_RADIUS_SM)
+        .margin({ left: 16, right: 16, top: 8 })
 
         this.OcrFieldCard('题目内容', this.questionText, this.ocrResult.questionText, (v: string) => {
           this.questionText = v;
@@ -495,7 +511,6 @@ export struct CapturePage {
       this.currentStep = 1;
     }
     await this.loadImageSize();
-    await this.loadTags();
   }
 
   private async loadImageSize(): Promise<void> {
@@ -531,6 +546,8 @@ export struct CapturePage {
     this.ocrResult = result;
     this.questionText = result.questionText.text;
     this.standardAnswer = result.standardAnswerCandidate.text;
+    this.selectedSubject = SubjectDetector.detect(this.questionText);
+    await this.loadTags();
     this.ocrBusy = false;
     this.currentStep = 2;
   }

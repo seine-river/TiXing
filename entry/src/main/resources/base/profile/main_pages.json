@@ -1,6 +1,7 @@
 {
   "src": [
     "pages/Index",
+    "pages/CapturePage",
     "pages/MistakeDetailPage",
     "pages/ReviewPage",
     "pages/ProfileSettingPage",

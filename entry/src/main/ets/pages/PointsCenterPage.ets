@@ -3,6 +3,7 @@ import { RedeemableItem, RedeemableCategory } from '../models/RedeemableItem';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { PreferenceService } from '../services/PreferenceService';
 import { AppColors, AppSizes, AppStrings } from '../common/Constants';
+import { PageHeader } from '../components/CommonComponents';
 
 @Entry
 @Component
@@ -37,18 +38,13 @@ struct PointsCenterPage {
   }
 
   build() {
-    Scroll() {
-      Column() {
-        Text(AppStrings.POINTS_CENTER)
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.TEXT_PRIMARY)
-          .width('100%')
-          .padding({ left: 16, top: 12, bottom: 8 })
-
+    Column() {
+      PageHeader({ title: AppStrings.POINTS_CENTER })
+      Scroll() {
         Column() {
-          Text(`${this.availablePoints()}`)
-            .fontSize(48)
+          Column() {
+            Text(`${this.availablePoints()}`)
+              .fontSize(48)
             .fontWeight(FontWeight.Bold)
             .fontColor(AppColors.WARNING)
           Text('可用积分')
@@ -221,13 +217,15 @@ struct PointsCenterPage {
           .fontSize(12)
           .fontColor(AppColors.TEXT_PLACEHOLDER)
           .margin({ top: 12, bottom: 24 })
+        }
+        .width('100%')
       }
-      .width('100%')
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
     }
     .width('100%')
     .height('100%')
     .backgroundColor(AppColors.BG_PAGE)
-    .scrollBar(BarState.Auto)
   }
 
   private buildRedeemItems(): RedeemableItem[] {

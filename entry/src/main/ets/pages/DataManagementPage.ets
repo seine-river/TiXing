@@ -4,6 +4,7 @@ import { dbHelper } from '../repository/DatabaseHelper';
 import { DataPortabilityService, ImportPreview } from '../services/DataPortabilityService';
 import { KnowledgeProfileAggregator } from '../usecases/KnowledgeProfileAggregator';
 import { AppColors, AppSizes, subjectLabel, formatDate } from '../common/Constants';
+import { PageHeader } from '../components/CommonComponents';
 
 @Entry
 @Component
@@ -14,19 +15,14 @@ struct DataManagementPage {
   @State busy: boolean = false;
 
   build() {
-    Scroll() {
-      Column() {
-        Text('数据管理')
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.TEXT_PRIMARY)
-          .width('100%')
-          .padding({ left: 16, top: 12, bottom: 8 })
-
+    Column() {
+      PageHeader({ title: '导出与导入' })
+      Scroll() {
         Column() {
-          Text('导出数据')
-            .fontSize(16)
-            .fontWeight(FontWeight.Medium)
+          Column() {
+            Text('导出数据')
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
             .fontColor(AppColors.TEXT_PRIMARY)
             .width('100%')
             .margin({ bottom: 8 })
@@ -121,13 +117,15 @@ struct DataManagementPage {
             .fontColor(AppColors.SECONDARY)
             .padding({ left: 16, right: 16, top: 16 })
         }
+        }
+        .width('100%')
       }
-      .width('100%')
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
     }
     .width('100%')
     .height('100%')
     .backgroundColor(AppColors.BG_PAGE)
-    .scrollBar(BarState.Auto)
   }
 
   private async doExport(): Promise<void> {

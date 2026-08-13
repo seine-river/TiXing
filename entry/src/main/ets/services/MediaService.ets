@@ -36,7 +36,7 @@ export class MediaService {
       }
       return MediaService.persistUri(result.resultUri);
     } catch (e) {
-      return MediaService.pickFromAlbum();
+      return undefined;
     }
   }
 

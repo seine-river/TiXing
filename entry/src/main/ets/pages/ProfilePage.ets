@@ -33,13 +33,6 @@ export struct ProfilePage {
   build() {
     Scroll() {
       Column() {
-        Text('我的')
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.TEXT_PRIMARY)
-          .width('100%')
-          .padding({ left: 16, top: 12, bottom: 8 })
-
         this.UserInfoCard()
 
         Column() {
@@ -52,10 +45,7 @@ export struct ProfilePage {
           this.MenuItem('💰 ' + AppStrings.POINTS_CENTER, () => {
             this.getUIContext().getRouter().pushUrl({ url: 'pages/PointsCenterPage' });
           })
-          this.MenuItem('📤 ' + AppStrings.EXPORT_DATA, () => {
-            this.getUIContext().getRouter().pushUrl({ url: 'pages/DataManagementPage' });
-          })
-          this.MenuItem('📥 ' + AppStrings.IMPORT_DATA, () => {
+          this.MenuItem('🔄 导出与导入', () => {
             this.getUIContext().getRouter().pushUrl({ url: 'pages/DataManagementPage' });
           })
           this.MenuItem('👨‍👩‍👧 ' + AppStrings.PARENT_CENTER, () => {

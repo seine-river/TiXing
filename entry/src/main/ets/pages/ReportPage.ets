@@ -62,13 +62,6 @@ export struct ReportPage {
   build() {
     Scroll() {
       Column() {
-        Text('学习报告')
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.TEXT_PRIMARY)
-          .width('100%')
-          .padding({ left: 16, top: 12, bottom: 8 })
-
         this.OverviewSection()
         this.SubjectSection()
         this.WeakPointsSection()

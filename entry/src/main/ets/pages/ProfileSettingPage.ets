@@ -2,6 +2,7 @@ import { Student } from '../models/Student';
 import { Grade, TextbookVersion } from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { AppColors, AppSizes, AppStrings } from '../common/Constants';
+import { PageHeader } from '../components/CommonComponents';
 
 @Entry
 @Component
@@ -37,12 +38,7 @@ struct ProfileSettingPage {
   build() {
     Scroll() {
       Column() {
-        Text(AppStrings.LEARNING_PROFILE)
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.TEXT_PRIMARY)
-          .width('100%')
-          .padding({ left: 16, top: 12, bottom: 8 })
+        PageHeader({ title: AppStrings.LEARNING_PROFILE })
 
         Column() {
           Text('昵称')

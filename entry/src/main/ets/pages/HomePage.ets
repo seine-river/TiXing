@@ -92,6 +92,19 @@ export struct HomePage {
         .margin({ left: 16, right: 16, top: 8 })
         .shadow({ radius: 4, color: '#1A000000', offsetY: 2 })
 
+        Button('📷 录入错题')
+          .width('100%')
+          .height(48)
+          .backgroundColor(AppColors.PRIMARY)
+          .fontColor(Color.White)
+          .fontSize(17)
+          .fontWeight(FontWeight.Medium)
+          .borderRadius(AppSizes.CORNER_RADIUS)
+          .margin({ left: 16, right: 16, top: 12 })
+          .onClick(() => {
+            this.getUIContext().getRouter().pushUrl({ url: 'pages/CapturePage' });
+          })
+
         Row() {
           Column() {
             Text(`${this.totalMistakes}`)

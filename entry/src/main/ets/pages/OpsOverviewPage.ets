@@ -3,6 +3,7 @@ import { Mistake } from '../models/Mistake';
 import { MistakeStatus } from '../models/Enums';
 import { MetricSummary } from '../models/AnalyticsEvent';
 import { AppColors, AppSizes, subjectLabel } from '../common/Constants';
+import { PageHeader } from '../components/CommonComponents';
 
 @Entry
 @Component
@@ -27,19 +28,15 @@ struct OpsOverviewPage {
   }
 
   build() {
-    Scroll() {
-      Column() {
-        Text('运营指标概览')
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.TEXT_PRIMARY)
-          .width('100%')
-          .padding({ left: 16, top: 12, bottom: 4 })
-        Text('本地聚合统计（脱敏），对应 FR-OPS 基础运营看板')
-          .fontSize(12)
-          .fontColor(AppColors.TEXT_PLACEHOLDER)
-          .width('100%')
-          .padding({ left: 16, bottom: 8 })
+    Column() {
+      PageHeader({ title: '运营指标概览' })
+      Scroll() {
+        Column() {
+          Text('本地聚合统计（脱敏），对应 FR-OPS 基础运营看板')
+            .fontSize(12)
+            .fontColor(AppColors.TEXT_PLACEHOLDER)
+            .width('100%')
+            .padding({ left: 16, bottom: 8 })
 
         Column() {
           Text('功能使用')
@@ -82,13 +79,15 @@ struct OpsOverviewPage {
           .fontSize(12)
           .fontColor(AppColors.TEXT_PLACEHOLDER)
           .padding({ left: 16, right: 16, top: 16, bottom: 24 })
+        }
+        .width('100%')
       }
-      .width('100%')
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
     }
     .width('100%')
     .height('100%')
     .backgroundColor(AppColors.BG_PAGE)
-    .scrollBar(BarState.Auto)
   }
 
   @Builder

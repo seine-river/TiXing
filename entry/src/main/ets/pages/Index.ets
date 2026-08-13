@@ -1,5 +1,4 @@
 import { HomePage } from './HomePage';
-import { CapturePage } from './CapturePage';
 import { MistakesPage } from './MistakesPage';
 import { ReportPage } from './ReportPage';
 import { ProfilePage } from './ProfilePage';
@@ -39,24 +38,19 @@ struct Index {
       .tabBar(this.TabBuilder(0, '🏠', AppStrings.TAB_HOME))
 
       TabContent() {
-        CapturePage()
-      }
-      .tabBar(this.TabBuilder(1, '📷', AppStrings.TAB_CAPTURE))
-
-      TabContent() {
         MistakesPage()
       }
-      .tabBar(this.TabBuilder(2, '📒', AppStrings.TAB_MISTAKES))
+      .tabBar(this.TabBuilder(1, '📒', AppStrings.TAB_MISTAKES))
 
       TabContent() {
         ReportPage()
       }
-      .tabBar(this.TabBuilder(3, '📊', AppStrings.TAB_REPORT))
+      .tabBar(this.TabBuilder(2, '📊', AppStrings.TAB_REPORT))
 
       TabContent() {
         ProfilePage()
       }
-      .tabBar(this.TabBuilder(4, '👤', AppStrings.TAB_PROFILE))
+      .tabBar(this.TabBuilder(3, '👤', AppStrings.TAB_PROFILE))
     }
     .width('100%')
     .height('100%')
