@@ -68,8 +68,8 @@ export class AiQuestionResult {
 }
 
 export class AiService {
-  static async recognizeImage(imagePath: string): Promise<string> {
-    const base64: string | undefined = await MediaService.readImageBase64(imagePath, 1024);
+  static async recognizeImage(imagePath: string, fracs: CropFracs | undefined): Promise<string> {
+    const base64: string | undefined = await MediaService.readRegionBase64(imagePath, fracs, 1280);
     if (base64 === undefined || base64.length === 0) {
       throw new Error('图片读取失败');
     }

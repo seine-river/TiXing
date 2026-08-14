@@ -38,9 +38,17 @@ struct CapturePage {
   @State capturing: boolean = false;
 
   @State compareResult: string = '';
-  @State fieldOcrBusy: string = '';
   @State knowledgeBusy: boolean = false;
   @State compareBusy: boolean = false;
+
+  @State stdImage: string = '';
+  @State myImage: string = '';
+  @State regionTarget: string = 'question';
+  @State regionImagePath: string = '';
+  @State stdAnalyzing: boolean = false;
+  @State myAnalyzing: boolean = false;
+  private stdFracs: CropFracs = new CropFracs(0.05, 0.05, 0.95, 0.95);
+  private myFracs: CropFracs = new CropFracs(0.05, 0.05, 0.95, 0.95);
 
   @State answerTypeOptions: AnswerTypeOption[] = [];
   @State errorTypeOptions: ErrorTypeOption[] = [];
@@ -173,14 +181,14 @@ struct CapturePage {
   @Builder
   StepRegionSelect() {
     Column() {
-      Text('拖动四角调整识别区域，或直接识别全图')
+      Text(this.regionTarget === 'question' ? '拖动四角调整题目识别区域' : '拖动四角框选答案区域')
         .fontSize(14)
         .fontColor(AppColors.TEXT_SECONDARY)
         .width('100%')
         .padding({ left: 16, top: 12, bottom: 8 })
 
       Stack() {
-        Image(toFileUri(this.imagePath))
+        Image(toFileUri(this.regionImagePath))
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Contain)
@@ -259,23 +267,24 @@ struct CapturePage {
       })
 
       Row() {
-        Button('识别全图')
+        Button(this.regionTarget === 'question' ? '识别全图' : '使用全图')
           .height(40)
           .backgroundColor(AppColors.BG_CARD)
           .fontColor(AppColors.PRIMARY)
           .borderRadius(20)
           .margin({ right: 12 })
+          .enabled(this.regionTarget !== 'question' || !this.ocrBusy)
           .onClick(() => {
-            this.runOcr(undefined);
+            this.onRegionConfirm(undefined);
           })
-        Button('识别此区域')
+        Button(this.regionTarget === 'question' ? '识别此区域' : '确认区域')
           .height(40)
           .backgroundColor(this.ocrBusy ? '#C0C4CC' : AppColors.PRIMARY)
           .fontColor(Color.White)
           .borderRadius(20)
-          .enabled(!this.ocrBusy)
+          .enabled(this.regionTarget !== 'question' || !this.ocrBusy)
           .onClick(() => {
-            this.runOcr(this.currentFracs());
+            this.onRegionConfirm(this.currentFracs());
           })
       }
       .width('100%')
@@ -291,6 +300,57 @@ struct CapturePage {
     }
     .width('100%')
     .height('100%')
+  }
+
+  private async onRegionConfirm(fracs: CropFracs | undefined): Promise<void> {
+    if (this.regionTarget === 'question') {
+      this.runOcr(fracs);
+      return;
+    }
+    if (this.regionTarget === 'standard') {
+      this.stdFracs = fracs !== undefined ? fracs : new CropFracs(0, 0, 1, 1);
+    } else if (this.regionTarget === 'mine') {
+      this.myFracs = fracs !== undefined ? fracs : new CropFracs(0, 0, 1, 1);
+    }
+    this.currentStep = 2;
+  }
+
+  private async enterRegion(target: string): Promise<void> {
+    this.regionTarget = target;
+    if (target === 'question') {
+      this.regionImagePath = this.imagePath;
+      this.cropLeftFrac = 0.08;
+      this.cropTopFrac = 0.08;
+      this.cropRightFrac = 0.92;
+      this.cropBottomFrac = 0.92;
+    } else if (target === 'standard') {
+      this.regionImagePath = this.stdImage;
+      this.cropLeftFrac = this.stdFracs.leftFrac;
+      this.cropTopFrac = this.stdFracs.topFrac;
+      this.cropRightFrac = this.stdFracs.rightFrac;
+      this.cropBottomFrac = this.stdFracs.bottomFrac;
+    } else {
+      this.regionImagePath = this.myImage;
+      this.cropLeftFrac = this.myFracs.leftFrac;
+      this.cropTopFrac = this.myFracs.topFrac;
+      this.cropRightFrac = this.myFracs.rightFrac;
+      this.cropBottomFrac = this.myFracs.bottomFrac;
+    }
+    await this.loadRegionImageSize();
+    this.currentStep = 1;
+  }
+
+  private async loadRegionImageSize(): Promise<void> {
+    const pm = await MediaService.loadScaledPixelMap(this.regionImagePath, 1280);
+    if (pm !== undefined) {
+      try {
+        const info = await pm.getImageInfo();
+        this.imgNatW = info.size.width;
+        this.imgNatH = info.size.height;
+        await pm.release();
+      } catch (e) {
+      }
+    }
   }
 
   private imageAspectRatio(): number {
@@ -517,16 +577,16 @@ struct CapturePage {
           .fontSize(14)
           .fontColor(AppColors.TEXT_SECONDARY)
           .layoutWeight(1)
-        if (this.fieldOcrBusy === target) {
-          Text('识别中...')
+        if ((target === 'standard' && this.stdAnalyzing) || (target === 'mine' && this.myAnalyzing)) {
+          Text('AI 分析中...')
             .fontSize(11)
-            .fontColor(AppColors.TEXT_PLACEHOLDER)
+            .fontColor(AppColors.WARNING)
         }
       }
       .width('100%')
       .margin({ bottom: 4 })
 
-      TextInput({ text: value, placeholder: `输入${label}，或点击右侧拍照识别` })
+      TextArea({ text: value, placeholder: `输入${label}，或选图后智能分析` })
         .fontSize(16)
         .borderRadius(AppSizes.CORNER_RADIUS_SM)
         .backgroundColor(AppColors.BG_PAGE)
@@ -538,26 +598,61 @@ struct CapturePage {
           }
         })
 
+      if (this.answerImageOf(target).length > 0) {
+        Row() {
+          Image(toFileUri(this.answerImageOf(target)))
+            .width(72)
+            .height(72)
+            .borderRadius(AppSizes.CORNER_RADIUS_XS)
+            .objectFit(ImageFit.Cover)
+            .margin({ right: 8 })
+
+          Column({ space: 8 }) {
+            Button('✂️ 框选区域')
+              .height(32)
+              .fontSize(12)
+              .backgroundColor('#E8EAED')
+              .fontColor(AppColors.TEXT_REGULAR)
+              .borderRadius(16)
+              .onClick(() => {
+                this.enterRegion(target);
+              })
+            Button('🔍 智能分析')
+              .height(32)
+              .fontSize(12)
+              .backgroundColor(AppColors.PRIMARY)
+              .fontColor(Color.White)
+              .borderRadius(16)
+              .enabled(!this.answerAnalyzing(target))
+              .onClick(() => {
+                this.analyzeAnswer(target);
+              })
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+        }
+        .width('100%')
+        .margin({ top: 8 })
+      }
+
       Row({ space: 8 }) {
-        Button('📷 拍照识别')
+        Button('📷 拍照')
           .height(32)
           .fontSize(12)
           .backgroundColor('#E8EAED')
           .fontColor(AppColors.TEXT_REGULAR)
           .borderRadius(16)
-          .enabled(this.fieldOcrBusy.length === 0)
           .onClick(() => {
-            this.ocrForField(target, true);
+            this.pickAnswerImage(target, true);
           })
-        Button('🖼️ 相册选取')
+        Button('🖼️ 相册')
           .height(32)
           .fontSize(12)
           .backgroundColor('#E8EAED')
           .fontColor(AppColors.TEXT_REGULAR)
           .borderRadius(16)
-          .enabled(this.fieldOcrBusy.length === 0)
           .onClick(() => {
-            this.ocrForField(target, false);
+            this.pickAnswerImage(target, false);
           })
       }
       .width('100%')
@@ -568,6 +663,68 @@ struct CapturePage {
     .backgroundColor(AppColors.BG_CARD)
     .borderRadius(AppSizes.CORNER_RADIUS_SM)
     .margin({ left: 16, right: 16, top: 8 })
+  }
+
+  private answerImageOf(target: string): string {
+    if (target === 'standard') {
+      return this.stdImage;
+    }
+    return this.myImage;
+  }
+
+  private answerAnalyzing(target: string): boolean {
+    if (target === 'standard') {
+      return this.stdAnalyzing;
+    }
+    return this.myAnalyzing;
+  }
+
+  private async pickAnswerImage(target: string, fromCamera: boolean): Promise<void> {
+    const path = fromCamera ? await MediaService.capturePhoto() : await MediaService.pickFromAlbum();
+    if (path === undefined || path.length === 0) {
+      Toast.show('未获取到图片，请重试');
+      return;
+    }
+    if (target === 'standard') {
+      this.stdImage = path;
+      this.stdFracs = new CropFracs(0.05, 0.05, 0.95, 0.95);
+    } else {
+      this.myImage = path;
+      this.myFracs = new CropFracs(0.05, 0.05, 0.95, 0.95);
+    }
+    await this.enterRegion(target);
+  }
+
+  private async analyzeAnswer(target: string): Promise<void> {
+    const img: string = this.answerImageOf(target);
+    if (img.length === 0) {
+      Toast.show('请先选择图片');
+      return;
+    }
+    if (target === 'standard') {
+      this.stdAnalyzing = true;
+    } else {
+      this.myAnalyzing = true;
+    }
+    try {
+      const fracs: CropFracs = target === 'standard' ? this.stdFracs : this.myFracs;
+      const text: string = await AiService.recognizeImage(img, fracs);
+      const cleaned: string = text.trim();
+      if (cleaned.length === 0) {
+        Toast.show('未识别到文字，请手动输入');
+      } else if (target === 'standard') {
+        this.standardAnswer = this.standardAnswer.length > 0 ? this.standardAnswer + ' ' + cleaned : cleaned;
+      } else {
+        this.studentAnswer = this.studentAnswer.length > 0 ? this.studentAnswer + ' ' + cleaned : cleaned;
+      }
+    } catch (e) {
+      Toast.show('AI 分析失败，请检查网络');
+    }
+    if (target === 'standard') {
+      this.stdAnalyzing = false;
+    } else {
+      this.myAnalyzing = false;
+    }
   }
 
   @Builder
@@ -587,7 +744,7 @@ struct CapturePage {
       .width('100%')
       .margin({ bottom: 4 })
 
-      TextInput({ text: value, placeholder: `请核对${label}` })
+      TextArea({ text: value, placeholder: `请核对${label}` })
         .fontSize(16)
         .borderRadius(AppSizes.CORNER_RADIUS_SM)
         .backgroundColor(AppColors.BG_PAGE)
@@ -596,8 +753,21 @@ struct CapturePage {
           onChange(v);
         })
 
+      if (label === '题目内容') {
+        Button('🔄 重新选择题目图片')
+          .height(32)
+          .fontSize(12)
+          .backgroundColor('#E8EAED')
+          .fontColor(AppColors.TEXT_REGULAR)
+          .borderRadius(16)
+          .margin({ top: 8 })
+          .onClick(() => {
+            this.repickQuestion();
+          })
+      }
+
       if (CaptureOrchestrator.isLowConfidence(field)) {
-        Text('⚠️ 该项识别置信度较低，请重点核对（可使用输入法的语音/手写）')
+        Text('⚠️ 该项识别置信度较低，请重点核对')
           .fontSize(11)
           .fontColor(AppColors.WARNING)
           .margin({ top: 4 })
@@ -652,6 +822,10 @@ struct CapturePage {
     .alignItems(HorizontalAlign.Center)
   }
 
+  private repickQuestion(): void {
+    this.currentStep = 0;
+  }
+
   private async startCapture(fromCamera: boolean): Promise<void> {
     this.capturing = true;
     const path = fromCamera ? await MediaService.capturePhoto() : await MediaService.pickFromAlbum();
@@ -665,25 +839,10 @@ struct CapturePage {
     const quality = await CaptureOrchestrator.checkImageQuality(path);
     if (!quality.passed) {
       this.qualityIssue = quality.issue;
-      this.currentStep = 1;
     } else {
       this.qualityIssue = '';
-      this.currentStep = 1;
     }
-    await this.loadImageSize();
-  }
-
-  private async loadImageSize(): Promise<void> {
-    const pm = await MediaService.loadScaledPixelMap(this.imagePath, 1280);
-    if (pm !== undefined) {
-      try {
-        const info = await pm.getImageInfo();
-        this.imgNatW = info.size.width;
-        this.imgNatH = info.size.height;
-        await pm.release();
-      } catch (e) {
-      }
-    }
+    await this.enterRegion('question');
   }
 
   private async loadTags(): Promise<void> {
@@ -738,33 +897,6 @@ struct CapturePage {
       Toast.show('AI识别失败，请检查网络，可手动修改');
     }
     this.knowledgeBusy = false;
-  }
-
-  private async ocrForField(target: string, fromCamera: boolean): Promise<void> {
-    this.fieldOcrBusy = target;
-    const path = fromCamera ? await MediaService.capturePhoto() : await MediaService.pickFromAlbum();
-    if (path === undefined || path.length === 0) {
-      this.fieldOcrBusy = '';
-      Toast.show('未获取到图片，请重试');
-      return;
-    }
-    try {
-      const text: string = await AiService.recognizeImage(path);
-      this.fieldOcrBusy = '';
-      const cleaned: string = text.trim();
-      if (cleaned.length === 0) {
-        Toast.show('未识别到文字，请手动输入');
-        return;
-      }
-      if (target === 'standard') {
-        this.standardAnswer = this.standardAnswer.length > 0 ? this.standardAnswer + ' ' + cleaned : cleaned;
-      } else {
-        this.studentAnswer = this.studentAnswer.length > 0 ? this.studentAnswer + ' ' + cleaned : cleaned;
-      }
-    } catch (e) {
-      this.fieldOcrBusy = '';
-      Toast.show('识别失败，请检查网络或手动输入');
-    }
   }
 
   private async runCompare(): Promise<void> {
@@ -876,6 +1008,14 @@ struct CapturePage {
     this.selectedErrorType = ErrorType.OTHER;
     this.selectedTagIds = [];
     this.imagePath = '';
+    this.stdImage = '';
+    this.myImage = '';
+    this.stdFracs = new CropFracs(0.05, 0.05, 0.95, 0.95);
+    this.myFracs = new CropFracs(0.05, 0.05, 0.95, 0.95);
+    this.regionTarget = 'question';
+    this.regionImagePath = '';
+    this.stdAnalyzing = false;
+    this.myAnalyzing = false;
     this.qualityIssue = '';
     this.ocrResult = new OcrRecognitionResult();
     this.imgNatW = 0;
