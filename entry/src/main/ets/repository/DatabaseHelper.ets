@@ -14,7 +14,6 @@ import {
 } from '../models/Enums';
 
 const DB_NAME: string = 'tixing.db';
-const DB_VERSION: number = 1;
 
 const CREATE_MISTAKE_TABLE: string =
   `CREATE TABLE IF NOT EXISTS mistake (
@@ -88,19 +87,22 @@ export class DatabaseHelper {
       name: DB_NAME,
       securityLevel: relationalStore.SecurityLevel.S1
     };
-    this.rdbStore = await relationalStore.getRdbStore(context, config);
-    await this.rdbStore.executeSql(CREATE_MISTAKE_TABLE);
-    await this.rdbStore.executeSql(CREATE_REVIEW_LOG_TABLE);
-    await this.rdbStore.executeSql(CREATE_KNOWLEDGE_TAG_TABLE);
-    await this.rdbStore.executeSql(CREATE_KNOWLEDGE_PROFILE_TABLE);
-    await this.rdbStore.executeSql(CREATE_STUDENT_TABLE);
-    await this.rdbStore.executeSql(CREATE_PARENT_TABLE);
-    await this.rdbStore.executeSql(CREATE_POINTS_LOG_TABLE);
-    await this.rdbStore.executeSql(CREATE_COMMUNITY_POST_TABLE);
-    await this.rdbStore.executeSql(CREATE_REMINDER_SETTINGS_TABLE);
-    await this.rdbStore.executeSql(CREATE_ANALYTICS_EVENT_TABLE);
-    await this.rdbStore.executeSql(CREATE_REDEMPTION_TABLE);
-    await this.seedKnowledgeTags();
+    try {
+      this.rdbStore = await relationalStore.getRdbStore(context, config);
+      await this.rdbStore.executeSql(CREATE_MISTAKE_TABLE);
+      await this.rdbStore.executeSql(CREATE_REVIEW_LOG_TABLE);
+      await this.rdbStore.executeSql(CREATE_KNOWLEDGE_TAG_TABLE);
+      await this.rdbStore.executeSql(CREATE_KNOWLEDGE_PROFILE_TABLE);
+      await this.rdbStore.executeSql(CREATE_STUDENT_TABLE);
+      await this.rdbStore.executeSql(CREATE_PARENT_TABLE);
+      await this.rdbStore.executeSql(CREATE_POINTS_LOG_TABLE);
+      await this.rdbStore.executeSql(CREATE_COMMUNITY_POST_TABLE);
+      await this.rdbStore.executeSql(CREATE_REMINDER_SETTINGS_TABLE);
+      await this.rdbStore.executeSql(CREATE_ANALYTICS_EVENT_TABLE);
+      await this.rdbStore.executeSql(CREATE_REDEMPTION_TABLE);
+      await this.seedKnowledgeTags();
+    } catch (e) {
+    }
   }
 
   private async seedKnowledgeTags(): Promise<void> {
@@ -123,7 +125,7 @@ export class DatabaseHelper {
       this.makeTag('kt_g3_chinese_01', Subject.CHINESE, Grade.G3, TextbookVersion.PEP, '字词理解', ''),
       this.makeTag('kt_g3_chinese_02', Subject.CHINESE, Grade.G3, TextbookVersion.PEP, '阅读理解', ''),
       this.makeTag('kt_g4_chinese_01', Subject.CHINESE, Grade.G4, TextbookVersion.PEP, '段落分析', ''),
-      this.makeTag('kt_g4_chinese_02', Subject.CHINESE, Grade.G4, TextbookVersion.PEP, '作文基础', ''),
+      this.makeTag('kt_g4_chinese_02', Subject.CHINESE, Grade.G4, TextbookVersion.PEP, '作文基础', '')
     ];
     for (const tag of seeds) {
       await this.insertKnowledgeTag(tag);
@@ -161,7 +163,10 @@ export class DatabaseHelper {
       'communityPostId': m.communityPostId, 'createdAt': m.createdAt,
       'syncStatus': m.syncStatus
     };
-    await this.rdbStore.insert('mistake', value);
+    try {
+      await this.rdbStore.insert('mistake', value);
+    } catch (e) {
+    }
   }
 
   async updateMistake(m: Mistake): Promise<void> {
@@ -179,89 +184,104 @@ export class DatabaseHelper {
     };
     const predicates = new relationalStore.RdbPredicates('mistake');
     predicates.equalTo('id', m.id);
-    await this.rdbStore.update(value, predicates);
+    try {
+      await this.rdbStore.update(value, predicates);
+    } catch (e) {
+    }
   }
 
   async queryMistakes(subject?: Subject, status?: MistakeStatus, keyword?: string, errorType?: ErrorType): Promise<Mistake[]> {
     if (this.rdbStore === undefined) return [];
-    const predicates = new relationalStore.RdbPredicates('mistake');
-    predicates.orderByDesc('createdAt');
-    if (subject !== undefined) {
-      predicates.equalTo('subject', subject);
-    }
-    if (status !== undefined) {
-      predicates.equalTo('status', status);
-    }
-    if (errorType !== undefined) {
-      predicates.equalTo('errorType', errorType);
-    }
-    if (keyword !== undefined && keyword.length > 0) {
-      predicates.and();
-      predicates.contains('ocrText', keyword);
-    }
-    const resultSet = await this.rdbStore.query(predicates);
     const list: Mistake[] = [];
-    while (resultSet.goToNextRow()) {
-      list.push(this.rowToMistake(resultSet));
+    try {
+      const predicates = new relationalStore.RdbPredicates('mistake');
+      predicates.orderByDesc('createdAt');
+      if (subject !== undefined) {
+        predicates.equalTo('subject', subject);
+      }
+      if (status !== undefined) {
+        predicates.equalTo('status', status);
+      }
+      if (errorType !== undefined) {
+        predicates.equalTo('errorType', errorType);
+      }
+      if (keyword !== undefined && keyword.length > 0) {
+        predicates.and();
+        predicates.contains('ocrText', keyword);
+      }
+      const resultSet = await this.rdbStore.query(predicates);
+      while (resultSet.goToNextRow()) {
+        list.push(this.rowToMistake(resultSet));
+      }
+      resultSet.close();
+    } catch (e) {
     }
-    resultSet.close();
     return list;
   }
 
   async queryMistakeById(id: string): Promise<Mistake | undefined> {
     if (this.rdbStore === undefined) return undefined;
-    const predicates = new relationalStore.RdbPredicates('mistake');
-    predicates.equalTo('id', id);
-    const resultSet = await this.rdbStore.query(predicates);
-    if (resultSet.goToFirstRow()) {
-      const m = this.rowToMistake(resultSet);
+    try {
+      const predicates = new relationalStore.RdbPredicates('mistake');
+      predicates.equalTo('id', id);
+      const resultSet = await this.rdbStore.query(predicates);
+      if (resultSet.goToFirstRow()) {
+        const m = this.rowToMistake(resultSet);
+        resultSet.close();
+        return m;
+      }
       resultSet.close();
-      return m;
+    } catch (e) {
     }
-    resultSet.close();
     return undefined;
   }
 
   async queryTodayReviewMistakes(): Promise<Mistake[]> {
     if (this.rdbStore === undefined) return [];
-    const now = Date.now();
-    const predicates = new relationalStore.RdbPredicates('mistake');
-    predicates.lessThanOrEqualTo('nextReviewDate', now);
-    predicates.notEqualTo('status', MistakeStatus.MASTERED);
-    predicates.orderByAsc('nextReviewDate');
-    const resultSet = await this.rdbStore.query(predicates);
     const list: Mistake[] = [];
-    while (resultSet.goToNextRow()) {
-      list.push(this.rowToMistake(resultSet));
+    try {
+      const now = Date.now();
+      const predicates = new relationalStore.RdbPredicates('mistake');
+      predicates.lessThanOrEqualTo('nextReviewDate', now);
+      predicates.notEqualTo('status', MistakeStatus.MASTERED);
+      predicates.orderByAsc('nextReviewDate');
+      const resultSet = await this.rdbStore.query(predicates);
+      while (resultSet.goToNextRow()) {
+        list.push(this.rowToMistake(resultSet));
+      }
+      resultSet.close();
+    } catch (e) {
     }
-    resultSet.close();
     return list;
   }
 
   private rowToMistake(rs: relationalStore.ResultSet): Mistake {
     const m = new Mistake();
-    m.id = rs.getString(rs.getColumnIndex('id'));
-    m.studentId = rs.getString(rs.getColumnIndex('studentId'));
-    m.imageUrl = rs.getString(rs.getColumnIndex('imageUrl'));
-    m.ocrText = rs.getString(rs.getColumnIndex('ocrText'));
-    m.ocrConfidence = rs.getDouble(rs.getColumnIndex('ocrConfidence'));
-    m.isConfirmed = rs.getLong(rs.getColumnIndex('isConfirmed')) === 1;
-    m.subject = rs.getString(rs.getColumnIndex('subject')) as Subject;
-    const tagStr = rs.getString(rs.getColumnIndex('knowledgeTagIds'));
-    m.knowledgeTagIds = tagStr.length > 0 ? tagStr.split(',') : [];
-    m.errorType = rs.getString(rs.getColumnIndex('errorType')) as ErrorType;
-    m.status = rs.getString(rs.getColumnIndex('status')) as MistakeStatus;
-    m.intervalIndex = rs.getLong(rs.getColumnIndex('intervalIndex'));
-    m.nextReviewDate = rs.getLong(rs.getColumnIndex('nextReviewDate'));
-    m.firstReviewDuration = rs.getLong(rs.getColumnIndex('firstReviewDuration'));
-    m.standardAnswer = rs.getString(rs.getColumnIndex('standardAnswer'));
-    m.answerType = rs.getString(rs.getColumnIndex('answerType')) as AnswerType;
-    m.notes = rs.getString(rs.getColumnIndex('notes'));
-    m.notesAttachmentUrl = rs.getString(rs.getColumnIndex('notesAttachmentUrl'));
-    m.sharedToCommunity = rs.getLong(rs.getColumnIndex('sharedToCommunity')) === 1;
-    m.communityPostId = rs.getString(rs.getColumnIndex('communityPostId'));
-    m.createdAt = rs.getLong(rs.getColumnIndex('createdAt'));
-    m.syncStatus = rs.getString(rs.getColumnIndex('syncStatus')) as SyncStatus;
+    try {
+      m.id = rs_col(rs, 'id');
+      m.studentId = rs_col(rs, 'studentId');
+      m.imageUrl = rs_col(rs, 'imageUrl');
+      m.ocrText = rs_col(rs, 'ocrText');
+      m.ocrConfidence = rs_col_double(rs, 'ocrConfidence');
+      m.isConfirmed = rs_col_long(rs, 'isConfirmed') === 1;
+      m.subject = rs_col(rs, 'subject') as Subject;
+      const tagStr = rs_col(rs, 'knowledgeTagIds');
+      m.knowledgeTagIds = tagStr.length > 0 ? tagStr.split(',') : [];
+      m.errorType = rs_col(rs, 'errorType') as ErrorType;
+      m.status = rs_col(rs, 'status') as MistakeStatus;
+      m.intervalIndex = rs_col_long(rs, 'intervalIndex');
+      m.nextReviewDate = rs_col_long(rs, 'nextReviewDate');
+      m.firstReviewDuration = rs_col_long(rs, 'firstReviewDuration');
+      m.standardAnswer = rs_col(rs, 'standardAnswer');
+      m.answerType = rs_col(rs, 'answerType') as AnswerType;
+      m.notes = rs_col(rs, 'notes');
+      m.notesAttachmentUrl = rs_col(rs, 'notesAttachmentUrl');
+      m.sharedToCommunity = rs_col_long(rs, 'sharedToCommunity') === 1;
+      m.communityPostId = rs_col(rs, 'communityPostId');
+      m.createdAt = rs_col_long(rs, 'createdAt');
+      m.syncStatus = rs_col(rs, 'syncStatus') as SyncStatus;
+    } catch (e) {
+    }
     return m;
   }
 
@@ -273,30 +293,36 @@ export class DatabaseHelper {
       'correct': log.correct ? 1 : 0, 'durationSeconds': log.durationSeconds,
       'pointsAwarded': log.pointsAwarded, 'clientOperationId': log.clientOperationId
     };
-    await this.rdbStore.insert('review_log', value);
+    try {
+      await this.rdbStore.insert('review_log', value);
+    } catch (e) {
+    }
   }
 
   async queryReviewLogs(mistakeId: string): Promise<ReviewLog[]> {
     if (this.rdbStore === undefined) return [];
-    const predicates = new relationalStore.RdbPredicates('review_log');
-    predicates.equalTo('mistakeId', mistakeId);
-    predicates.orderByDesc('reviewTime');
-    const resultSet = await this.rdbStore.query(predicates);
     const list: ReviewLog[] = [];
-    while (resultSet.goToNextRow()) {
-      const log = new ReviewLog();
-      log.id = rs_col(resultSet, 'id');
-      log.mistakeId = rs_col(resultSet, 'mistakeId');
-      log.reviewTime = rs_col_long(resultSet, 'reviewTime');
-      log.gradingMethod = rs_col(resultSet, 'gradingMethod') as GradingMethod;
-      log.inputMethod = rs_col(resultSet, 'inputMethod') as InputMethod;
-      log.correct = rs_col_long(resultSet, 'correct') === 1;
-      log.durationSeconds = rs_col_long(resultSet, 'durationSeconds');
-      log.pointsAwarded = rs_col_long(resultSet, 'pointsAwarded');
-      log.clientOperationId = rs_col(resultSet, 'clientOperationId');
-      list.push(log);
+    try {
+      const predicates = new relationalStore.RdbPredicates('review_log');
+      predicates.equalTo('mistakeId', mistakeId);
+      predicates.orderByDesc('reviewTime');
+      const resultSet = await this.rdbStore.query(predicates);
+      while (resultSet.goToNextRow()) {
+        const log = new ReviewLog();
+        log.id = rs_col(resultSet, 'id');
+        log.mistakeId = rs_col(resultSet, 'mistakeId');
+        log.reviewTime = rs_col_long(resultSet, 'reviewTime');
+        log.gradingMethod = rs_col(resultSet, 'gradingMethod') as GradingMethod;
+        log.inputMethod = rs_col(resultSet, 'inputMethod') as InputMethod;
+        log.correct = rs_col_long(resultSet, 'correct') === 1;
+        log.durationSeconds = rs_col_long(resultSet, 'durationSeconds');
+        log.pointsAwarded = rs_col_long(resultSet, 'pointsAwarded');
+        log.clientOperationId = rs_col(resultSet, 'clientOperationId');
+        list.push(log);
+      }
+      resultSet.close();
+    } catch (e) {
     }
-    resultSet.close();
     return list;
   }
 
@@ -307,53 +333,62 @@ export class DatabaseHelper {
       'textbookVersion': tag.textbookVersion, 'name': tag.name,
       'parentTagId': tag.parentTagId
     };
-    await this.rdbStore.insert('knowledge_tag', value);
+    try {
+      await this.rdbStore.insert('knowledge_tag', value);
+    } catch (e) {
+    }
   }
 
   async queryKnowledgeTags(subject?: Subject, grade?: Grade): Promise<KnowledgeTag[]> {
     if (this.rdbStore === undefined) return [];
-    const predicates = new relationalStore.RdbPredicates('knowledge_tag');
-    if (subject !== undefined) {
-      predicates.equalTo('subject', subject);
-    }
-    if (grade !== undefined) {
-      predicates.equalTo('grade', grade);
-    }
-    const resultSet = await this.rdbStore.query(predicates);
     const list: KnowledgeTag[] = [];
-    while (resultSet.goToNextRow()) {
-      const tag = new KnowledgeTag();
-      tag.id = rs_col(resultSet, 'id');
-      tag.subject = rs_col(resultSet, 'subject') as Subject;
-      tag.grade = rs_col(resultSet, 'grade') as Grade;
-      tag.textbookVersion = rs_col(resultSet, 'textbookVersion') as TextbookVersion;
-      tag.name = rs_col(resultSet, 'name');
-      tag.parentTagId = rs_col(resultSet, 'parentTagId');
-      list.push(tag);
+    try {
+      const predicates = new relationalStore.RdbPredicates('knowledge_tag');
+      if (subject !== undefined) {
+        predicates.equalTo('subject', subject);
+      }
+      if (grade !== undefined) {
+        predicates.equalTo('grade', grade);
+      }
+      const resultSet = await this.rdbStore.query(predicates);
+      while (resultSet.goToNextRow()) {
+        const tag = new KnowledgeTag();
+        tag.id = rs_col(resultSet, 'id');
+        tag.subject = rs_col(resultSet, 'subject') as Subject;
+        tag.grade = rs_col(resultSet, 'grade') as Grade;
+        tag.textbookVersion = rs_col(resultSet, 'textbookVersion') as TextbookVersion;
+        tag.name = rs_col(resultSet, 'name');
+        tag.parentTagId = rs_col(resultSet, 'parentTagId');
+        list.push(tag);
+      }
+      resultSet.close();
+    } catch (e) {
     }
-    resultSet.close();
     return list;
   }
 
   async queryKnowledgeProfiles(studentId: string): Promise<KnowledgeProfile[]> {
     if (this.rdbStore === undefined) return [];
-    const predicates = new relationalStore.RdbPredicates('knowledge_profile');
-    predicates.equalTo('studentId', studentId);
-    const resultSet = await this.rdbStore.query(predicates);
     const list: KnowledgeProfile[] = [];
-    while (resultSet.goToNextRow()) {
-      const p = new KnowledgeProfile();
-      p.id = rs_col(resultSet, 'id');
-      p.studentId = rs_col(resultSet, 'studentId');
-      p.knowledgeTagId = rs_col(resultSet, 'knowledgeTagId');
-      p.totalMistakes = rs_col_long(resultSet, 'totalMistakes');
-      p.masteredCount = rs_col_long(resultSet, 'masteredCount');
-      p.currentMasteryScore = rs_col_double(resultSet, 'currentMasteryScore');
-      p.trend = rs_col(resultSet, 'trend') as Trend;
-      p.updatedAt = rs_col_long(resultSet, 'updatedAt');
-      list.push(p);
+    try {
+      const predicates = new relationalStore.RdbPredicates('knowledge_profile');
+      predicates.equalTo('studentId', studentId);
+      const resultSet = await this.rdbStore.query(predicates);
+      while (resultSet.goToNextRow()) {
+        const p = new KnowledgeProfile();
+        p.id = rs_col(resultSet, 'id');
+        p.studentId = rs_col(resultSet, 'studentId');
+        p.knowledgeTagId = rs_col(resultSet, 'knowledgeTagId');
+        p.totalMistakes = rs_col_long(resultSet, 'totalMistakes');
+        p.masteredCount = rs_col_long(resultSet, 'masteredCount');
+        p.currentMasteryScore = rs_col_double(resultSet, 'currentMasteryScore');
+        p.trend = rs_col(resultSet, 'trend') as Trend;
+        p.updatedAt = rs_col_long(resultSet, 'updatedAt');
+        list.push(p);
+      }
+      resultSet.close();
+    } catch (e) {
     }
-    resultSet.close();
     return list;
   }
 
@@ -369,29 +404,35 @@ export class DatabaseHelper {
       'currentMasteryScore': profile.currentMasteryScore,
       'trend': profile.trend, 'updatedAt': profile.updatedAt
     };
-    const updated: number = await this.rdbStore.update(value, predicates);
-    if (updated === 0) {
-      await this.rdbStore.insert('knowledge_profile', value);
+    try {
+      const updated: number = await this.rdbStore.update(value, predicates);
+      if (updated === 0) {
+        await this.rdbStore.insert('knowledge_profile', value);
+      }
+    } catch (e) {
     }
   }
 
   async queryKnowledgeTagsByIds(ids: string[]): Promise<KnowledgeTag[]> {
     if (this.rdbStore === undefined || ids.length === 0) return [];
-    const predicates = new relationalStore.RdbPredicates('knowledge_tag');
-    predicates.in('id', ids);
-    const resultSet = await this.rdbStore.query(predicates);
     const list: KnowledgeTag[] = [];
-    while (resultSet.goToNextRow()) {
-      const tag = new KnowledgeTag();
-      tag.id = rs_col(resultSet, 'id');
-      tag.subject = rs_col(resultSet, 'subject') as Subject;
-      tag.grade = rs_col(resultSet, 'grade') as Grade;
-      tag.textbookVersion = rs_col(resultSet, 'textbookVersion') as TextbookVersion;
-      tag.name = rs_col(resultSet, 'name');
-      tag.parentTagId = rs_col(resultSet, 'parentTagId');
-      list.push(tag);
+    try {
+      const predicates = new relationalStore.RdbPredicates('knowledge_tag');
+      predicates.in('id', ids);
+      const resultSet = await this.rdbStore.query(predicates);
+      while (resultSet.goToNextRow()) {
+        const tag = new KnowledgeTag();
+        tag.id = rs_col(resultSet, 'id');
+        tag.subject = rs_col(resultSet, 'subject') as Subject;
+        tag.grade = rs_col(resultSet, 'grade') as Grade;
+        tag.textbookVersion = rs_col(resultSet, 'textbookVersion') as TextbookVersion;
+        tag.name = rs_col(resultSet, 'name');
+        tag.parentTagId = rs_col(resultSet, 'parentTagId');
+        list.push(tag);
+      }
+      resultSet.close();
+    } catch (e) {
     }
-    resultSet.close();
     return list;
   }
 
@@ -405,30 +446,36 @@ export class DatabaseHelper {
       'communityShareEnabled': s.communityShareEnabled ? 1 : 0,
       'createdAt': s.createdAt
     };
-    await this.rdbStore.insert('student', value);
+    try {
+      await this.rdbStore.insert('student', value);
+    } catch (e) {
+    }
   }
 
   async queryStudent(id: string): Promise<Student | undefined> {
     if (this.rdbStore === undefined) return undefined;
-    const predicates = new relationalStore.RdbPredicates('student');
-    predicates.equalTo('id', id);
-    const resultSet = await this.rdbStore.query(predicates);
-    if (resultSet.goToFirstRow()) {
-      const s = new Student();
-      s.id = rs_col(resultSet, 'id');
-      s.parentId = rs_col(resultSet, 'parentId');
-      s.nickname = rs_col(resultSet, 'nickname');
-      s.grade = rs_col(resultSet, 'grade') as Grade;
-      s.textbookVersion = rs_col(resultSet, 'textbookVersion') as TextbookVersion;
-      s.region = rs_col(resultSet, 'region');
-      s.school = rs_col(resultSet, 'school');
-      s.communityBrowseEnabled = rs_col_long(resultSet, 'communityBrowseEnabled') === 1;
-      s.communityShareEnabled = rs_col_long(resultSet, 'communityShareEnabled') === 1;
-      s.createdAt = rs_col_long(resultSet, 'createdAt');
+    try {
+      const predicates = new relationalStore.RdbPredicates('student');
+      predicates.equalTo('id', id);
+      const resultSet = await this.rdbStore.query(predicates);
+      if (resultSet.goToFirstRow()) {
+        const s = new Student();
+        s.id = rs_col(resultSet, 'id');
+        s.parentId = rs_col(resultSet, 'parentId');
+        s.nickname = rs_col(resultSet, 'nickname');
+        s.grade = rs_col(resultSet, 'grade') as Grade;
+        s.textbookVersion = rs_col(resultSet, 'textbookVersion') as TextbookVersion;
+        s.region = rs_col(resultSet, 'region');
+        s.school = rs_col(resultSet, 'school');
+        s.communityBrowseEnabled = rs_col_long(resultSet, 'communityBrowseEnabled') === 1;
+        s.communityShareEnabled = rs_col_long(resultSet, 'communityShareEnabled') === 1;
+        s.createdAt = rs_col_long(resultSet, 'createdAt');
+        resultSet.close();
+        return s;
+      }
       resultSet.close();
-      return s;
+    } catch (e) {
     }
-    resultSet.close();
     return undefined;
   }
 
@@ -443,7 +490,10 @@ export class DatabaseHelper {
     };
     const predicates = new relationalStore.RdbPredicates('student');
     predicates.equalTo('id', s.id);
-    await this.rdbStore.update(value, predicates);
+    try {
+      await this.rdbStore.update(value, predicates);
+    } catch (e) {
+    }
   }
 
   async insertPointsLog(log: PointsLog): Promise<void> {
@@ -453,82 +503,91 @@ export class DatabaseHelper {
       'actionType': log.actionType, 'points': log.points,
       'createdAt': log.createdAt
     };
-    await this.rdbStore.insert('points_log', value);
+    try {
+      await this.rdbStore.insert('points_log', value);
+    } catch (e) {
+    }
   }
 
   async queryPointsSummary(studentId: string): Promise<PointsSummary> {
-    if (this.rdbStore === undefined) {
-      const s = new PointsSummary();
-      return s;
-    }
-    const predicates = new relationalStore.RdbPredicates('points_log');
-    predicates.equalTo('studentId', studentId);
-    const resultSet = await this.rdbStore.query(predicates);
-    let total = 0;
-    let todayTotal = 0;
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayMs = todayStart.getTime();
-    while (resultSet.goToNextRow()) {
-      const pts = rs_col_long(resultSet, 'points');
-      const createdAt = rs_col_long(resultSet, 'createdAt');
-      total += pts;
-      if (createdAt >= todayMs) {
-        todayTotal += pts;
-      }
-    }
-    resultSet.close();
     const summary = new PointsSummary();
-    summary.totalPoints = total;
-    summary.todayPoints = todayTotal;
-    summary.streakDays = 0;
+    if (this.rdbStore === undefined) return summary;
+    try {
+      const predicates = new relationalStore.RdbPredicates('points_log');
+      predicates.equalTo('studentId', studentId);
+      const resultSet = await this.rdbStore.query(predicates);
+      let total = 0;
+      let todayTotal = 0;
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayMs = todayStart.getTime();
+      while (resultSet.goToNextRow()) {
+        const pts = rs_col_long(resultSet, 'points');
+        const createdAt = rs_col_long(resultSet, 'createdAt');
+        total += pts;
+        if (createdAt >= todayMs) {
+          todayTotal += pts;
+        }
+      }
+      resultSet.close();
+      summary.totalPoints = total;
+      summary.todayPoints = todayTotal;
+      summary.streakDays = 0;
+    } catch (e) {
+    }
     return summary;
   }
 
   async queryPointsLogs(studentId: string): Promise<PointsLog[]> {
     if (this.rdbStore === undefined) return [];
-    const predicates = new relationalStore.RdbPredicates('points_log');
-    predicates.equalTo('studentId', studentId);
-    predicates.orderByDesc('createdAt');
-    const resultSet = await this.rdbStore.query(predicates);
     const list: PointsLog[] = [];
-    while (resultSet.goToNextRow()) {
-      const log = new PointsLog();
-      log.id = rs_col(resultSet, 'id');
-      log.studentId = rs_col(resultSet, 'studentId');
-      log.actionType = rs_col(resultSet, 'actionType') as PointsActionType;
-      log.points = rs_col_long(resultSet, 'points');
-      log.createdAt = rs_col_long(resultSet, 'createdAt');
-      list.push(log);
+    try {
+      const predicates = new relationalStore.RdbPredicates('points_log');
+      predicates.equalTo('studentId', studentId);
+      predicates.orderByDesc('createdAt');
+      const resultSet = await this.rdbStore.query(predicates);
+      while (resultSet.goToNextRow()) {
+        const log = new PointsLog();
+        log.id = rs_col(resultSet, 'id');
+        log.studentId = rs_col(resultSet, 'studentId');
+        log.actionType = rs_col(resultSet, 'actionType') as PointsActionType;
+        log.points = rs_col_long(resultSet, 'points');
+        log.createdAt = rs_col_long(resultSet, 'createdAt');
+        list.push(log);
+      }
+      resultSet.close();
+    } catch (e) {
     }
-    resultSet.close();
     return list;
   }
 
   async queryReminderSettings(studentId: string): Promise<ReminderSettings> {
     const fallback: ReminderSettings = ReminderSettings.create(studentId);
     if (this.rdbStore === undefined) return fallback;
-    const predicates = new relationalStore.RdbPredicates('reminder_settings');
-    predicates.equalTo('studentId', studentId);
-    const resultSet = await this.rdbStore.query(predicates);
-    if (resultSet.goToFirstRow()) {
-      const r = new ReminderSettings();
-      r.id = rs_col(resultSet, 'id');
-      r.studentId = rs_col(resultSet, 'studentId');
-      r.reviewTimeStart = rs_col(resultSet, 'reviewTimeStart');
-      r.reviewTimeEnd = rs_col(resultSet, 'reviewTimeEnd');
-      r.dailyLimit = rs_col_long(resultSet, 'dailyLimit');
-      r.mathEnabled = rs_col_long(resultSet, 'mathEnabled') === 1;
-      r.chineseEnabled = rs_col_long(resultSet, 'chineseEnabled') === 1;
-      r.englishEnabled = rs_col_long(resultSet, 'englishEnabled') === 1;
-      r.scienceEnabled = rs_col_long(resultSet, 'scienceEnabled') === 1;
-      r.doNotDisturb = rs_col_long(resultSet, 'doNotDisturb') === 1;
-      r.notificationEnabled = rs_col_long(resultSet, 'notificationEnabled') === 1;
-      r.updatedAt = rs_col_long(resultSet, 'updatedAt');
+    try {
+      const predicates = new relationalStore.RdbPredicates('reminder_settings');
+      predicates.equalTo('studentId', studentId);
+      const resultSet = await this.rdbStore.query(predicates);
+      if (resultSet.goToFirstRow()) {
+        const r = new ReminderSettings();
+        r.id = rs_col(resultSet, 'id');
+        r.studentId = rs_col(resultSet, 'studentId');
+        r.reviewTimeStart = rs_col(resultSet, 'reviewTimeStart');
+        r.reviewTimeEnd = rs_col(resultSet, 'reviewTimeEnd');
+        r.dailyLimit = rs_col_long(resultSet, 'dailyLimit');
+        r.mathEnabled = rs_col_long(resultSet, 'mathEnabled') === 1;
+        r.chineseEnabled = rs_col_long(resultSet, 'chineseEnabled') === 1;
+        r.englishEnabled = rs_col_long(resultSet, 'englishEnabled') === 1;
+        r.scienceEnabled = rs_col_long(resultSet, 'scienceEnabled') === 1;
+        r.doNotDisturb = rs_col_long(resultSet, 'doNotDisturb') === 1;
+        r.notificationEnabled = rs_col_long(resultSet, 'notificationEnabled') === 1;
+        r.updatedAt = rs_col_long(resultSet, 'updatedAt');
+        resultSet.close();
+        return r;
+      }
       resultSet.close();
-      return r;
+    } catch (e) {
     }
-    resultSet.close();
     return fallback;
   }
 
@@ -548,9 +607,12 @@ export class DatabaseHelper {
       'notificationEnabled': r.notificationEnabled ? 1 : 0,
       'updatedAt': r.updatedAt
     };
-    const updated: number = await this.rdbStore.update(value, predicates);
-    if (updated === 0) {
-      await this.rdbStore.insert('reminder_settings', value);
+    try {
+      const updated: number = await this.rdbStore.update(value, predicates);
+      if (updated === 0) {
+        await this.rdbStore.insert('reminder_settings', value);
+      }
+    } catch (e) {
     }
   }
 
@@ -560,42 +622,48 @@ export class DatabaseHelper {
       'id': e.id, 'eventType': e.eventType, 'studentIdHash': e.studentIdHash,
       'platform': e.platform, 'properties': e.properties, 'occurredAt': e.occurredAt
     };
-    await this.rdbStore.insert('analytics_event', value);
+    try {
+      await this.rdbStore.insert('analytics_event', value);
+    } catch (e) {
+    }
   }
 
   async queryMetricSummary(): Promise<MetricSummary> {
     const summary = new MetricSummary();
     if (this.rdbStore === undefined) return summary;
-    const predicates = new relationalStore.RdbPredicates('analytics_event');
-    const resultSet = await this.rdbStore.query(predicates);
-    let confSum: number = 0;
-    let confCount: number = 0;
-    let reviewCorrect: number = 0;
-    while (resultSet.goToNextRow()) {
-      const type: string = rs_col(resultSet, 'eventType');
-      if (type === 'capture') {
-        summary.captureCount++;
-      } else if (type === 'review_submit') {
-        summary.reviewSubmitCount++;
-        const props: string = rs_col(resultSet, 'properties');
-        if (props.indexOf('correct') >= 0 && props.indexOf('"correct":true') >= 0) {
-          reviewCorrect++;
-        }
-      } else if (type === 'mastery_achieved') {
-        summary.masteryAchievedCount++;
-      } else if (type === 'ocr_confirm') {
-        summary.ocrConfirmCount++;
-        const props: string = rs_col(resultSet, 'properties');
-        const parsed = parseConfidence(props);
-        if (parsed >= 0) {
-          confSum += parsed;
-          confCount++;
+    try {
+      const predicates = new relationalStore.RdbPredicates('analytics_event');
+      const resultSet = await this.rdbStore.query(predicates);
+      let confSum: number = 0;
+      let confCount: number = 0;
+      let reviewCorrect: number = 0;
+      while (resultSet.goToNextRow()) {
+        const type: string = rs_col(resultSet, 'eventType');
+        if (type === 'capture') {
+          summary.captureCount++;
+        } else if (type === 'review_submit') {
+          summary.reviewSubmitCount++;
+          const props: string = rs_col(resultSet, 'properties');
+          if (props.indexOf('correct') >= 0 && props.indexOf('"correct":true') >= 0) {
+            reviewCorrect++;
+          }
+        } else if (type === 'mastery_achieved') {
+          summary.masteryAchievedCount++;
+        } else if (type === 'ocr_confirm') {
+          summary.ocrConfirmCount++;
+          const props: string = rs_col(resultSet, 'properties');
+          const parsed = parseConfidence(props);
+          if (parsed >= 0) {
+            confSum += parsed;
+            confCount++;
+          }
         }
       }
+      resultSet.close();
+      summary.avgOcrConfidence = confCount > 0 ? confSum / confCount : 0;
+      summary.reviewAccuracy = summary.reviewSubmitCount > 0 ? reviewCorrect / summary.reviewSubmitCount : 0;
+    } catch (e) {
     }
-    resultSet.close();
-    summary.avgOcrConfidence = confCount > 0 ? confSum / confCount : 0;
-    summary.reviewAccuracy = summary.reviewSubmitCount > 0 ? reviewCorrect / summary.reviewSubmitCount : 0;
     return summary;
   }
 
@@ -606,65 +674,90 @@ export class DatabaseHelper {
       'studentId': studentId, 'itemId': itemId, 'cost': cost,
       'redeemedAt': Date.now()
     };
-    await this.rdbStore.insert('redemption', value);
+    try {
+      await this.rdbStore.insert('redemption', value);
+    } catch (e) {
+    }
   }
 
   async queryRedeemedItemIds(studentId: string): Promise<string[]> {
     if (this.rdbStore === undefined) return [];
-    const predicates = new relationalStore.RdbPredicates('redemption');
-    predicates.equalTo('studentId', studentId);
-    const resultSet = await this.rdbStore.query(predicates);
     const ids: string[] = [];
-    while (resultSet.goToNextRow()) {
-      ids.push(rs_col(resultSet, 'itemId'));
+    try {
+      const predicates = new relationalStore.RdbPredicates('redemption');
+      predicates.equalTo('studentId', studentId);
+      const resultSet = await this.rdbStore.query(predicates);
+      while (resultSet.goToNextRow()) {
+        ids.push(rs_col(resultSet, 'itemId'));
+      }
+      resultSet.close();
+    } catch (e) {
     }
-    resultSet.close();
     return ids;
   }
 
   async queryTotalSpent(studentId: string): Promise<number> {
     if (this.rdbStore === undefined) return 0;
-    const predicates = new relationalStore.RdbPredicates('redemption');
-    predicates.equalTo('studentId', studentId);
-    const resultSet = await this.rdbStore.query(predicates);
     let total: number = 0;
-    while (resultSet.goToNextRow()) {
-      total += rs_col_long(resultSet, 'cost');
+    try {
+      const predicates = new relationalStore.RdbPredicates('redemption');
+      predicates.equalTo('studentId', studentId);
+      const resultSet = await this.rdbStore.query(predicates);
+      while (resultSet.goToNextRow()) {
+        total += rs_col_long(resultSet, 'cost');
+      }
+      resultSet.close();
+    } catch (e) {
     }
-    resultSet.close();
     return total;
   }
 }
 
 function parseConfidence(props: string): number {
-  const marker: string = '"confidence":';
-  const idx: number = props.indexOf(marker);
-  if (idx < 0) {
+  try {
+    const marker: string = '"confidence":';
+    const idx: number = props.indexOf(marker);
+    if (idx < 0) {
+      return -1;
+    }
+    const rest: string = props.substring(idx + marker.length);
+    let end: number = 0;
+    while (end < rest.length && rest.charAt(end) !== ',' && rest.charAt(end) !== '}') {
+      end++;
+    }
+    const numStr: string = rest.substring(0, end);
+    const val: number = parseFloat(numStr);
+    return isNaN(val) ? -1 : val;
+  } catch (e) {
     return -1;
   }
-  const rest: string = props.substring(idx + marker.length);
-  let end: number = 0;
-  while (end < rest.length && rest.charAt(end) !== ',' && rest.charAt(end) !== '}') {
-    end++;
-  }
-  const numStr: string = rest.substring(0, end);
-  const val: number = parseFloat(numStr);
-  return isNaN(val) ? -1 : val;
 }
 
 function rs_col(rs: relationalStore.ResultSet, col: string): string {
-  const idx = rs.getColumnIndex(col);
-  return rs.getString(idx);
+  try {
+    const idx = rs.getColumnIndex(col);
+    return rs.getString(idx);
+  } catch (e) {
+    return '';
+  }
 }
 
 function rs_col_long(rs: relationalStore.ResultSet, col: string): number {
-  const idx = rs.getColumnIndex(col);
-  return rs.getLong(idx);
+  try {
+    const idx = rs.getColumnIndex(col);
+    return rs.getLong(idx);
+  } catch (e) {
+    return 0;
+  }
 }
 
 function rs_col_double(rs: relationalStore.ResultSet, col: string): number {
-  const idx = rs.getColumnIndex(col);
-  return rs.getDouble(idx);
+  try {
+    const idx = rs.getColumnIndex(col);
+    return rs.getDouble(idx);
+  } catch (e) {
+    return 0;
+  }
 }
 
 export const dbHelper = new DatabaseHelper();

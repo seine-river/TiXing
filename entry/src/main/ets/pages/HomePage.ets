@@ -1,7 +1,7 @@
 import { Mistake } from '../models/Mistake';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { MistakeStatus, Subject } from '../models/Enums';
-import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor } from '../common/Constants';
+import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor, toFileUri } from '../common/Constants';
 import { StatusTag, SubjectTag, EmptyPlaceholder } from '../components/CommonComponents';
 
 @Component
@@ -202,7 +202,7 @@ export struct HomePage {
       .layoutWeight(1)
 
       if (item.imageUrl.length > 0) {
-        Image(item.imageUrl)
+        Image(toFileUri(item.imageUrl))
           .width(64)
           .height(64)
           .borderRadius(AppSizes.CORNER_RADIUS_XS)

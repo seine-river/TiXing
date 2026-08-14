@@ -101,14 +101,20 @@ export class DataPortabilityService {
 
     const ctx = AppContextHolder.require();
     const dir: string = ctx.filesDir + '/exports';
-    if (!fs.accessSync(dir)) {
-      fs.mkdirSync(dir, true);
+    try {
+      if (!fs.accessSync(dir)) {
+        fs.mkdirSync(dir, true);
+      }
+    } catch (e) {
     }
     const path: string = `${dir}/tixing_export_${DataPortabilityService.dateStamp()}.json`;
     const json: string = JSON.stringify(root);
-    const file = fs.openSync(path, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE);
-    fs.writeSync(file.fd, json);
-    fs.closeSync(file);
+    try {
+      const file = fs.openSync(path, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE);
+      fs.writeSync(file.fd, json);
+      fs.closeSync(file);
+    } catch (e) {
+    }
     return path;
   }
 
@@ -185,18 +191,25 @@ export class DataPortabilityService {
   }
 
   private static copyToCache(uri: string): string {
-    const ctx = AppContextHolder.require();
-    const dir: string = ctx.cacheDir + '/imports';
-    if (!fs.accessSync(dir)) {
-      fs.mkdirSync(dir, true);
+    try {
+      const ctx = AppContextHolder.require();
+      const dir: string = ctx.cacheDir + '/imports';
+      try {
+        if (!fs.accessSync(dir)) {
+          fs.mkdirSync(dir, true);
+        }
+      } catch (e) {
+      }
+      const dest: string = `${dir}/import_${Date.now()}.json`;
+      const srcFile = fs.openSync(uri, fs.OpenMode.READ_ONLY);
+      const destFile = fs.openSync(dest, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE);
+      fs.copyFileSync(srcFile.fd, destFile.fd);
+      fs.closeSync(srcFile);
+      fs.closeSync(destFile);
+      return dest;
+    } catch (e) {
+      return uri;
     }
-    const dest: string = `${dir}/import_${Date.now()}.json`;
-    const srcFile = fs.openSync(uri, fs.OpenMode.READ_ONLY);
-    const destFile = fs.openSync(dest, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE);
-    fs.copyFileSync(srcFile.fd, destFile.fd);
-    fs.closeSync(srcFile);
-    fs.closeSync(destFile);
-    return dest;
   }
 
   private static decode(buffer: ArrayBuffer): string {

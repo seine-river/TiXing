@@ -6,8 +6,15 @@ const KEY_LEADERBOARD: string = 'leaderboard_enabled';
 
 export class PreferenceService {
   private static async getStore(): Promise<preferences.Preferences> {
-    const ctx = AppContextHolder.require();
-    return preferences.getPreferences(ctx, STORE_NAME);
+    const ctx: Context | undefined = AppContextHolder.get();
+    if (ctx === undefined) {
+      throw new Error('AppContext not initialized');
+    }
+    try {
+      return await preferences.getPreferences(ctx, STORE_NAME);
+    } catch (e) {
+      throw new Error('preference store unavailable');
+    }
   }
 
   static async getLeaderboardEnabled(): Promise<boolean> {

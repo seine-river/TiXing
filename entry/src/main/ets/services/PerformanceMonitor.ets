@@ -32,7 +32,10 @@ export class PerformanceMonitor {
         PerformanceMonitor.handleReceivedEvents(domain, appEventGroups);
       }
     };
-    hiAppEvent.addWatcher(watcher);
+    try {
+      hiAppEvent.addWatcher(watcher);
+    } catch (e) {
+    }
   }
 
   private static handleReceivedEvents(domain: string, appEventGroups: Array<hiAppEvent.AppEventGroup>): void {

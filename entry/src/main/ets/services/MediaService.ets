@@ -1,4 +1,4 @@
-import picker from '@ohos.file.picker';
+import photoAccessHelper from '@ohos.file.photoAccessHelper';
 import fs from '@ohos.file.fs';
 import { image } from '@kit.ImageKit';
 import camera from '@ohos.multimedia.camera';
@@ -9,11 +9,11 @@ import { generateId } from '../common/Constants';
 export class MediaService {
   static async pickFromAlbum(): Promise<string | undefined> {
     try {
-      const photoPicker = new picker.PhotoViewPicker();
-      const options = new picker.PhotoSelectOptions();
-      options.MIMEType = picker.PhotoViewMIMETypes.IMAGE_TYPE;
+      const photoPicker = new photoAccessHelper.PhotoViewPicker();
+      const options = new photoAccessHelper.PhotoSelectOptions();
+      options.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
       options.maxSelectNumber = 1;
-      const result: picker.PhotoSelectResult = await photoPicker.select(options);
+      const result: photoAccessHelper.PhotoSelectResult = await photoPicker.select(options);
       if (result.photoUris.length === 0) {
         return undefined;
       }

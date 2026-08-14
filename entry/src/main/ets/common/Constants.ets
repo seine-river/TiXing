@@ -110,3 +110,14 @@ export function formatDate(timestamp: number): string {
 export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
 }
+
+export function toFileUri(path: string): string {
+  if (path.startsWith('file://') || path.startsWith('http://') || path.startsWith('https://') ||
+    path.startsWith('datashare://') || path.startsWith('content://') || path.startsWith('data:')) {
+    return path;
+  }
+  if (path.length === 0) {
+    return path;
+  }
+  return 'file://' + path;
+}

@@ -13,10 +13,6 @@
       "value": "题醒"
     },
     {
-      "name": "app_name",
-      "value": "题醒"
-    },
-    {
       "name": "reason_reminder",
       "value": "用于在设定时间推送复习提醒通知"
     },

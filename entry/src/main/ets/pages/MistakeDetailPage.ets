@@ -6,7 +6,7 @@ import { ReviewScheduler } from '../usecases/ReviewScheduler';
 import { MasteryEvaluator } from '../usecases/MasteryEvaluator';
 import { PointsCalculator } from '../usecases/PointsCalculator';
 import { MediaService } from '../services/MediaService';
-import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor, formatDate, generateId } from '../common/Constants';
+import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor, formatDate, generateId, toFileUri } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { StatusTag, SubjectTag, PageTitle, EmptyPlaceholder, PageHeader } from '../components/CommonComponents';
 import { MistakeDetailParams } from '../common/RouteParams';
@@ -144,7 +144,7 @@ struct MistakeDetailPage {
             .borderRadius(AppSizes.CORNER_RADIUS_SM)
             .backgroundColor(AppColors.BG_PAGE)
           if (this.mistake.notesAttachmentUrl.length > 0) {
-            Image(this.mistake.notesAttachmentUrl)
+            Image(toFileUri(this.mistake.notesAttachmentUrl))
               .width('100%')
               .height(160)
               .objectFit(ImageFit.Contain)

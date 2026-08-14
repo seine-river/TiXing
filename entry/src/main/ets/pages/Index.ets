@@ -5,6 +5,7 @@ import { ProfilePage } from './ProfilePage';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { AppColors, AppStrings } from '../common/Constants';
 import { AppContextHolder } from '../common/AppContext';
+import { Toast } from '../common/Toast';
 import { ReminderService } from '../services/ReminderService';
 import { ReminderSettings } from '../models/ReminderSettings';
 
@@ -15,6 +16,7 @@ struct Index {
   @State dbInitialized: boolean = false;
 
   aboutToAppear(): void {
+    Toast.setContext(this.getUIContext());
     if (!this.dbInitialized) {
       const ctx = this.getUIContext().getHostContext() as Context;
       AppContextHolder.set(ctx);

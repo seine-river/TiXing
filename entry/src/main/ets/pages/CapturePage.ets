@@ -9,7 +9,7 @@ import { AnalyticsTracker } from '../usecases/AnalyticsTracker';
 import { PointsCalculator } from '../usecases/PointsCalculator';
 import { MediaService } from '../services/MediaService';
 import { PerformanceMonitor } from '../services/PerformanceMonitor';
-import { AppColors, AppSizes, AppStrings, subjectLabel, generateId } from '../common/Constants';
+import { AppColors, AppSizes, AppStrings, subjectLabel, generateId, toFileUri } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
 
@@ -46,10 +46,15 @@ struct CapturePage {
   @State imgNatH: number = 0;
   @State dispW: number = 0;
   @State dispH: number = 0;
-  @State cropLeftFrac: number = 0.05;
-  @State cropTopFrac: number = 0.05;
-  @State cropRightFrac: number = 0.95;
-  @State cropBottomFrac: number = 0.95;
+  @State cropLeftFrac: number = 0.08;
+  @State cropTopFrac: number = 0.08;
+  @State cropRightFrac: number = 0.92;
+  @State cropBottomFrac: number = 0.92;
+
+  @State dragStartLeft: number = 0;
+  @State dragStartTop: number = 0;
+  @State dragStartRight: number = 0;
+  @State dragStartBottom: number = 0;
 
   @State qualityIssue: string = '';
   @State ocrBusy: boolean = false;
@@ -161,43 +166,41 @@ struct CapturePage {
   @Builder
   StepRegionSelect() {
     Column() {
-      Text('框选题目区域（可拖动四角调整）')
+      Text('拖动四角调整识别区域，或直接识别全图')
         .fontSize(14)
         .fontColor(AppColors.TEXT_SECONDARY)
         .width('100%')
         .padding({ left: 16, top: 12, bottom: 8 })
 
       Stack() {
-        Image(this.imagePath)
-          .width('100%')
-          .objectFit(ImageFit.Contain)
-          .onAreaChange((_o: Area, n: Area) => {
-            this.dispW = toPixels(n.width);
-            this.dispH = toPixels(n.height);
-          })
-
-        Column() {
-          Stack() {
-            Column() {
-            }
-            .width((this.cropRightFrac - this.cropLeftFrac) * this.dispW)
-            .height((this.cropBottomFrac - this.cropTopFrac) * this.dispH)
-            .border({ width: 2, color: AppColors.PRIMARY })
-            .backgroundColor('#334A90D9')
-            .position({ x: this.cropLeftFrac * this.dispW, y: this.cropTopFrac * this.dispH })
-
-            this.CornerKnob(this.cropLeftFrac, this.cropTopFrac, true, true)
-            this.CornerKnob(this.cropRightFrac, this.cropBottomFrac, false, false)
-          }
+        Image(toFileUri(this.imagePath))
           .width('100%')
           .height('100%')
+          .objectFit(ImageFit.Contain)
+          .draggable(false)
+
+        Column() {
         }
-        .width('100%')
-        .height('100%')
+        .width((this.cropRightFrac - this.cropLeftFrac) * this.dispW)
+        .height((this.cropBottomFrac - this.cropTopFrac) * this.dispH)
+        .position({ x: this.cropLeftFrac * this.dispW, y: this.cropTopFrac * this.dispH })
+        .border({ width: 2, color: AppColors.PRIMARY })
+        .backgroundColor('#333A7BD5')
         .hitTestBehavior(HitTestMode.Transparent)
+
+        this.CornerKnob(this.cropLeftFrac, this.cropTopFrac, true, true)
+        this.CornerKnob(this.cropRightFrac, this.cropBottomFrac, false, false)
       }
       .width('100%')
-      .padding({ left: 16, right: 16 })
+      .aspectRatio(this.imageAspectRatio())
+      .margin({ left: 16, right: 16 })
+      .backgroundColor('#000000')
+      .borderRadius(AppSizes.CORNER_RADIUS_SM)
+      .clip(true)
+      .onAreaChange((_o: Area, n: Area) => {
+        this.dispW = toPixels(n.width);
+        this.dispH = toPixels(n.height);
+      })
 
       Row() {
         Button('识别全图')
@@ -234,30 +237,53 @@ struct CapturePage {
     .height('100%')
   }
 
+  private imageAspectRatio(): number {
+    if (this.imgNatW > 0 && this.imgNatH > 0) {
+      return this.imgNatW / this.imgNatH;
+    }
+    return 0.75;
+  }
+
   @Builder
   CornerKnob(fracX: number, fracY: number, isLeft: boolean, isTop: boolean) {
-    Column() {
+    Stack() {
+      Column() {
+      }
+      .width(28)
+      .height(28)
+      .borderRadius(14)
+      .backgroundColor(AppColors.PRIMARY)
+      .border({ width: 3, color: Color.White })
     }
-    .width(24)
-    .height(24)
-    .borderRadius(12)
-    .backgroundColor(AppColors.PRIMARY)
-    .border({ width: 2, color: Color.White })
-    .position({ x: fracX * this.dispW - 12, y: fracY * this.dispH - 12 })
+    .width(44)
+    .height(44)
+    .position({ x: fracX * this.dispW - 22, y: fracY * this.dispH - 22 })
     .gesture(
       PanGesture()
+        .onActionStart(() => {
+          if (isLeft) {
+            this.dragStartLeft = this.cropLeftFrac;
+          } else {
+            this.dragStartRight = this.cropRightFrac;
+          }
+          if (isTop) {
+            this.dragStartTop = this.cropTopFrac;
+          } else {
+            this.dragStartBottom = this.cropBottomFrac;
+          }
+        })
         .onActionUpdate((e) => {
           const dx: number = e.offsetX / (this.dispW > 0 ? this.dispW : 1);
           const dy: number = e.offsetY / (this.dispH > 0 ? this.dispH : 1);
           if (isLeft) {
-            this.cropLeftFrac = clamp(this.cropLeftFrac + dx, 0, this.cropRightFrac - 0.05);
+            this.cropLeftFrac = clamp(this.dragStartLeft + dx, 0, this.cropRightFrac - 0.05);
           } else {
-            this.cropRightFrac = clamp(this.cropRightFrac + dx, this.cropLeftFrac + 0.05, 1);
+            this.cropRightFrac = clamp(this.dragStartRight + dx, this.cropLeftFrac + 0.05, 1);
           }
           if (isTop) {
-            this.cropTopFrac = clamp(this.cropTopFrac + dy, 0, this.cropBottomFrac - 0.05);
+            this.cropTopFrac = clamp(this.dragStartTop + dy, 0, this.cropBottomFrac - 0.05);
           } else {
-            this.cropBottomFrac = clamp(this.cropBottomFrac + dy, this.cropTopFrac + 0.05, 1);
+            this.cropBottomFrac = clamp(this.dragStartBottom + dy, this.cropTopFrac + 0.05, 1);
           }
         })
     )
@@ -541,7 +567,10 @@ struct CapturePage {
     this.knowledgeTags = tags;
   }
 
-  private currentRegion(): ImageRegion {
+  private currentRegion(): ImageRegion | undefined {
+    if (this.imgNatW <= 0 || this.imgNatH <= 0) {
+      return undefined;
+    }
     return new ImageRegion(
       Math.round(this.cropLeftFrac * this.imgNatW),
       Math.round(this.cropTopFrac * this.imgNatH),
@@ -627,6 +656,14 @@ struct CapturePage {
     this.imagePath = '';
     this.qualityIssue = '';
     this.ocrResult = new OcrRecognitionResult();
+    this.imgNatW = 0;
+    this.imgNatH = 0;
+    this.dispW = 0;
+    this.dispH = 0;
+    this.cropLeftFrac = 0.08;
+    this.cropTopFrac = 0.08;
+    this.cropRightFrac = 0.92;
+    this.cropBottomFrac = 0.92;
   }
 }
 
