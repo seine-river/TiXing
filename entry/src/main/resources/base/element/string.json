@@ -15,10 +15,6 @@
     {
       "name": "reason_reminder",
       "value": "用于在设定时间推送复习提醒通知"
-    },
-    {
-      "name": "reason_media",
-      "value": "用于拍照或从相册选取错题图片"
     }
   ]
 }
