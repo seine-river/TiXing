@@ -2,6 +2,7 @@ import { Mistake } from '../models/Mistake';
 import { MistakeStatus, Subject, ErrorType } from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor, formatDate, toFileUri } from '../common/Constants';
+import { Toast } from '../common/Toast';
 import { StatusTag, SubjectTag, EmptyPlaceholder } from '../components/CommonComponents';
 
 @Component
@@ -118,11 +119,21 @@ export struct MistakesPage {
             ListItem() {
               Row() {
                 Column() {
-                  Text(item.ocrText.length > 40 ? item.ocrText.substring(0, 40) + '...' : item.ocrText)
+                  Text(this.displayTitle(item))
                     .fontSize(15)
+                    .fontWeight(FontWeight.Medium)
                     .fontColor(AppColors.TEXT_PRIMARY)
                     .maxLines(2)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+                  if (item.ocrText.length > 0) {
+                    Text(item.ocrText.length > 40 ? item.ocrText.substring(0, 40) + '...' : item.ocrText)
+                      .fontSize(12)
+                      .fontColor(AppColors.TEXT_SECONDARY)
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      .margin({ top: 4 })
+                  }
 
                   Row({ space: 4 }) {
                     SubjectTag({ subjectText: subjectLabel(item.subject), subjectColor: AppColors.PRIMARY })
@@ -132,13 +143,6 @@ export struct MistakesPage {
                       .fontColor(AppColors.TEXT_SECONDARY)
                   }
                   .margin({ top: 6 })
-
-                  Row() {
-                    Text(`复习${item.intervalIndex}次`)
-                      .fontSize(12)
-                      .fontColor(AppColors.TEXT_SECONDARY)
-                  }
-                  .margin({ top: 4 })
                 }
                 .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1)
@@ -171,6 +175,13 @@ export struct MistakesPage {
                 this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeDetailPage', params: { mistakeId: item.id } });
               })
             }
+            .swipeAction({
+              end: {
+                builder: () => {
+                  this.DeleteAction(item)
+                }
+              }
+            })
           }, (item: Mistake) => item.id)
         }
         .width('100%')
@@ -182,5 +193,35 @@ export struct MistakesPage {
     .width('100%')
     .height('100%')
     .backgroundColor(AppColors.BG_PAGE)
+  }
+
+  @Builder
+  DeleteAction(item: Mistake) {
+    Button('删除')
+      .height('100%')
+      .backgroundColor(AppColors.DANGER)
+      .fontColor(Color.White)
+      .fontSize(15)
+      .borderRadius(0)
+      .padding({ left: 20, right: 20 })
+      .onClick(() => {
+        this.confirmDelete(item);
+      })
+  }
+
+  private displayTitle(item: Mistake): string {
+    if (item.knowledgeSummary.length > 0) {
+      return item.knowledgeSummary;
+    }
+    if (item.ocrText.length > 0) {
+      return item.ocrText.length > 30 ? item.ocrText.substring(0, 30) + '...' : item.ocrText;
+    }
+    return '未命名错题';
+  }
+
+  private async confirmDelete(item: Mistake): Promise<void> {
+    await dbHelper.deleteMistake(item.id);
+    Toast.show('已删除该错题');
+    this.loadMistakes();
   }
 }

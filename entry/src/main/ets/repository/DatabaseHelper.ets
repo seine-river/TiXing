@@ -6,7 +6,7 @@ import { Student, ParentAccount } from '../models/Student';
 import { PointsLog, PointsSummary } from '../models/PointsLog';
 import { CommunityPost } from '../models/CommunityPost';
 import { ReminderSettings } from '../models/ReminderSettings';
-import { AnalyticsEvent, MetricSummary } from '../models/AnalyticsEvent';
+import { AnalyticsEvent, MetricSummary, ReviewStats } from '../models/AnalyticsEvent';
 import {
   Subject, Grade, ErrorType, MistakeStatus, AnswerType, GradingMethod,
   InputMethod, SyncStatus, PointsActionType, CommunityPostStatus,
@@ -20,7 +20,8 @@ const CREATE_MISTAKE_TABLE: string =
     id TEXT PRIMARY KEY, studentId TEXT, imageUrl TEXT, ocrText TEXT,
     ocrConfidence REAL, isConfirmed INTEGER, subject TEXT, knowledgeTagIds TEXT,
     errorType TEXT, status TEXT, intervalIndex INTEGER, nextReviewDate INTEGER,
-    firstReviewDuration INTEGER, standardAnswer TEXT, answerType TEXT,
+    firstReviewDuration INTEGER, standardAnswer TEXT, studentAnswer TEXT,
+    knowledgeSummary TEXT, answerType TEXT,
     notes TEXT, notesAttachmentUrl TEXT, sharedToCommunity INTEGER,
     communityPostId TEXT, createdAt INTEGER, syncStatus TEXT)`;
 
@@ -100,6 +101,7 @@ export class DatabaseHelper {
       await this.rdbStore.executeSql(CREATE_REMINDER_SETTINGS_TABLE);
       await this.rdbStore.executeSql(CREATE_ANALYTICS_EVENT_TABLE);
       await this.rdbStore.executeSql(CREATE_REDEMPTION_TABLE);
+      this.migrateMistakeTable();
       await this.seedKnowledgeTags();
     } catch (e) {
     }
@@ -132,6 +134,22 @@ export class DatabaseHelper {
     }
   }
 
+  private migrateMistakeTable(): void {
+    if (this.rdbStore === undefined) {
+      return;
+    }
+    const migrations: string[] = [
+      'ALTER TABLE mistake ADD COLUMN studentAnswer TEXT',
+      'ALTER TABLE mistake ADD COLUMN knowledgeSummary TEXT'
+    ];
+    for (const sql of migrations) {
+      try {
+        this.rdbStore.executeSql(sql);
+      } catch (e) {
+      }
+    }
+  }
+
   private makeTag(id: string, subject: Subject, grade: Grade, ver: TextbookVersion, name: string, parent: string): KnowledgeTag {
     const t = new KnowledgeTag();
     t.id = id;
@@ -157,7 +175,8 @@ export class DatabaseHelper {
       'errorType': m.errorType, 'status': m.status,
       'intervalIndex': m.intervalIndex, 'nextReviewDate': m.nextReviewDate,
       'firstReviewDuration': m.firstReviewDuration,
-      'standardAnswer': m.standardAnswer, 'answerType': m.answerType,
+      'standardAnswer': m.standardAnswer, 'studentAnswer': m.studentAnswer,
+      'knowledgeSummary': m.knowledgeSummary, 'answerType': m.answerType,
       'notes': m.notes, 'notesAttachmentUrl': m.notesAttachmentUrl,
       'sharedToCommunity': m.sharedToCommunity ? 1 : 0,
       'communityPostId': m.communityPostId, 'createdAt': m.createdAt,
@@ -178,7 +197,8 @@ export class DatabaseHelper {
       'errorType': m.errorType, 'status': m.status,
       'intervalIndex': m.intervalIndex, 'nextReviewDate': m.nextReviewDate,
       'firstReviewDuration': m.firstReviewDuration,
-      'standardAnswer': m.standardAnswer, 'answerType': m.answerType,
+      'standardAnswer': m.standardAnswer, 'studentAnswer': m.studentAnswer,
+      'knowledgeSummary': m.knowledgeSummary, 'answerType': m.answerType,
       'notes': m.notes, 'notesAttachmentUrl': m.notesAttachmentUrl,
       'syncStatus': m.syncStatus
     };
@@ -255,6 +275,36 @@ export class DatabaseHelper {
     return list;
   }
 
+  async deleteMistake(id: string): Promise<void> {
+    if (this.rdbStore === undefined) return;
+    try {
+      const p1 = new relationalStore.RdbPredicates('mistake');
+      p1.equalTo('id', id);
+      await this.rdbStore.delete(p1);
+      const p2 = new relationalStore.RdbPredicates('review_log');
+      p2.equalTo('mistakeId', id);
+      await this.rdbStore.delete(p2);
+    } catch (e) {
+    }
+  }
+
+  async queryReviewStats(): Promise<ReviewStats> {
+    const stats = new ReviewStats();
+    if (this.rdbStore === undefined) return stats;
+    try {
+      const resultSet = await this.rdbStore.query(new relationalStore.RdbPredicates('review_log'));
+      while (resultSet.goToNextRow()) {
+        stats.total++;
+        if (rs_col_long(resultSet, 'correct') === 1) {
+          stats.correct++;
+        }
+      }
+      resultSet.close();
+    } catch (e) {
+    }
+    return stats;
+  }
+
   private rowToMistake(rs: relationalStore.ResultSet): Mistake {
     const m = new Mistake();
     try {
@@ -273,6 +323,8 @@ export class DatabaseHelper {
       m.nextReviewDate = rs_col_long(rs, 'nextReviewDate');
       m.firstReviewDuration = rs_col_long(rs, 'firstReviewDuration');
       m.standardAnswer = rs_col(rs, 'standardAnswer');
+      m.studentAnswer = rs_col(rs, 'studentAnswer');
+      m.knowledgeSummary = rs_col(rs, 'knowledgeSummary');
       m.answerType = rs_col(rs, 'answerType') as AnswerType;
       m.notes = rs_col(rs, 'notes');
       m.notesAttachmentUrl = rs_col(rs, 'notesAttachmentUrl');

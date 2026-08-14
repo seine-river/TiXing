@@ -53,6 +53,22 @@ struct MistakeDetailPage {
           .padding({ left: 16, right: 16, top: 4 })
 
         Column() {
+          Text('知识点总结')
+            .fontSize(14)
+            .fontColor(AppColors.TEXT_SECONDARY)
+            .margin({ bottom: 6 })
+          Text(this.mistake.knowledgeSummary.length > 0 ? this.mistake.knowledgeSummary : '未填写')
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(AppColors.PRIMARY)
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor(AppColors.BG_CARD)
+        .borderRadius(AppSizes.CORNER_RADIUS_SM)
+        .margin({ left: 16, right: 16, top: 8 })
+
+        Column() {
           Text('题目内容')
             .fontSize(14)
             .fontColor(AppColors.TEXT_SECONDARY)
@@ -73,9 +89,24 @@ struct MistakeDetailPage {
             .fontSize(14)
             .fontColor(AppColors.TEXT_SECONDARY)
             .margin({ bottom: 6 })
-          Text(this.mistake.standardAnswer)
+          Text(this.mistake.standardAnswer.length > 0 ? this.mistake.standardAnswer : '未填写')
             .fontSize(16)
             .fontColor(AppColors.SECONDARY)
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor(AppColors.BG_CARD)
+        .borderRadius(AppSizes.CORNER_RADIUS_SM)
+        .margin({ left: 16, right: 16, top: 8 })
+
+        Column() {
+          Text('我的答案')
+            .fontSize(14)
+            .fontColor(AppColors.TEXT_SECONDARY)
+            .margin({ bottom: 6 })
+          Text(this.mistake.studentAnswer.length > 0 ? this.mistake.studentAnswer : '未填写')
+            .fontSize(16)
+            .fontColor(AppColors.DANGER)
         }
         .width('100%')
         .padding(16)

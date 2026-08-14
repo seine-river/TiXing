@@ -26,13 +26,25 @@ export class MediaService {
   static async capturePhoto(): Promise<string | undefined> {
     try {
       const ctx = AppContextHolder.require();
+      const dir: string = ctx.filesDir + '/mistakes';
+      try {
+        if (!fs.accessSync(dir)) {
+          fs.mkdirSync(dir, true);
+        }
+      } catch (e) {
+      }
+      const savePath: string = `${dir}/cam_${generateId()}.jpg`;
       const profile: cameraPicker.PickerProfile = {
-        cameraPosition: camera.CameraPosition.CAMERA_POSITION_BACK
+        cameraPosition: camera.CameraPosition.CAMERA_POSITION_BACK,
+        saveUri: 'file://' + savePath
       };
       const result: cameraPicker.PickerResult = await cameraPicker.pick(ctx,
         [cameraPicker.PickerMediaType.PHOTO], profile);
       if (result.resultCode !== 0 || result.resultUri.length === 0) {
         return undefined;
+      }
+      if (result.resultUri.indexOf('mistakes/cam_') >= 0) {
+        return result.resultUri;
       }
       return MediaService.persistUri(result.resultUri);
     } catch (e) {

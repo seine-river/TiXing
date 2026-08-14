@@ -236,6 +236,8 @@ export default function coreAlgorithmTest() {
       expect(m.isConfirmed).assertEqual(false);
       expect(m.syncStatus).assertEqual(SyncStatus.PENDING);
       expect(m.nextReviewDate).assertLarger(0);
+      expect(m.studentAnswer).assertEqual('');
+      expect(m.knowledgeSummary).assertEqual('');
     });
 
     it('Mistake_default_status_is_unmastered', 0, () => {

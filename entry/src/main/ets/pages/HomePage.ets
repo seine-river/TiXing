@@ -186,8 +186,9 @@ export struct HomePage {
   RecentCard(item: Mistake) {
     Row() {
       Column() {
-        Text(item.ocrText.length > 36 ? item.ocrText.substring(0, 36) + '...' : item.ocrText)
+        Text(this.recentTitle(item))
           .fontSize(15)
+          .fontWeight(FontWeight.Medium)
           .fontColor(AppColors.TEXT_PRIMARY)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -231,5 +232,15 @@ export struct HomePage {
     .onClick(() => {
       this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeDetailPage', params: { mistakeId: item.id } });
     })
+  }
+
+  private recentTitle(item: Mistake): string {
+    if (item.knowledgeSummary.length > 0) {
+      return item.knowledgeSummary;
+    }
+    if (item.ocrText.length > 0) {
+      return item.ocrText.length > 36 ? item.ocrText.substring(0, 36) + '...' : item.ocrText;
+    }
+    return '未命名错题';
   }
 }

@@ -31,9 +31,14 @@ struct CapturePage {
   @State ocrResult: OcrRecognitionResult = new OcrRecognitionResult();
   @State questionText: string = '';
   @State standardAnswer: string = '';
+  @State studentAnswer: string = '';
+  @State knowledgeSummary: string = '';
   @State answerType: AnswerType = AnswerType.TEXT;
   @State isConfirmed: boolean = false;
   @State capturing: boolean = false;
+
+  @State compareResult: string = '';
+  @State fieldOcrBusy: string = '';
 
   @State answerTypeOptions: AnswerTypeOption[] = [];
   @State errorTypeOptions: ErrorTypeOption[] = [];
@@ -188,8 +193,57 @@ struct CapturePage {
         .backgroundColor('#333A7BD5')
         .hitTestBehavior(HitTestMode.Transparent)
 
-        this.CornerKnob(this.cropLeftFrac, this.cropTopFrac, true, true)
-        this.CornerKnob(this.cropRightFrac, this.cropBottomFrac, false, false)
+        Stack() {
+          Column() {
+          }
+          .width(28)
+          .height(28)
+          .borderRadius(14)
+          .backgroundColor(AppColors.PRIMARY)
+          .border({ width: 3, color: Color.White })
+        }
+        .width(44)
+        .height(44)
+        .position({ x: this.cropLeftFrac * this.dispW - 22, y: this.cropTopFrac * this.dispH - 22 })
+        .gesture(
+          PanGesture()
+            .onActionStart(() => {
+              this.dragStartLeft = this.cropLeftFrac;
+              this.dragStartTop = this.cropTopFrac;
+            })
+            .onActionUpdate((e) => {
+              const dx: number = e.offsetX / (this.dispW > 0 ? this.dispW : 1);
+              const dy: number = e.offsetY / (this.dispH > 0 ? this.dispH : 1);
+              this.cropLeftFrac = clamp(this.dragStartLeft + dx, 0, this.cropRightFrac - 0.05);
+              this.cropTopFrac = clamp(this.dragStartTop + dy, 0, this.cropBottomFrac - 0.05);
+            })
+        )
+
+        Stack() {
+          Column() {
+          }
+          .width(28)
+          .height(28)
+          .borderRadius(14)
+          .backgroundColor(AppColors.PRIMARY)
+          .border({ width: 3, color: Color.White })
+        }
+        .width(44)
+        .height(44)
+        .position({ x: this.cropRightFrac * this.dispW - 22, y: this.cropBottomFrac * this.dispH - 22 })
+        .gesture(
+          PanGesture()
+            .onActionStart(() => {
+              this.dragStartRight = this.cropRightFrac;
+              this.dragStartBottom = this.cropBottomFrac;
+            })
+            .onActionUpdate((e) => {
+              const dx: number = e.offsetX / (this.dispW > 0 ? this.dispW : 1);
+              const dy: number = e.offsetY / (this.dispH > 0 ? this.dispH : 1);
+              this.cropRightFrac = clamp(this.dragStartRight + dx, this.cropLeftFrac + 0.05, 1);
+              this.cropBottomFrac = clamp(this.dragStartBottom + dy, this.cropTopFrac + 0.05, 1);
+            })
+        )
       }
       .width('100%')
       .aspectRatio(this.imageAspectRatio())
@@ -245,51 +299,6 @@ struct CapturePage {
   }
 
   @Builder
-  CornerKnob(fracX: number, fracY: number, isLeft: boolean, isTop: boolean) {
-    Stack() {
-      Column() {
-      }
-      .width(28)
-      .height(28)
-      .borderRadius(14)
-      .backgroundColor(AppColors.PRIMARY)
-      .border({ width: 3, color: Color.White })
-    }
-    .width(44)
-    .height(44)
-    .position({ x: fracX * this.dispW - 22, y: fracY * this.dispH - 22 })
-    .gesture(
-      PanGesture()
-        .onActionStart(() => {
-          if (isLeft) {
-            this.dragStartLeft = this.cropLeftFrac;
-          } else {
-            this.dragStartRight = this.cropRightFrac;
-          }
-          if (isTop) {
-            this.dragStartTop = this.cropTopFrac;
-          } else {
-            this.dragStartBottom = this.cropBottomFrac;
-          }
-        })
-        .onActionUpdate((e) => {
-          const dx: number = e.offsetX / (this.dispW > 0 ? this.dispW : 1);
-          const dy: number = e.offsetY / (this.dispH > 0 ? this.dispH : 1);
-          if (isLeft) {
-            this.cropLeftFrac = clamp(this.dragStartLeft + dx, 0, this.cropRightFrac - 0.05);
-          } else {
-            this.cropRightFrac = clamp(this.dragStartRight + dx, this.cropLeftFrac + 0.05, 1);
-          }
-          if (isTop) {
-            this.cropTopFrac = clamp(this.dragStartTop + dy, 0, this.cropBottomFrac - 0.05);
-          } else {
-            this.cropBottomFrac = clamp(this.dragStartBottom + dy, this.cropTopFrac + 0.05, 1);
-          }
-        })
-    )
-  }
-
-  @Builder
   StepOcrConfirm() {
     Scroll() {
       Column() {
@@ -298,6 +307,25 @@ struct CapturePage {
           .fontWeight(FontWeight.Medium)
           .fontColor(AppColors.TEXT_PRIMARY)
           .padding({ left: 16, right: 16, bottom: 12 })
+
+        Column() {
+          Text('知识点总结')
+            .fontSize(14)
+            .fontColor(AppColors.TEXT_SECONDARY)
+            .margin({ bottom: 4 })
+          TextInput({ text: this.knowledgeSummary, placeholder: '如：分数加减法 / 阅读理解（可手动修改）' })
+            .fontSize(16)
+            .borderRadius(AppSizes.CORNER_RADIUS_SM)
+            .backgroundColor(AppColors.BG_PAGE)
+            .onChange((v: string) => {
+              this.knowledgeSummary = v;
+            })
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor(AppColors.BG_CARD)
+        .borderRadius(AppSizes.CORNER_RADIUS_SM)
+        .margin({ left: 16, right: 16, top: 8 })
 
         Column() {
           Row() {
@@ -339,9 +367,32 @@ struct CapturePage {
           this.questionText = v;
         })
 
-        this.OcrFieldCard('标准答案', this.standardAnswer, this.ocrResult.standardAnswerCandidate, (v: string) => {
-          this.standardAnswer = v;
-        })
+        this.AnswerFieldCard('标准答案', this.standardAnswer, 'standard')
+        this.AnswerFieldCard('我的答案', this.studentAnswer, 'mine')
+
+        Button('🔍 智能对比分析')
+          .width('90%')
+          .height(42)
+          .backgroundColor(AppColors.SECONDARY)
+          .fontColor(Color.White)
+          .borderRadius(21)
+          .margin({ top: 12 })
+          .onClick(() => {
+            this.runCompare();
+          })
+
+        if (this.compareResult.length > 0) {
+          Text(this.compareResult)
+            .fontSize(13)
+            .fontColor(AppColors.TEXT_REGULAR)
+            .lineHeight(20)
+            .width('100%')
+            .padding(14)
+            .backgroundColor(AppColors.BG_CARD)
+            .borderRadius(AppSizes.CORNER_RADIUS_SM)
+            .border({ width: 1, color: AppColors.DIVIDER })
+            .margin({ left: 16, right: 16, top: 8 })
+        }
 
         Column() {
           Text('题目类型')
@@ -444,6 +495,67 @@ struct CapturePage {
       .width('100%')
     }
     .scrollBar(BarState.Auto)
+  }
+
+  @Builder
+  AnswerFieldCard(label: string, value: string, target: string) {
+    Column() {
+      Row() {
+        Text(label)
+          .fontSize(14)
+          .fontColor(AppColors.TEXT_SECONDARY)
+          .layoutWeight(1)
+        if (this.fieldOcrBusy === target) {
+          Text('识别中...')
+            .fontSize(11)
+            .fontColor(AppColors.TEXT_PLACEHOLDER)
+        }
+      }
+      .width('100%')
+      .margin({ bottom: 4 })
+
+      TextInput({ text: value, placeholder: `输入${label}，或点击右侧拍照识别` })
+        .fontSize(16)
+        .borderRadius(AppSizes.CORNER_RADIUS_SM)
+        .backgroundColor(AppColors.BG_PAGE)
+        .onChange((v: string) => {
+          if (target === 'standard') {
+            this.standardAnswer = v;
+          } else {
+            this.studentAnswer = v;
+          }
+        })
+
+      Row({ space: 8 }) {
+        Button('📷 拍照识别')
+          .height(32)
+          .fontSize(12)
+          .backgroundColor('#E8EAED')
+          .fontColor(AppColors.TEXT_REGULAR)
+          .borderRadius(16)
+          .enabled(this.fieldOcrBusy.length === 0)
+          .onClick(() => {
+            this.ocrForField(target, true);
+          })
+        Button('🖼️ 相册选取')
+          .height(32)
+          .fontSize(12)
+          .backgroundColor('#E8EAED')
+          .fontColor(AppColors.TEXT_REGULAR)
+          .borderRadius(16)
+          .enabled(this.fieldOcrBusy.length === 0)
+          .onClick(() => {
+            this.ocrForField(target, false);
+          })
+      }
+      .width('100%')
+      .margin({ top: 8 })
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.BG_CARD)
+    .borderRadius(AppSizes.CORNER_RADIUS_SM)
+    .margin({ left: 16, right: 16, top: 8 })
   }
 
   @Builder
@@ -584,14 +696,48 @@ struct CapturePage {
     const result = await CaptureOrchestrator.performOcr(this.imagePath, region);
     this.ocrResult = result;
     this.questionText = result.questionText.text;
-    this.standardAnswer = result.standardAnswerCandidate.text;
     this.selectedSubject = SubjectDetector.detect(this.questionText);
+    if (this.knowledgeSummary.length === 0) {
+      this.knowledgeSummary = subjectLabel(this.selectedSubject) + '错题';
+    }
     await this.loadTags();
     this.ocrBusy = false;
     this.currentStep = 2;
     if (this.questionText.length === 0) {
       Toast.show('未识别到文字内容，请手动输入或重新圈选区域');
     }
+  }
+
+  private async ocrForField(target: string, fromCamera: boolean): Promise<void> {
+    this.fieldOcrBusy = target;
+    const path = fromCamera ? await MediaService.capturePhoto() : await MediaService.pickFromAlbum();
+    if (path === undefined || path.length === 0) {
+      this.fieldOcrBusy = '';
+      Toast.show('未获取到图片，请重试');
+      return;
+    }
+    const result = await CaptureOrchestrator.performOcr(path, undefined);
+    this.fieldOcrBusy = '';
+    const text: string = result.questionText.text;
+    if (text.length === 0) {
+      Toast.show('未识别到文字，请手动输入');
+      return;
+    }
+    if (target === 'standard') {
+      this.standardAnswer = this.standardAnswer.length > 0 ? this.standardAnswer + ' ' + text : text;
+    } else {
+      this.studentAnswer = this.studentAnswer.length > 0 ? this.studentAnswer + ' ' + text : text;
+    }
+  }
+
+  private runCompare(): void {
+    const s: string = this.standardAnswer.trim();
+    const m: string = this.studentAnswer.trim();
+    if (s.length === 0 || m.length === 0) {
+      Toast.show('请先填写标准答案和我的答案');
+      return;
+    }
+    this.compareResult = diffAnswers(s, m);
   }
 
   private toggleTag(tagId: string): void {
@@ -627,6 +773,8 @@ struct CapturePage {
       mistake.isConfirmed = true;
       mistake.errorType = this.selectedErrorType;
       mistake.ocrConfidence = this.ocrResult.questionText.confidence;
+      mistake.studentAnswer = this.studentAnswer;
+      mistake.knowledgeSummary = this.knowledgeSummary;
       await dbHelper.insertMistake(mistake);
 
       const pointsLog = PointsCalculator.createPointsLog(generateId(), mistake.studentId, PointsActionType.CAPTURE);
@@ -650,6 +798,9 @@ struct CapturePage {
     this.currentStep = 0;
     this.questionText = '';
     this.standardAnswer = '';
+    this.studentAnswer = '';
+    this.knowledgeSummary = '';
+    this.compareResult = '';
     this.answerType = AnswerType.TEXT;
     this.selectedErrorType = ErrorType.OTHER;
     this.selectedTagIds = [];
@@ -681,4 +832,36 @@ function toPixels(len: Length): number {
     return parseFloat(len);
   }
   return 0;
+}
+
+function diffAnswers(standard: string, mine: string): string {
+  if (standard === mine) {
+    return '✅ 智能对比：答案一致，未发现错误点。';
+  }
+  let pre: number = 0;
+  while (pre < standard.length && pre < mine.length && standard.charAt(pre) === mine.charAt(pre)) {
+    pre++;
+  }
+  let suf: number = 0;
+  while (suf < standard.length - pre && suf < mine.length - pre &&
+    standard.charAt(standard.length - 1 - suf) === mine.charAt(mine.length - 1 - suf)) {
+    suf++;
+  }
+  const sDiff: string = standard.substring(pre, standard.length - suf);
+  const mDiff: string = mine.substring(pre, mine.length - suf);
+  let msg: string = '⚠️ 智能对比发现差异：\n';
+  if (sDiff.length > 0) {
+    msg += `· 标准答案关键处：「${sDiff}」\n`;
+  }
+  if (mDiff.length > 0) {
+    msg += `· 你的作答处：「${mDiff}」\n`;
+  }
+  if (sDiff.length === 0 && mDiff.length > 0) {
+    msg += '· 你的答案多写了内容\n';
+  }
+  if (mDiff.length === 0 && sDiff.length > 0) {
+    msg += '· 你的答案遗漏了内容\n';
+  }
+  msg += '建议针对以上差异点重点复习。';
+  return msg;
 }

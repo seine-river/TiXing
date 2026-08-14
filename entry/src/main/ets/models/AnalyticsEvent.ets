@@ -26,6 +26,11 @@ export class MetricSummary {
   reviewAccuracy: number = 0;
 }
 
+export class ReviewStats {
+  total: number = 0;
+  correct: number = 0;
+}
+
 function hashStudentId(studentId: string): string {
   let hash: number = 0;
   for (let i = 0; i < studentId.length; i++) {

@@ -17,6 +17,8 @@ export class Mistake {
   nextReviewDate: number = 0;
   firstReviewDuration: number = 0;
   standardAnswer: string = '';
+  studentAnswer: string = '';
+  knowledgeSummary: string = '';
   answerType: AnswerType = AnswerType.TEXT;
   notes: string = '';
   notesAttachmentUrl: string = '';
