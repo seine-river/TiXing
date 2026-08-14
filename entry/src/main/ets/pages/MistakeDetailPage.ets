@@ -6,6 +6,7 @@ import { ReviewScheduler } from '../usecases/ReviewScheduler';
 import { MasteryEvaluator } from '../usecases/MasteryEvaluator';
 import { PointsCalculator } from '../usecases/PointsCalculator';
 import { MediaService } from '../services/MediaService';
+import { AiService } from '../services/AiService';
 import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor, formatDate, generateId, toFileUri } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { StatusTag, SubjectTag, PageTitle, EmptyPlaceholder, PageHeader } from '../components/CommonComponents';
@@ -17,6 +18,11 @@ struct MistakeDetailPage {
   @State mistake: Mistake = new Mistake();
   @State reviewLogs: ReviewLog[] = [];
   @State notesText: string = '';
+  @State editQuestion: string = '';
+  @State editStdAnswer: string = '';
+  @State editMyAnswer: string = '';
+  @State editKnowledge: string = '';
+  @State fieldBusy: string = '';
   @State isLoaded: boolean = false;
 
   aboutToAppear(): void {
@@ -32,10 +38,85 @@ struct MistakeDetailPage {
     if (m !== undefined) {
       this.mistake = m;
       this.notesText = m.notes;
+      this.editQuestion = m.ocrText;
+      this.editStdAnswer = m.standardAnswer;
+      this.editMyAnswer = m.studentAnswer;
+      this.editKnowledge = m.knowledgeSummary;
     }
     const logs = await dbHelper.queryReviewLogs(id);
     this.reviewLogs = logs;
     this.isLoaded = true;
+  }
+
+  @Builder
+  EditableCard(label: string, value: string, color: string, onChange: (v: string) => void, target: string) {
+    Column() {
+      Row() {
+        Text(label)
+          .fontSize(14)
+          .fontColor(AppColors.TEXT_SECONDARY)
+          .layoutWeight(1)
+        if (this.fieldBusy === target) {
+          Text('识别中...')
+            .fontSize(11)
+            .fontColor(AppColors.TEXT_PLACEHOLDER)
+        }
+      }
+      .width('100%')
+      .margin({ bottom: 6 })
+
+      TextArea({ text: value, placeholder: `输入或修改${label}` })
+        .fontSize(16)
+        .fontColor(color)
+        .borderRadius(AppSizes.CORNER_RADIUS_SM)
+        .backgroundColor(AppColors.BG_PAGE)
+        .onChange((v: string) => {
+          onChange(v);
+        })
+
+      Button('📷 拍照重新识别')
+        .height(32)
+        .fontSize(12)
+        .backgroundColor('#E8EAED')
+        .fontColor(AppColors.TEXT_REGULAR)
+        .borderRadius(16)
+        .margin({ top: 8 })
+        .enabled(this.fieldBusy.length === 0)
+        .onClick(() => {
+          this.reRecognizeField(target);
+        })
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.BG_CARD)
+    .borderRadius(AppSizes.CORNER_RADIUS_SM)
+    .margin({ left: 16, right: 16, top: 8 })
+  }
+
+  private async reRecognizeField(target: string): Promise<void> {
+    const path = await MediaService.pickFromAlbum();
+    if (path === undefined || path.length === 0) {
+      Toast.show('未选取图片');
+      return;
+    }
+    this.fieldBusy = target;
+    try {
+      const text: string = await AiService.recognizeImage(path, undefined);
+      const cleaned: string = text.trim();
+      if (cleaned.length === 0) {
+        Toast.show('未识别到文字');
+      } else if (target === 'question') {
+        this.editQuestion = cleaned;
+        this.mistake.imageUrl = path;
+      } else if (target === 'standard') {
+        this.editStdAnswer = cleaned;
+      } else {
+        this.editMyAnswer = cleaned;
+      }
+    } catch (e) {
+      Toast.show('识别失败，请检查网络');
+    }
+    this.fieldBusy = '';
   }
 
   build() {
@@ -57,10 +138,11 @@ struct MistakeDetailPage {
             .fontSize(14)
             .fontColor(AppColors.TEXT_SECONDARY)
             .margin({ bottom: 6 })
-          Text(this.mistake.knowledgeSummary.length > 0 ? this.mistake.knowledgeSummary : '未填写')
+          TextInput({ text: this.editKnowledge, placeholder: '知识点总结' })
             .fontSize(16)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(AppColors.PRIMARY)
+            .borderRadius(AppSizes.CORNER_RADIUS_SM)
+            .backgroundColor(AppColors.BG_PAGE)
+            .onChange((v: string) => { this.editKnowledge = v; })
         }
         .width('100%')
         .padding(16)
@@ -68,51 +150,17 @@ struct MistakeDetailPage {
         .borderRadius(AppSizes.CORNER_RADIUS_SM)
         .margin({ left: 16, right: 16, top: 8 })
 
-        Column() {
-          Text('题目内容')
-            .fontSize(14)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .margin({ bottom: 6 })
-          Text(this.mistake.ocrText)
-            .fontSize(16)
-            .fontColor(AppColors.TEXT_PRIMARY)
-            .lineHeight(24)
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .margin({ left: 16, right: 16, top: 8 })
+        this.EditableCard('题目内容', this.editQuestion, AppColors.TEXT_PRIMARY, (v: string) => {
+          this.editQuestion = v;
+        }, 'question')
 
-        Column() {
-          Text('标准答案')
-            .fontSize(14)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .margin({ bottom: 6 })
-          Text(this.mistake.standardAnswer.length > 0 ? this.mistake.standardAnswer : '未填写')
-            .fontSize(16)
-            .fontColor(AppColors.SECONDARY)
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .margin({ left: 16, right: 16, top: 8 })
+        this.EditableCard('标准答案', this.editStdAnswer, AppColors.SECONDARY, (v: string) => {
+          this.editStdAnswer = v;
+        }, 'standard')
 
-        Column() {
-          Text('我的答案')
-            .fontSize(14)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .margin({ bottom: 6 })
-          Text(this.mistake.studentAnswer.length > 0 ? this.mistake.studentAnswer : '未填写')
-            .fontSize(16)
-            .fontColor(AppColors.DANGER)
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .margin({ left: 16, right: 16, top: 8 })
+        this.EditableCard('我的答案', this.editMyAnswer, AppColors.DANGER, (v: string) => {
+          this.editMyAnswer = v;
+        }, 'mine')
 
         Column() {
           Text('掌握度信息')
@@ -225,7 +273,7 @@ struct MistakeDetailPage {
         .borderRadius(AppSizes.CORNER_RADIUS_SM)
         .margin({ left: 16, right: 16, top: 8 })
 
-        Button('保存笔记')
+        Button('保存修改')
           .width('90%')
           .height(44)
           .backgroundColor(AppColors.PRIMARY)
@@ -233,7 +281,7 @@ struct MistakeDetailPage {
           .borderRadius(22)
           .margin({ top: 24, bottom: 32 })
           .onClick(() => {
-            this.saveNotes();
+            this.saveAll();
           })
         }
         .width('100%')
@@ -247,11 +295,15 @@ struct MistakeDetailPage {
     .backgroundColor(AppColors.BG_PAGE)
   }
 
-  private async saveNotes(): Promise<void> {
+  private async saveAll(): Promise<void> {
     this.mistake.notes = this.notesText;
+    this.mistake.ocrText = this.editQuestion;
+    this.mistake.standardAnswer = this.editStdAnswer;
+    this.mistake.studentAnswer = this.editMyAnswer;
+    this.mistake.knowledgeSummary = this.editKnowledge;
     try {
       await dbHelper.updateMistake(this.mistake);
-      Toast.show('笔记已保存');
+      Toast.show('已保存修改');
     } catch (e) {
       Toast.show('保存失败，请重试');
     }

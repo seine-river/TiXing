@@ -101,7 +101,7 @@ export class DatabaseHelper {
       await this.rdbStore.executeSql(CREATE_REMINDER_SETTINGS_TABLE);
       await this.rdbStore.executeSql(CREATE_ANALYTICS_EVENT_TABLE);
       await this.rdbStore.executeSql(CREATE_REDEMPTION_TABLE);
-      this.migrateMistakeTable();
+      await this.migrateAllTables();
       await this.seedKnowledgeTags();
     } catch (e) {
     }
@@ -134,17 +134,59 @@ export class DatabaseHelper {
     }
   }
 
-  private migrateMistakeTable(): void {
+  private async migrateAllTables(): Promise<void> {
     if (this.rdbStore === undefined) {
       return;
     }
     const migrations: string[] = [
+      'ALTER TABLE mistake ADD COLUMN imageUrl TEXT',
+      'ALTER TABLE mistake ADD COLUMN ocrText TEXT',
+      'ALTER TABLE mistake ADD COLUMN ocrConfidence REAL',
+      'ALTER TABLE mistake ADD COLUMN isConfirmed INTEGER',
+      'ALTER TABLE mistake ADD COLUMN subject TEXT',
+      'ALTER TABLE mistake ADD COLUMN knowledgeTagIds TEXT',
+      'ALTER TABLE mistake ADD COLUMN errorType TEXT',
+      'ALTER TABLE mistake ADD COLUMN status TEXT',
+      'ALTER TABLE mistake ADD COLUMN intervalIndex INTEGER',
+      'ALTER TABLE mistake ADD COLUMN nextReviewDate INTEGER',
+      'ALTER TABLE mistake ADD COLUMN firstReviewDuration INTEGER',
+      'ALTER TABLE mistake ADD COLUMN standardAnswer TEXT',
       'ALTER TABLE mistake ADD COLUMN studentAnswer TEXT',
-      'ALTER TABLE mistake ADD COLUMN knowledgeSummary TEXT'
+      'ALTER TABLE mistake ADD COLUMN knowledgeSummary TEXT',
+      'ALTER TABLE mistake ADD COLUMN answerType TEXT',
+      'ALTER TABLE mistake ADD COLUMN notes TEXT',
+      'ALTER TABLE mistake ADD COLUMN notesAttachmentUrl TEXT',
+      'ALTER TABLE mistake ADD COLUMN sharedToCommunity INTEGER',
+      'ALTER TABLE mistake ADD COLUMN communityPostId TEXT',
+      'ALTER TABLE mistake ADD COLUMN createdAt INTEGER',
+      'ALTER TABLE mistake ADD COLUMN syncStatus TEXT',
+      'ALTER TABLE review_log ADD COLUMN mistakeId TEXT',
+      'ALTER TABLE review_log ADD COLUMN reviewTime INTEGER',
+      'ALTER TABLE review_log ADD COLUMN gradingMethod TEXT',
+      'ALTER TABLE review_log ADD COLUMN inputMethod TEXT',
+      'ALTER TABLE review_log ADD COLUMN correct INTEGER',
+      'ALTER TABLE review_log ADD COLUMN durationSeconds INTEGER',
+      'ALTER TABLE review_log ADD COLUMN pointsAwarded INTEGER',
+      'ALTER TABLE review_log ADD COLUMN clientOperationId TEXT',
+      'ALTER TABLE reminder_settings ADD COLUMN reviewTimeStart TEXT',
+      'ALTER TABLE reminder_settings ADD COLUMN reviewTimeEnd TEXT',
+      'ALTER TABLE reminder_settings ADD COLUMN dailyLimit INTEGER',
+      'ALTER TABLE reminder_settings ADD COLUMN mathEnabled INTEGER',
+      'ALTER TABLE reminder_settings ADD COLUMN chineseEnabled INTEGER',
+      'ALTER TABLE reminder_settings ADD COLUMN englishEnabled INTEGER',
+      'ALTER TABLE reminder_settings ADD COLUMN scienceEnabled INTEGER',
+      'ALTER TABLE reminder_settings ADD COLUMN doNotDisturb INTEGER',
+      'ALTER TABLE reminder_settings ADD COLUMN notificationEnabled INTEGER',
+      'ALTER TABLE reminder_settings ADD COLUMN updatedAt INTEGER',
+      'ALTER TABLE analytics_event ADD COLUMN eventType TEXT',
+      'ALTER TABLE analytics_event ADD COLUMN studentIdHash TEXT',
+      'ALTER TABLE analytics_event ADD COLUMN platform TEXT',
+      'ALTER TABLE analytics_event ADD COLUMN properties TEXT',
+      'ALTER TABLE analytics_event ADD COLUMN occurredAt INTEGER'
     ];
     for (const sql of migrations) {
       try {
-        this.rdbStore.executeSql(sql);
+        await this.rdbStore.executeSql(sql);
       } catch (e) {
       }
     }
