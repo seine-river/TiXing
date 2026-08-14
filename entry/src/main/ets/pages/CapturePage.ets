@@ -434,21 +434,19 @@ struct CapturePage {
         .borderRadius(AppSizes.CORNER_RADIUS_SM)
         .margin({ left: 16, right: 16, top: 8 })
 
-        this.OcrFieldCard('题目内容', this.questionText, this.ocrResult.questionText, (v: string) => {
-          this.questionText = v;
-        })
+        this.OcrFieldCard('题目内容', this.ocrResult.questionText)
 
-        this.AnswerFieldCard('标准答案', this.standardAnswer, 'standard')
-        this.AnswerFieldCard('我的答案', this.studentAnswer, 'mine')
+        this.AnswerFieldCard('标准答案', 'standard')
+        this.AnswerFieldCard('我的答案', 'mine')
 
         Button(this.compareBusy ? '🔍 AI 分析中...' : '🔍 智能对比分析')
           .width('90%')
           .height(42)
-          .backgroundColor(this.compareBusy ? '#C0C4CC' : AppColors.SECONDARY)
+          .backgroundColor(this.anyAiBusy() ? '#C0C4CC' : AppColors.SECONDARY)
           .fontColor(Color.White)
           .borderRadius(21)
           .margin({ top: 12 })
-          .enabled(!this.compareBusy)
+          .enabled(!this.anyAiBusy())
           .onClick(() => {
             this.runCompare();
           })
@@ -552,14 +550,14 @@ struct CapturePage {
         .borderRadius(AppSizes.CORNER_RADIUS_SM)
         .margin({ left: 16, right: 16, top: 8 })
 
-        Button(AppStrings.CONFIRM_COMPLETE)
+        Button(this.anyAiBusy() ? 'AI 识别中，请稍候...' : AppStrings.CONFIRM_COMPLETE)
           .width('90%')
           .height(44)
-          .backgroundColor(this.questionText.length > 0 ? AppColors.PRIMARY : '#C0C4CC')
+          .backgroundColor((this.questionText.length > 0 && !this.anyAiBusy()) ? AppColors.PRIMARY : '#C0C4CC')
           .fontColor(Color.White)
           .borderRadius(22)
           .margin({ top: 24, bottom: 24 })
-          .enabled(this.questionText.length > 0)
+          .enabled(this.questionText.length > 0 && !this.anyAiBusy())
           .onClick(() => {
             this.saveMistake();
           })
@@ -570,7 +568,7 @@ struct CapturePage {
   }
 
   @Builder
-  AnswerFieldCard(label: string, value: string, target: string) {
+  AnswerFieldCard(label: string, target: string) {
     Column() {
       Row() {
         Text(label)
@@ -586,17 +584,19 @@ struct CapturePage {
       .width('100%')
       .margin({ bottom: 4 })
 
-      TextArea({ text: value, placeholder: `输入${label}，或选图后智能分析` })
-        .fontSize(16)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .backgroundColor(AppColors.BG_PAGE)
-        .onChange((v: string) => {
-          if (target === 'standard') {
-            this.standardAnswer = v;
-          } else {
-            this.studentAnswer = v;
-          }
-        })
+      if (target === 'standard') {
+        TextArea({ text: this.standardAnswer, placeholder: `输入${label}，或选图后智能分析` })
+          .fontSize(16)
+          .borderRadius(AppSizes.CORNER_RADIUS_SM)
+          .backgroundColor(AppColors.BG_PAGE)
+          .onChange((v: string) => { this.standardAnswer = v; })
+      } else {
+        TextArea({ text: this.studentAnswer, placeholder: `输入${label}，或选图后智能分析` })
+          .fontSize(16)
+          .borderRadius(AppSizes.CORNER_RADIUS_SM)
+          .backgroundColor(AppColors.BG_PAGE)
+          .onChange((v: string) => { this.studentAnswer = v; })
+      }
 
       if (this.answerImageOf(target).length > 0) {
         Row() {
@@ -728,7 +728,7 @@ struct CapturePage {
   }
 
   @Builder
-  OcrFieldCard(label: string, value: string, field: OcrFieldResult, onChange: (v: string) => void) {
+  OcrFieldCard(label: string, field: OcrFieldResult) {
     Column() {
       Row() {
         Text(label)
@@ -744,13 +744,13 @@ struct CapturePage {
       .width('100%')
       .margin({ bottom: 4 })
 
-      TextArea({ text: value, placeholder: `请核对${label}` })
+      TextArea({ text: this.questionText, placeholder: `请核对${label}` })
         .fontSize(16)
         .borderRadius(AppSizes.CORNER_RADIUS_SM)
         .backgroundColor(AppColors.BG_PAGE)
         .border({ width: CaptureOrchestrator.isLowConfidence(field) ? 1.5 : 0, color: AppColors.WARNING })
         .onChange((v: string) => {
-          onChange(v);
+          this.questionText = v;
         })
 
       if (label === '题目内容') {
@@ -820,6 +820,10 @@ struct CapturePage {
     .height('100%')
     .justifyContent(FlexAlign.Start)
     .alignItems(HorizontalAlign.Center)
+  }
+
+  private anyAiBusy(): boolean {
+    return this.knowledgeBusy || this.stdAnalyzing || this.myAnalyzing || this.compareBusy;
   }
 
   private repickQuestion(): void {

@@ -49,10 +49,10 @@ struct MistakeDetailPage {
   }
 
   @Builder
-  EditableCard(label: string, value: string, color: string, onChange: (v: string) => void, target: string) {
+  EditableCard(target: string) {
     Column() {
       Row() {
-        Text(label)
+        Text(this.fieldLabel(target))
           .fontSize(14)
           .fontColor(AppColors.TEXT_SECONDARY)
           .layoutWeight(1)
@@ -65,14 +65,28 @@ struct MistakeDetailPage {
       .width('100%')
       .margin({ bottom: 6 })
 
-      TextArea({ text: value, placeholder: `输入或修改${label}` })
-        .fontSize(16)
-        .fontColor(color)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .backgroundColor(AppColors.BG_PAGE)
-        .onChange((v: string) => {
-          onChange(v);
-        })
+      if (target === 'question') {
+        TextArea({ text: this.editQuestion, placeholder: '输入或修改题目内容' })
+          .fontSize(16)
+          .fontColor(AppColors.TEXT_PRIMARY)
+          .borderRadius(AppSizes.CORNER_RADIUS_SM)
+          .backgroundColor(AppColors.BG_PAGE)
+          .onChange((v: string) => { this.editQuestion = v; })
+      } else if (target === 'standard') {
+        TextArea({ text: this.editStdAnswer, placeholder: '输入或修改标准答案' })
+          .fontSize(16)
+          .fontColor(AppColors.SECONDARY)
+          .borderRadius(AppSizes.CORNER_RADIUS_SM)
+          .backgroundColor(AppColors.BG_PAGE)
+          .onChange((v: string) => { this.editStdAnswer = v; })
+      } else {
+        TextArea({ text: this.editMyAnswer, placeholder: '输入或修改我的答案' })
+          .fontSize(16)
+          .fontColor(AppColors.DANGER)
+          .borderRadius(AppSizes.CORNER_RADIUS_SM)
+          .backgroundColor(AppColors.BG_PAGE)
+          .onChange((v: string) => { this.editMyAnswer = v; })
+      }
 
       Button('📷 拍照重新识别')
         .height(32)
@@ -91,6 +105,15 @@ struct MistakeDetailPage {
     .backgroundColor(AppColors.BG_CARD)
     .borderRadius(AppSizes.CORNER_RADIUS_SM)
     .margin({ left: 16, right: 16, top: 8 })
+  }
+
+  private fieldLabel(target: string): string {
+    if (target === 'standard') {
+      return '标准答案';
+    } else if (target === 'mine') {
+      return '我的答案';
+    }
+    return '题目内容';
   }
 
   private async reRecognizeField(target: string): Promise<void> {
@@ -150,17 +173,11 @@ struct MistakeDetailPage {
         .borderRadius(AppSizes.CORNER_RADIUS_SM)
         .margin({ left: 16, right: 16, top: 8 })
 
-        this.EditableCard('题目内容', this.editQuestion, AppColors.TEXT_PRIMARY, (v: string) => {
-          this.editQuestion = v;
-        }, 'question')
+        this.EditableCard('question')
 
-        this.EditableCard('标准答案', this.editStdAnswer, AppColors.SECONDARY, (v: string) => {
-          this.editStdAnswer = v;
-        }, 'standard')
+        this.EditableCard('standard')
 
-        this.EditableCard('我的答案', this.editMyAnswer, AppColors.DANGER, (v: string) => {
-          this.editMyAnswer = v;
-        }, 'mine')
+        this.EditableCard('mine')
 
         Column() {
           Text('掌握度信息')
