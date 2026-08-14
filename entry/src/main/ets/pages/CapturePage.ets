@@ -9,6 +9,7 @@ import { AnalyticsTracker } from '../usecases/AnalyticsTracker';
 import { PointsCalculator } from '../usecases/PointsCalculator';
 import { MediaService } from '../services/MediaService';
 import { PerformanceMonitor } from '../services/PerformanceMonitor';
+import { AiService } from '../services/AiService';
 import { AppColors, AppSizes, AppStrings, subjectLabel, generateId, toFileUri } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
@@ -39,6 +40,8 @@ struct CapturePage {
 
   @State compareResult: string = '';
   @State fieldOcrBusy: string = '';
+  @State knowledgeBusy: boolean = false;
+  @State compareBusy: boolean = false;
 
   @State answerTypeOptions: AnswerTypeOption[] = [];
   @State errorTypeOptions: ErrorTypeOption[] = [];
@@ -309,11 +312,20 @@ struct CapturePage {
           .padding({ left: 16, right: 16, bottom: 12 })
 
         Column() {
-          Text('知识点总结')
-            .fontSize(14)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .margin({ bottom: 4 })
-          TextInput({ text: this.knowledgeSummary, placeholder: '如：分数加减法 / 阅读理解（可手动修改）' })
+          Row() {
+            Text('知识点总结')
+              .fontSize(14)
+              .fontColor(AppColors.TEXT_SECONDARY)
+              .layoutWeight(1)
+            if (this.knowledgeBusy) {
+              Text('AI 总结中...')
+                .fontSize(11)
+                .fontColor(AppColors.TEXT_PLACEHOLDER)
+            }
+          }
+          .width('100%')
+          .margin({ bottom: 4 })
+          TextInput({ text: this.knowledgeSummary, placeholder: '识别后由AI自动总结（不超过10字，可修改）' })
             .fontSize(16)
             .borderRadius(AppSizes.CORNER_RADIUS_SM)
             .backgroundColor(AppColors.BG_PAGE)
@@ -370,13 +382,14 @@ struct CapturePage {
         this.AnswerFieldCard('标准答案', this.standardAnswer, 'standard')
         this.AnswerFieldCard('我的答案', this.studentAnswer, 'mine')
 
-        Button('🔍 智能对比分析')
+        Button(this.compareBusy ? '🔍 AI 分析中...' : '🔍 智能对比分析')
           .width('90%')
           .height(42)
-          .backgroundColor(AppColors.SECONDARY)
+          .backgroundColor(this.compareBusy ? '#C0C4CC' : AppColors.SECONDARY)
           .fontColor(Color.White)
           .borderRadius(21)
           .margin({ top: 12 })
+          .enabled(!this.compareBusy)
           .onClick(() => {
             this.runCompare();
           })
@@ -705,6 +718,8 @@ struct CapturePage {
     this.currentStep = 2;
     if (this.questionText.length === 0) {
       Toast.show('未识别到文字内容，请手动输入或重新圈选区域');
+    } else {
+      this.summarizeKnowledgeAsync();
     }
   }
 
@@ -716,28 +731,82 @@ struct CapturePage {
       Toast.show('未获取到图片，请重试');
       return;
     }
-    const result = await CaptureOrchestrator.performOcr(path, undefined);
-    this.fieldOcrBusy = '';
-    const text: string = result.questionText.text;
-    if (text.length === 0) {
-      Toast.show('未识别到文字，请手动输入');
-      return;
-    }
-    if (target === 'standard') {
-      this.standardAnswer = this.standardAnswer.length > 0 ? this.standardAnswer + ' ' + text : text;
-    } else {
-      this.studentAnswer = this.studentAnswer.length > 0 ? this.studentAnswer + ' ' + text : text;
+    try {
+      const text: string = await AiService.recognizeImage(path);
+      this.fieldOcrBusy = '';
+      const cleaned: string = text.trim();
+      if (cleaned.length === 0) {
+        Toast.show('未识别到文字，请手动输入');
+        return;
+      }
+      if (target === 'standard') {
+        this.standardAnswer = this.standardAnswer.length > 0 ? this.standardAnswer + ' ' + cleaned : cleaned;
+      } else {
+        this.studentAnswer = this.studentAnswer.length > 0 ? this.studentAnswer + ' ' + cleaned : cleaned;
+      }
+    } catch (e) {
+      this.fieldOcrBusy = '';
+      Toast.show('识别失败，请检查网络或手动输入');
     }
   }
 
-  private runCompare(): void {
+  private async summarizeKnowledgeAsync(): Promise<void> {
+    if (this.questionText.length === 0) {
+      return;
+    }
+    this.knowledgeBusy = true;
+    try {
+      const summary: string = await AiService.summarizeKnowledge(this.questionText);
+      if (summary.length > 0) {
+        this.knowledgeSummary = summary;
+      }
+    } catch (e) {
+    }
+    this.knowledgeBusy = false;
+  }
+
+  private async runCompare(): Promise<void> {
     const s: string = this.standardAnswer.trim();
     const m: string = this.studentAnswer.trim();
     if (s.length === 0 || m.length === 0) {
       Toast.show('请先填写标准答案和我的答案');
       return;
     }
-    this.compareResult = diffAnswers(s, m);
+    this.compareBusy = true;
+    this.compareResult = '🔍 AI 正在分析...';
+    try {
+      const analysis = await AiService.analyzeMistake(this.questionText, m, s);
+      let msg: string = '🔍 AI 分析结果：\n' + analysis.analysis;
+      if (analysis.tags.length > 0) {
+        msg += '\n知识点：' + analysis.tags.join('、');
+      }
+      this.compareResult = msg;
+      this.answerType = analysis.answerType;
+      this.selectedSubject = analysis.subject;
+      await this.loadTags();
+      this.selectTagsByName(analysis.tags);
+      if (analysis.tags.length > 0) {
+        this.knowledgeSummary = analysis.tags[0];
+      }
+    } catch (e) {
+      this.compareResult = diffAnswers(s, m);
+      Toast.show('AI 分析失败，已使用本地对比');
+    }
+    this.compareBusy = false;
+  }
+
+  private selectTagsByName(names: string[]): void {
+    this.selectedTagIds = [];
+    for (const tag of this.knowledgeTags) {
+      for (const name of names) {
+        if (tag.name === name || tag.name.indexOf(name) >= 0 || name.indexOf(tag.name) >= 0) {
+          if (this.selectedTagIds.indexOf(tag.id) < 0) {
+            this.selectedTagIds.push(tag.id);
+          }
+        }
+      }
+    }
+    this.selectedTagIds = this.selectedTagIds.slice();
   }
 
   private toggleTag(tagId: string): void {

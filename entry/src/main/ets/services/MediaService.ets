@@ -1,5 +1,6 @@
 import photoAccessHelper from '@ohos.file.photoAccessHelper';
 import fs from '@ohos.file.fs';
+import buffer from '@ohos.buffer';
 import { image } from '@kit.ImageKit';
 import camera from '@ohos.multimedia.camera';
 import cameraPicker from '@ohos.multimedia.cameraPicker';
@@ -101,9 +102,26 @@ export class MediaService {
 
   static async readRgbaBuffer(pixelMap: image.PixelMap, width: number, height: number): Promise<ArrayBuffer | undefined> {
     try {
-      const buffer: ArrayBuffer = new ArrayBuffer(width * height * 4);
-      await pixelMap.readPixelsToBuffer(buffer);
-      return buffer;
+      const rgba: ArrayBuffer = new ArrayBuffer(width * height * 4);
+      await pixelMap.readPixelsToBuffer(rgba);
+      return rgba;
+    } catch (e) {
+      return undefined;
+    }
+  }
+
+  static async readImageBase64(path: string, maxDim: number): Promise<string | undefined> {
+    const pm = await MediaService.loadScaledPixelMap(path, maxDim);
+    if (pm === undefined) {
+      return undefined;
+    }
+    try {
+      const packer: image.ImagePacker = image.createImagePacker();
+      const data: ArrayBuffer = await packer.packing(pm, { format: 'image/jpeg', quality: 80 });
+      await pm.release();
+      packer.release();
+      const buf: buffer.Buffer = buffer.from(new Uint8Array(data));
+      return buf.toString('base64');
     } catch (e) {
       return undefined;
     }
