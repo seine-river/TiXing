@@ -7,11 +7,11 @@
         "material": {
           "certpath": "/Users/dfx/.ohos/config/default_TiXing_qf7zbaZc5C_h9W0SbE-fJHWdyuWh46x1c73yrb5V8d8=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001BC9CEA7C6C6C615DE410BD9B51BF01DEF792AE4F78B421206C50C73D725ACA86BCE4E6698B53238",
+          "keyPassword": "0000001B39458D409E8DE0EEA3AA9DA44A0FF7017AD74C05E38319AA4CC33FDC2462B638C4E8DAC5A1EE68",
           "profile": "/Users/dfx/.ohos/config/default_TiXing_qf7zbaZc5C_h9W0SbE-fJHWdyuWh46x1c73yrb5V8d8=.p7b",
           "signAlg": "SHA256withECDSA",
           "storeFile": "/Users/dfx/.ohos/config/default_TiXing_qf7zbaZc5C_h9W0SbE-fJHWdyuWh46x1c73yrb5V8d8=.p12",
-          "storePassword": "0000001BF4996DD67CEBFD115FEA5283458C128742212D484D26AFE3180DF242F5947079D77BA1FFBF1ACF"
+          "storePassword": "0000001BC2BF4B0676F4DB56F351B8DF869EFD43BE18D2A8C503178461183888C484A116878552627E2FF3"
         }
       }
     ],
