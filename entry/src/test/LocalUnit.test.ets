@@ -350,7 +350,7 @@ export default function coreAlgorithmTest() {
     it('statusColor_all_statuses', 0, () => {
       expect(statusColor(MistakeStatus.MASTERED)).assertEqual('#34C759');
       expect(statusColor(MistakeStatus.REVIEWING)).assertEqual('#3A7BD5');
-      expect(statusColor(MistakeStatus.UNMASTERED)).assertEqual('#FF3B30');
+      expect(statusColor(MistakeStatus.UNMASTERED)).assertEqual('#F56C6C');
     });
 
     it('formatDate_pads_single_digit', 0, () => {

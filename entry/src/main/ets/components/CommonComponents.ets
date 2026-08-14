@@ -6,8 +6,8 @@ export struct StatusTag {
   build() {
     Text(this.statusText)
       .fontSize(11)
-      .fontColor(this.statusColor)
-      .backgroundColor(this.statusColor + '1A')
+      .fontColor(Color.White)
+      .backgroundColor(this.statusColor)
       .borderRadius(8)
       .padding({ left: 8, right: 8, top: 3, bottom: 3 })
   }

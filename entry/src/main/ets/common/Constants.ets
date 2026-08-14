@@ -6,7 +6,7 @@ export class AppColors {
   static readonly GRADIENT_END: string = '#5BB6F0';
   static readonly SECONDARY: string = '#34C759';
   static readonly WARNING: string = '#FF9F0A';
-  static readonly DANGER: string = '#FF3B30';
+  static readonly DANGER: string = '#F56C6C';
   static readonly BG_PAGE: string = '#F2F4F8';
   static readonly BG_CARD: string = '#FFFFFF';
   static readonly BG_CHIP: string = '#EEF2F7';
@@ -19,7 +19,7 @@ export class AppColors {
   static readonly SHADOW: string = '#1F2A3D';
   static readonly MASTERY_MASTERED: string = '#34C759';
   static readonly MASTERY_REVIEWING: string = '#3A7BD5';
-  static readonly MASTERY_UNMASTERED: string = '#FF3B30';
+  static readonly MASTERY_UNMASTERED: string = '#F56C6C';
 }
 
 export class AppSizes {
