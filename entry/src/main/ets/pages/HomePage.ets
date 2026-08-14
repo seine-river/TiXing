@@ -2,10 +2,12 @@ import { Mistake } from '../models/Mistake';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { MistakeStatus, Subject } from '../models/Enums';
 import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor, toFileUri } from '../common/Constants';
+import { TabController } from '../common/TabController';
 import { StatusTag, SubjectTag, EmptyPlaceholder } from '../components/CommonComponents';
 
 @Component
 export struct HomePage {
+  controller: TabController = new TabController();
   @State todayReviewCount: number = 0;
   @State totalMistakes: number = 0;
   @State masteredCount: number = 0;
@@ -15,6 +17,7 @@ export struct HomePage {
   private studentId: string = 'stu_default';
 
   aboutToAppear(): void {
+    this.controller.reload = (): void => { this.loadData(); };
     this.loadData();
   }
 

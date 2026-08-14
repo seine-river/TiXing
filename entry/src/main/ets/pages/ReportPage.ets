@@ -3,10 +3,12 @@ import { Mistake } from '../models/Mistake';
 import { MistakeStatus, Subject } from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { AppColors, AppSizes, AppStrings, subjectLabel } from '../common/Constants';
+import { TabController } from '../common/TabController';
 import { PageTitle } from '../components/CommonComponents';
 
 @Component
 export struct ReportPage {
+  controller: TabController = new TabController();
   @State totalMistakes: number = 0;
   @State masteredCount: number = 0;
   @State reviewingCount: number = 0;
@@ -16,6 +18,7 @@ export struct ReportPage {
   @State subjectDistribution: SubjectDist[] = [];
 
   aboutToAppear(): void {
+    this.controller.reload = (): void => { this.loadReport(); };
     this.loadReport();
   }
 

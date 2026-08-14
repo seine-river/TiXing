@@ -2,11 +2,13 @@ import { Mistake } from '../models/Mistake';
 import { MistakeStatus, Subject, ErrorType } from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor, formatDate, toFileUri } from '../common/Constants';
+import { TabController } from '../common/TabController';
 import { Toast } from '../common/Toast';
 import { StatusTag, SubjectTag, EmptyPlaceholder } from '../components/CommonComponents';
 
 @Component
 export struct MistakesPage {
+  controller: TabController = new TabController();
   @State mistakes: Mistake[] = [];
   @State filterSubject: string = '';
   @State filterStatus: string = '';
@@ -15,6 +17,7 @@ export struct MistakesPage {
   @State currentTab: number = 0;
 
   aboutToAppear(): void {
+    this.controller.reload = (): void => { this.loadMistakes(); };
     this.loadMistakes();
   }
 

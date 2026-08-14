@@ -20,6 +20,10 @@ struct OpsOverviewPage {
     this.loadMetrics();
   }
 
+  onPageShow(): void {
+    this.loadMetrics();
+  }
+
   async loadMetrics(): Promise<void> {
     const all: Mistake[] = await dbHelper.queryMistakes();
     this.totalMistakes = all.length;

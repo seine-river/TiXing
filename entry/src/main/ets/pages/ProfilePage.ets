@@ -2,15 +2,18 @@ import { Student } from '../models/Student';
 import { Grade, TextbookVersion } from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { AppColors, AppSizes, AppStrings } from '../common/Constants';
+import { TabController } from '../common/TabController';
 import { PointsSummary } from '../models/PointsLog';
 
 @Component
 export struct ProfilePage {
+  controller: TabController = new TabController();
   @State student: Student = new Student();
   @State pointsSummary: PointsSummary = new PointsSummary();
   @State isLoaded: boolean = false;
 
   aboutToAppear(): void {
+    this.controller.reload = (): void => { this.loadData(); };
     this.loadData();
   }
 
