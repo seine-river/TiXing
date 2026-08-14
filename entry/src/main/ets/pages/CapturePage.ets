@@ -1,9 +1,8 @@
-import { Mistake, OcrFieldResult, OcrRecognitionResult, ImageRegion } from '../models/Mistake';
+import { Mistake, OcrFieldResult, OcrRecognitionResult, CropFracs } from '../models/Mistake';
 import { Subject, AnswerType, ErrorType, ContentType, Grade, ImageQualityIssue, PointsActionType } from '../models/Enums';
 import { KnowledgeTag } from '../models/KnowledgeTag';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { CaptureOrchestrator } from '../usecases/CaptureOrchestrator';
-import { SubjectDetector } from '../usecases/SubjectDetector';
 import { KnowledgeProfileAggregator } from '../usecases/KnowledgeProfileAggregator';
 import { AnalyticsTracker } from '../usecases/AnalyticsTracker';
 import { PointsCalculator } from '../usecases/PointsCalculator';
@@ -276,7 +275,7 @@ struct CapturePage {
           .borderRadius(20)
           .enabled(!this.ocrBusy)
           .onClick(() => {
-            this.runOcr(this.currentRegion());
+            this.runOcr(this.currentFracs());
           })
       }
       .width('100%')
@@ -692,35 +691,53 @@ struct CapturePage {
     this.knowledgeTags = tags;
   }
 
-  private currentRegion(): ImageRegion | undefined {
-    if (this.imgNatW <= 0 || this.imgNatH <= 0) {
-      return undefined;
-    }
-    return new ImageRegion(
-      Math.round(this.cropLeftFrac * this.imgNatW),
-      Math.round(this.cropTopFrac * this.imgNatH),
-      Math.round((this.cropRightFrac - this.cropLeftFrac) * this.imgNatW),
-      Math.round((this.cropBottomFrac - this.cropTopFrac) * this.imgNatH)
-    );
+  private currentFracs(): CropFracs {
+    return new CropFracs(this.cropLeftFrac, this.cropTopFrac, this.cropRightFrac, this.cropBottomFrac);
   }
 
-  private async runOcr(region: ImageRegion | undefined): Promise<void> {
+  private async runOcr(fracs: CropFracs | undefined): Promise<void> {
     this.ocrBusy = true;
-    const result = await CaptureOrchestrator.performOcr(this.imagePath, region);
-    this.ocrResult = result;
-    this.questionText = result.questionText.text;
-    this.selectedSubject = SubjectDetector.detect(this.questionText);
-    if (this.knowledgeSummary.length === 0) {
-      this.knowledgeSummary = subjectLabel(this.selectedSubject) + '错题';
-    }
-    await this.loadTags();
+    const localResult = await CaptureOrchestrator.performOcr(this.imagePath, fracs);
+    const localText: string = localResult.questionText.text;
+    this.ocrResult = localResult;
+    this.questionText = localText;
     this.ocrBusy = false;
     this.currentStep = 2;
-    if (this.questionText.length === 0) {
-      Toast.show('未识别到文字内容，请手动输入或重新圈选区域');
-    } else {
-      this.summarizeKnowledgeAsync();
+    if (localText.length === 0) {
+      Toast.show('本地识别未提取到文字，正在用AI识别图片...');
     }
+    this.recognizeByAi(fracs, localText);
+  }
+
+  private async recognizeByAi(fracs: CropFracs | undefined, localText: string): Promise<void> {
+    this.knowledgeBusy = true;
+    try {
+      const ai = await AiService.recognizeQuestion(this.imagePath, fracs, localText);
+      if (ai.ok) {
+        this.questionText = ai.question;
+      }
+      if (ai.knowledgeSummary.length > 0) {
+        this.knowledgeSummary = ai.knowledgeSummary;
+      }
+      this.selectedSubject = ai.subject;
+      this.answerType = ai.answerType;
+      this.selectedErrorType = ai.errorType;
+      await this.loadTags();
+      if (ai.tags.length > 0) {
+        this.selectTagsByName(ai.tags);
+      }
+      if (ai.ok) {
+        Toast.show('AI识别完成');
+      } else {
+        Toast.show('AI未能解析题目，请手动核对');
+      }
+    } catch (e) {
+      if (this.knowledgeSummary.length === 0) {
+        this.knowledgeSummary = subjectLabel(this.selectedSubject) + '错题';
+      }
+      Toast.show('AI识别失败，请检查网络，可手动修改');
+    }
+    this.knowledgeBusy = false;
   }
 
   private async ocrForField(target: string, fromCamera: boolean): Promise<void> {
@@ -748,21 +765,6 @@ struct CapturePage {
       this.fieldOcrBusy = '';
       Toast.show('识别失败，请检查网络或手动输入');
     }
-  }
-
-  private async summarizeKnowledgeAsync(): Promise<void> {
-    if (this.questionText.length === 0) {
-      return;
-    }
-    this.knowledgeBusy = true;
-    try {
-      const summary: string = await AiService.summarizeKnowledge(this.questionText);
-      if (summary.length > 0) {
-        this.knowledgeSummary = summary;
-      }
-    } catch (e) {
-    }
-    this.knowledgeBusy = false;
   }
 
   private async runCompare(): Promise<void> {

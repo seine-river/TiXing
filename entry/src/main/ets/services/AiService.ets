@@ -1,5 +1,6 @@
 import http from '@ohos.net.http';
-import { Subject, AnswerType } from '../models/Enums';
+import { Subject, AnswerType, ErrorType } from '../models/Enums';
+import { CropFracs } from '../models/Mistake';
 import { MediaService } from './MediaService';
 
 const API_URL: string = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
@@ -40,11 +41,30 @@ interface AiAnalysisRaw {
   knowledgeTags: string[];
 }
 
+interface AiQuestionRaw {
+  question: string;
+  knowledgeSummary: string;
+  subject: string;
+  answerType: string;
+  errorType: string;
+  knowledgeTags: string[];
+}
+
 export class AiAnalysis {
   analysis: string = '';
   answerType: AnswerType = AnswerType.TEXT;
   subject: Subject = Subject.MATH;
   tags: string[] = [];
+}
+
+export class AiQuestionResult {
+  question: string = '';
+  knowledgeSummary: string = '';
+  subject: Subject = Subject.MATH;
+  answerType: AnswerType = AnswerType.TEXT;
+  errorType: ErrorType = ErrorType.OTHER;
+  tags: string[] = [];
+  ok: boolean = false;
 }
 
 export class AiService {
@@ -70,6 +90,47 @@ export class AiService {
     const part: AiContentPart = { type: 'text', text: prompt };
     const raw: string = await AiService.request([{ role: 'user', content: [part] }]);
     return AiService.cleanText(raw);
+  }
+
+  static async recognizeQuestion(imagePath: string, fracs: CropFracs | undefined, ocrHint: string): Promise<AiQuestionResult> {
+    const base64: string | undefined = await MediaService.readRegionBase64(imagePath, fracs, 1280);
+    const textPrompt: string = '这是一道错题的图片，附带了OCR初步识别文字作为参考。请结合图片准确识别，并以纯JSON返回（不要markdown代码块、不要解释）。\n' +
+      'OCR参考文字：' + (ocrHint.length > 0 ? ocrHint : '（无）') + '\n' +
+      '返回格式：{"question":"准确的题目内容","knowledgeSummary":"不超过10个汉字的知识点名称","subject":"math或chinese或english","answerType":"choice或numeric或text或subjective","errorType":"concept或careless或misread或other","knowledgeTags":["标签1","标签2"]}\n' +
+      'subject 只能是 math/chinese/english；answerType 只能是 choice/numeric/text/subjective；errorType 只能是 concept/careless/misread/other。只输出JSON。';
+    const parts: AiContentPart[] = [];
+    if (base64 !== undefined && base64.length > 0) {
+      parts.push({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + base64 } });
+    }
+    parts.push({ type: 'text', text: textPrompt });
+    const raw: string = await AiService.request([{ role: 'user', content: parts }]);
+    return AiService.parseQuestion(raw);
+  }
+
+  private static parseQuestion(raw: string): AiQuestionResult {
+    const result: AiQuestionResult = new AiQuestionResult();
+    try {
+      const jsonStr: string = AiService.extractJson(raw);
+      const obj: AiQuestionRaw = JSON.parse(jsonStr) as AiQuestionRaw;
+      result.question = obj.question !== undefined ? obj.question : '';
+      result.knowledgeSummary = AiService.cleanText(obj.knowledgeSummary !== undefined ? obj.knowledgeSummary : '');
+      result.subject = AiService.mapSubject(obj.subject);
+      result.answerType = AiService.mapAnswerType(obj.answerType);
+      result.errorType = AiService.mapErrorType(obj.errorType);
+      if (obj.knowledgeTags !== undefined) {
+        result.tags = obj.knowledgeTags;
+      }
+      result.ok = result.question.length > 0;
+    } catch (e) {
+    }
+    return result;
+  }
+
+  private static mapErrorType(s: string): ErrorType {
+    if (s === 'concept') return ErrorType.CONCEPT;
+    if (s === 'careless') return ErrorType.CARELESS;
+    if (s === 'misread') return ErrorType.MISREAD;
+    return ErrorType.OTHER;
   }
 
   static async analyzeMistake(question: string, myAnswer: string, standardAnswer: string): Promise<AiAnalysis> {

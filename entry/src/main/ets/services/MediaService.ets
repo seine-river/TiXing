@@ -6,6 +6,7 @@ import camera from '@ohos.multimedia.camera';
 import cameraPicker from '@ohos.multimedia.cameraPicker';
 import { AppContextHolder } from '../common/AppContext';
 import { generateId } from '../common/Constants';
+import { CropFracs } from '../models/Mistake';
 
 export class MediaService {
   static async pickFromAlbum(): Promise<string | undefined> {
@@ -116,6 +117,35 @@ export class MediaService {
       return undefined;
     }
     try {
+      const packer: image.ImagePacker = image.createImagePacker();
+      const data: ArrayBuffer = await packer.packing(pm, { format: 'image/jpeg', quality: 80 });
+      await pm.release();
+      packer.release();
+      const buf: buffer.Buffer = buffer.from(new Uint8Array(data));
+      return buf.toString('base64');
+    } catch (e) {
+      return undefined;
+    }
+  }
+
+  static async readRegionBase64(path: string, fracs: CropFracs | undefined, maxDim: number): Promise<string | undefined> {
+    const pm = await MediaService.loadScaledPixelMap(path, maxDim);
+    if (pm === undefined) {
+      return undefined;
+    }
+    try {
+      if (fracs !== undefined) {
+        const info = await pm.getImageInfo();
+        const w: number = info.size.width;
+        const h: number = info.size.height;
+        const cx: number = Math.round(fracs.leftFrac * w);
+        const cy: number = Math.round(fracs.topFrac * h);
+        const cw: number = Math.round((fracs.rightFrac - fracs.leftFrac) * w);
+        const ch: number = Math.round((fracs.bottomFrac - fracs.topFrac) * h);
+        if (cw > 0 && ch > 0) {
+          await pm.crop({ x: cx, y: cy, size: { width: cw, height: ch } });
+        }
+      }
       const packer: image.ImagePacker = image.createImagePacker();
       const data: ArrayBuffer = await packer.packing(pm, { format: 'image/jpeg', quality: 80 });
       await pm.release();

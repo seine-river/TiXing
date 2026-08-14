@@ -1,6 +1,6 @@
 import { image } from '@kit.ImageKit';
 import { textRecognition } from '@kit.CoreVisionKit';
-import { OcrFieldResult, OcrRecognitionResult, ImageQualityResult, ImageRegion } from '../models/Mistake';
+import { OcrFieldResult, OcrRecognitionResult, ImageQualityResult, CropFracs } from '../models/Mistake';
 import { ImageQualityIssue, ContentType } from '../models/Enums';
 import { MediaService } from '../services/MediaService';
 import { PerformanceMonitor } from '../services/PerformanceMonitor';
@@ -40,7 +40,7 @@ export class CaptureOrchestrator {
     }
   }
 
-  static async performOcr(path: string, region: ImageRegion | undefined): Promise<OcrRecognitionResult> {
+  static async performOcr(path: string, fracs: CropFracs | undefined): Promise<OcrRecognitionResult> {
     const result = new OcrRecognitionResult();
     const traceStart: number = PerformanceMonitor.startTrace('ocr_recognize');
     const pixelMap = await MediaService.loadScaledPixelMap(path, 1280);
@@ -49,9 +49,18 @@ export class CaptureOrchestrator {
       PerformanceMonitor.writeFault('ocr_no_pixelmap', { 'reason': 'decode_failed' });
       return result;
     }
-    if (region !== undefined && region.width > 0 && region.height > 0) {
+    if (fracs !== undefined) {
       try {
-        await pixelMap.crop({ x: region.x, y: region.y, size: { width: region.width, height: region.height } });
+        const info = await pixelMap.getImageInfo();
+        const w: number = info.size.width;
+        const h: number = info.size.height;
+        const cx: number = Math.round(fracs.leftFrac * w);
+        const cy: number = Math.round(fracs.topFrac * h);
+        const cw: number = Math.round((fracs.rightFrac - fracs.leftFrac) * w);
+        const ch: number = Math.round((fracs.bottomFrac - fracs.topFrac) * h);
+        if (cw > 0 && ch > 0) {
+          await pixelMap.crop({ x: cx, y: cy, size: { width: cw, height: ch } });
+        }
       } catch (e) {
         PerformanceMonitor.warn('pixelMap crop failed');
       }

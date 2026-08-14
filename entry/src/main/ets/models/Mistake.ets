@@ -86,6 +86,20 @@ export class ImageRegion {
   }
 }
 
+export class CropFracs {
+  leftFrac: number = 0;
+  topFrac: number = 0;
+  rightFrac: number = 1;
+  bottomFrac: number = 1;
+
+  constructor(leftFrac: number, topFrac: number, rightFrac: number, bottomFrac: number) {
+    this.leftFrac = leftFrac;
+    this.topFrac = topFrac;
+    this.rightFrac = rightFrac;
+    this.bottomFrac = bottomFrac;
+  }
+}
+
 export class ImageQualityResult {
   passed: boolean = false;
   issue: string = '';
