@@ -4,6 +4,7 @@ import { MistakeStatus, Subject } from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { AppColors, AppSizes, AppStrings, subjectLabel } from '../common/Constants';
 import { TabController } from '../common/TabController';
+import { SystemBarHelper } from '../common/SystemBarHelper';
 import { PageTitle } from '../components/CommonComponents';
 
 @Component
@@ -16,10 +17,14 @@ export struct ReportPage {
   @State knowledgeProfiles: KnowledgeProfile[] = [];
   @State weakPoints: WeakPoint[] = [];
   @State subjectDistribution: SubjectDist[] = [];
+  @State statusBarHeight: number = 38;
 
   aboutToAppear(): void {
     this.controller.reload = (): void => { this.loadReport(); };
     this.loadReport();
+    SystemBarHelper.statusBarHeightVp(this.getUIContext()).then((h: number) => {
+      this.statusBarHeight = h;
+    });
   }
 
   async loadReport(): Promise<void> {
@@ -69,13 +74,14 @@ export struct ReportPage {
         this.SubjectSection()
         this.WeakPointsSection()
       }
-      .padding({ top: 8, bottom: 24 })
+      .padding({ top: this.statusBarHeight + 8, bottom: 24 })
       .width('100%')
+      .height('100%')
     }
-    .width('100%')
-    .height('100%')
     .backgroundColor(AppColors.BG_PAGE)
     .scrollBar(BarState.Auto)
+    .edgeEffect(EdgeEffect.Spring)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
   }
 
   @Builder

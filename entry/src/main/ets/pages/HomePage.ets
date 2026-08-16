@@ -3,6 +3,7 @@ import { dbHelper } from '../repository/DatabaseHelper';
 import { MistakeStatus, Subject } from '../models/Enums';
 import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor, toFileUri } from '../common/Constants';
 import { TabController } from '../common/TabController';
+import { SystemBarHelper } from '../common/SystemBarHelper';
 import { StatusTag, SubjectTag, EmptyPlaceholder } from '../components/CommonComponents';
 
 @Component
@@ -14,11 +15,15 @@ export struct HomePage {
   @State reviewingCount: number = 0;
   @State recentMistakes: Mistake[] = [];
   @State studentPoints: number = 0;
+  @State statusBarHeight: number = 38;
   private studentId: string = 'stu_default';
 
   aboutToAppear(): void {
     this.controller.reload = (): void => { this.loadData(); };
     this.loadData();
+    SystemBarHelper.statusBarHeightVp(this.getUIContext()).then((h: number) => {
+      this.statusBarHeight = h;
+    });
   }
 
   async loadData(): Promise<void> {
@@ -80,11 +85,13 @@ export struct HomePage {
         }
       }
       .width('100%')
+      .height('100%')
       .padding({ bottom: 24 })
     }
     .backgroundColor(AppColors.BG_PAGE)
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.Spring)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP])
   }
 
   @Builder
@@ -138,7 +145,7 @@ export struct HomePage {
         .margin({ top: 20 })
       }
       .width('100%')
-      .padding({ left: 20, right: 20, top: 28, bottom: 24 })
+      .padding({ left: 20, right: 20, top: this.statusBarHeight + 20, bottom: 24 })
 
       Row() {
         Text('⭐')
@@ -152,7 +159,7 @@ export struct HomePage {
       .padding({ left: 12, right: 12, top: 6, bottom: 6 })
       .borderRadius(16)
       .backgroundColor('#331A2A4D')
-      .margin({ top: 14, right: 14 })
+      .margin({ top: this.statusBarHeight + 10, right: 14 })
     }
     .width('100%')
     .linearGradient({

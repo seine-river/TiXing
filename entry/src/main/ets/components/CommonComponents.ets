@@ -42,9 +42,9 @@ export struct EmptyPlaceholder {
         .fontColor('#86909C')
     }
     .width('100%')
-    .height('100%')
-    .justifyContent(FlexAlign.Center)
+    .justifyContent(FlexAlign.Start)
     .alignItems(HorizontalAlign.Center)
+    .padding({ top: 48, bottom: 48 })
   }
 }
 
