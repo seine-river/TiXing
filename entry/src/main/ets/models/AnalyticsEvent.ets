@@ -31,6 +31,18 @@ export class ReviewStats {
   correct: number = 0;
 }
 
+export class MistakeStats {
+  total: number = 0;
+  mastered: number = 0;
+  reviewing: number = 0;
+  unmastered: number = 0;
+}
+
+export class SubjectCount {
+  subject: string = '';
+  count: number = 0;
+}
+
 function hashStudentId(studentId: string): string {
   let hash: number = 0;
   for (let i = 0; i < studentId.length; i++) {

@@ -1,16 +1,15 @@
 import { UIContext } from '@kit.ArkUI';
+import { AppContextHolder } from './AppContext';
 
+/**
+ * Toast（T041）：从 AppContextHolder 实时获取主窗口 UIContext，不再静态持有。
+ */
 export class Toast {
-  private static uiContext: UIContext | undefined = undefined;
-
-  static setContext(ctx: UIContext): void {
-    Toast.uiContext = ctx;
-  }
-
   static show(message: string): void {
     try {
-      if (Toast.uiContext !== undefined) {
-        Toast.uiContext.getPromptAction().showToast({ message: message, duration: 2000, bottom: 180 });
+      const ctx: UIContext | undefined = AppContextHolder.getUiContext();
+      if (ctx !== undefined) {
+        ctx.getPromptAction().showToast({ message: message, duration: 2000, bottom: 180 });
       }
     } catch (e) {
     }

@@ -1,74 +1,194 @@
 import { Mistake } from '../models/Mistake';
 import { MistakeStatus, Subject, ErrorType } from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
-import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor, formatDate, toFileUri } from '../common/Constants';
+import { AppColors, AppSizes, subjectLabel, statusLabel, formatDate, toFileUri, truncateText } from '../common/Constants';
 import { TabController } from '../common/TabController';
 import { Toast } from '../common/Toast';
-import { StatusTag, SubjectTag, EmptyPlaceholder } from '../components/CommonComponents';
+import { MediaService } from '../services/MediaService';
+import { StatusTag, SubjectTag } from '../components/CommonComponents';
+import { EmptyBlock, FilterChip } from '../components/BasicWidgets';
+
+const PAGE_SIZE: number = 20;
+
+/**
+ * 懒加载数据源（T037/D8）：键值为 mistake.id，数据变更经 notifyDataReload/onDataAdd 通知。
+ */
+class MistakeDataSource implements IDataSource {
+  private items: Mistake[] = [];
+  private listeners: DataChangeListener[] = [];
+
+  totalCount(): number {
+    return this.items.length;
+  }
+
+  getData(index: number): Mistake {
+    return this.items[index];
+  }
+
+  registerDataChangeListener(listener: DataChangeListener): void {
+    if (this.listeners.indexOf(listener) < 0) {
+      this.listeners.push(listener);
+    }
+  }
+
+  unregisterDataChangeListener(listener: DataChangeListener): void {
+    const idx: number = this.listeners.indexOf(listener);
+    if (idx >= 0) {
+      this.listeners.splice(idx, 1);
+    }
+  }
+
+  reload(items: Mistake[]): void {
+    this.items = items;
+    for (const listener of this.listeners) {
+      listener.onDataReloaded();
+    }
+  }
+
+  append(items: Mistake[]): void {
+    const start: number = this.items.length;
+    this.items = this.items.concat(items);
+    for (let i: number = 0; i < items.length; i++) {
+      for (const listener of this.listeners) {
+        listener.onDataAdd(start + i);
+      }
+    }
+  }
+}
 
 @Component
 export struct MistakesPage {
   controller: TabController = new TabController();
-  @State mistakes: Mistake[] = [];
+  private dataSource: MistakeDataSource = new MistakeDataSource();
   @State filterSubject: string = '';
   @State filterStatus: string = '';
   @State filterErrorType: string = '';
   @State searchKeyword: string = '';
-  @State currentTab: number = 0;
+  @State loading: boolean = false;
+  @State loadingMore: boolean = false;
+  @State loadFailed: boolean = false;
+  @State hasMore: boolean = false;
+  private queryOffset: number = 0;
 
   aboutToAppear(): void {
-    this.controller.reload = (): void => { this.loadMistakes(); };
-    this.loadMistakes();
+    this.controller.reload = (): void => { this.applyFilters(); };
+    this.applyFilters();
   }
 
-  async loadMistakes(): Promise<void> {
-    const subject = this.filterSubject.length > 0 ? this.filterSubject as Subject : undefined;
-    const status = this.filterStatus.length > 0 ? this.filterStatus as MistakeStatus : undefined;
-    const errorType = this.filterErrorType.length > 0 ? this.filterErrorType as ErrorType : undefined;
-    const keyword = this.searchKeyword.length > 0 ? this.searchKeyword : undefined;
-    this.mistakes = await dbHelper.queryMistakes(subject, status, keyword, errorType);
+  private currentSubject(): Subject | undefined {
+    return this.filterSubject.length > 0 ? this.filterSubject as Subject : undefined;
+  }
+
+  private currentStatus(): MistakeStatus | undefined {
+    return this.filterStatus.length > 0 ? this.filterStatus as MistakeStatus : undefined;
+  }
+
+  private currentErrorType(): ErrorType | undefined {
+    return this.filterErrorType.length > 0 ? this.filterErrorType as ErrorType : undefined;
+  }
+
+  private currentKeyword(): string | undefined {
+    return this.searchKeyword.length > 0 ? this.searchKeyword : undefined;
+  }
+
+  /**
+   * 首屏/筛选变更加载（T037）：分页参数 offset=0，触底后按页追加；
+   * 数据库未就绪/初始化失败时展示失败态（读失败细节以日志为准）。
+   */
+  private async applyFilters(): Promise<void> {
+    this.loading = true;
+    this.loadFailed = false;
+    this.queryOffset = 0;
+    const page: Mistake[] = await dbHelper.queryMistakes(this.currentSubject(), this.currentStatus(),
+      this.currentKeyword(), this.currentErrorType(), 0, PAGE_SIZE);
+    this.loading = false;
+    if (!dbHelper.isReady()) {
+      this.loadFailed = true;
+      return;
+    }
+    this.hasMore = page.length === PAGE_SIZE;
+    this.dataSource.reload(page);
+  }
+
+  private async loadMore(): Promise<void> {
+    if (!this.hasMore || this.loadingMore || this.loading) {
+      return;
+    }
+    this.loadingMore = true;
+    this.queryOffset += PAGE_SIZE;
+    const page: Mistake[] = await dbHelper.queryMistakes(this.currentSubject(), this.currentStatus(),
+      this.currentKeyword(), this.currentErrorType(), this.queryOffset, PAGE_SIZE);
+    this.loadingMore = false;
+    this.hasMore = page.length === PAGE_SIZE;
+    if (page.length > 0) {
+      this.dataSource.append(page);
+    }
   }
 
   build() {
     Column() {
       Scroll() {
         Row({ space: 8 }) {
-          Button('全部')
-            .height(32).fontSize(13).borderRadius(16)
-            .backgroundColor(this.filterSubject.length === 0 && this.filterStatus.length === 0 ? AppColors.PRIMARY : '#E8EAED')
-            .fontColor(this.filterSubject.length === 0 && this.filterStatus.length === 0 ? Color.White : AppColors.TEXT_REGULAR)
-            .onClick(() => { this.filterSubject = ''; this.filterStatus = ''; this.loadMistakes(); })
-          Button('数学')
-            .height(32).fontSize(13).borderRadius(16)
-            .backgroundColor(this.filterSubject === Subject.MATH ? AppColors.PRIMARY : '#E8EAED')
-            .fontColor(this.filterSubject === Subject.MATH ? Color.White : AppColors.TEXT_REGULAR)
-            .onClick(() => { this.filterSubject = Subject.MATH; this.filterStatus = ''; this.loadMistakes(); })
-          Button('语文')
-            .height(32).fontSize(13).borderRadius(16)
-            .backgroundColor(this.filterSubject === Subject.CHINESE ? AppColors.PRIMARY : '#E8EAED')
-            .fontColor(this.filterSubject === Subject.CHINESE ? Color.White : AppColors.TEXT_REGULAR)
-            .onClick(() => { this.filterSubject = Subject.CHINESE; this.filterStatus = ''; this.loadMistakes(); })
-          Button('未掌握')
-            .height(32).fontSize(13).borderRadius(16)
-            .backgroundColor(this.filterStatus === MistakeStatus.UNMASTERED ? AppColors.PRIMARY : '#E8EAED')
-            .fontColor(this.filterStatus === MistakeStatus.UNMASTERED ? Color.White : AppColors.TEXT_REGULAR)
-            .onClick(() => { this.filterStatus = MistakeStatus.UNMASTERED; this.filterSubject = ''; this.loadMistakes(); })
-          Button('复习中')
-            .height(32).fontSize(13).borderRadius(16)
-            .backgroundColor(this.filterStatus === MistakeStatus.REVIEWING ? AppColors.PRIMARY : '#E8EAED')
-            .fontColor(this.filterStatus === MistakeStatus.REVIEWING ? Color.White : AppColors.TEXT_REGULAR)
-            .onClick(() => { this.filterStatus = MistakeStatus.REVIEWING; this.filterSubject = ''; this.loadMistakes(); })
-          Button('已掌握')
-            .height(32).fontSize(13).borderRadius(16)
-            .backgroundColor(this.filterStatus === MistakeStatus.MASTERED ? AppColors.PRIMARY : '#E8EAED')
-            .fontColor(this.filterStatus === MistakeStatus.MASTERED ? Color.White : AppColors.TEXT_REGULAR)
-            .onClick(() => { this.filterStatus = MistakeStatus.MASTERED; this.filterSubject = ''; this.loadMistakes(); })
+          FilterChip({
+            text: '全部',
+            selected: this.filterSubject.length === 0 && this.filterStatus.length === 0,
+            onTap: (): void => {
+              this.filterSubject = '';
+              this.filterStatus = '';
+              this.applyFilters();
+            }
+          })
+          FilterChip({
+            text: '数学',
+            selected: this.filterSubject === Subject.MATH,
+            onTap: (): void => {
+              this.filterSubject = Subject.MATH;
+              this.filterStatus = '';
+              this.applyFilters();
+            }
+          })
+          FilterChip({
+            text: '语文',
+            selected: this.filterSubject === Subject.CHINESE,
+            onTap: (): void => {
+              this.filterSubject = Subject.CHINESE;
+              this.filterStatus = '';
+              this.applyFilters();
+            }
+          })
+          FilterChip({
+            text: '未掌握',
+            selected: this.filterStatus === MistakeStatus.UNMASTERED,
+            onTap: (): void => {
+              this.filterStatus = MistakeStatus.UNMASTERED;
+              this.filterSubject = '';
+              this.applyFilters();
+            }
+          })
+          FilterChip({
+            text: '复习中',
+            selected: this.filterStatus === MistakeStatus.REVIEWING,
+            onTap: (): void => {
+              this.filterStatus = MistakeStatus.REVIEWING;
+              this.filterSubject = '';
+              this.applyFilters();
+            }
+          })
+          FilterChip({
+            text: '已掌握',
+            selected: this.filterStatus === MistakeStatus.MASTERED,
+            onTap: (): void => {
+              this.filterStatus = MistakeStatus.MASTERED;
+              this.filterSubject = '';
+              this.applyFilters();
+            }
+          })
         }
       }
       .scrollable(ScrollDirection.Horizontal)
       .scrollBar(BarState.Off)
       .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 4 })
+      .padding({ left: 16, right: 16, top: 6, bottom: 4 })
 
       Row() {
         TextInput({ text: this.searchKeyword, placeholder: '🔍 搜索错题内容' })
@@ -85,40 +205,88 @@ export struct MistakesPage {
           .fontColor(Color.White)
           .borderRadius(AppSizes.CORNER_RADIUS_SM)
           .margin({ left: 8 })
-          .onClick(() => { this.loadMistakes(); })
+          .onClick(() => {
+            this.applyFilters();
+          })
       }
       .width('100%')
       .padding({ left: 16, right: 16, bottom: 8 })
 
       Scroll() {
         Row({ space: 8 }) {
-          Button('概念不清')
-            .height(30).fontSize(12).borderRadius(15)
-            .backgroundColor(this.filterErrorType === ErrorType.CONCEPT ? AppColors.PRIMARY : '#E8EAED')
-            .fontColor(this.filterErrorType === ErrorType.CONCEPT ? Color.White : AppColors.TEXT_REGULAR)
-            .onClick(() => { this.filterErrorType = this.filterErrorType === ErrorType.CONCEPT ? '' : ErrorType.CONCEPT; this.loadMistakes(); })
-          Button('粗心')
-            .height(30).fontSize(12).borderRadius(15)
-            .backgroundColor(this.filterErrorType === ErrorType.CARELESS ? AppColors.PRIMARY : '#E8EAED')
-            .fontColor(this.filterErrorType === ErrorType.CARELESS ? Color.White : AppColors.TEXT_REGULAR)
-            .onClick(() => { this.filterErrorType = this.filterErrorType === ErrorType.CARELESS ? '' : ErrorType.CARELESS; this.loadMistakes(); })
-          Button('审题错误')
-            .height(30).fontSize(12).borderRadius(15)
-            .backgroundColor(this.filterErrorType === ErrorType.MISREAD ? AppColors.PRIMARY : '#E8EAED')
-            .fontColor(this.filterErrorType === ErrorType.MISREAD ? Color.White : AppColors.TEXT_REGULAR)
-            .onClick(() => { this.filterErrorType = this.filterErrorType === ErrorType.MISREAD ? '' : ErrorType.MISREAD; this.loadMistakes(); })
+          FilterChip({
+            text: '概念不清',
+            selected: this.filterErrorType === ErrorType.CONCEPT,
+            onTap: (): void => {
+              this.filterErrorType = this.filterErrorType === ErrorType.CONCEPT ? '' : ErrorType.CONCEPT;
+              this.applyFilters();
+            }
+          })
+          FilterChip({
+            text: '粗心',
+            selected: this.filterErrorType === ErrorType.CARELESS,
+            onTap: (): void => {
+              this.filterErrorType = this.filterErrorType === ErrorType.CARELESS ? '' : ErrorType.CARELESS;
+              this.applyFilters();
+            }
+          })
+          FilterChip({
+            text: '审题错误',
+            selected: this.filterErrorType === ErrorType.MISREAD,
+            onTap: (): void => {
+              this.filterErrorType = this.filterErrorType === ErrorType.MISREAD ? '' : ErrorType.MISREAD;
+              this.applyFilters();
+            }
+          })
         }
       }
       .scrollable(ScrollDirection.Horizontal)
       .scrollBar(BarState.Off)
       .width('100%')
-      .padding({ left: 16, right: 16, bottom: 8 })
+      .padding({ left: 16, right: 16, bottom: 4 })
 
-      if (this.mistakes.length === 0) {
-        EmptyPlaceholder({ message: '还没有错题，快去录入吧' })
+      if (this.loading) {
+        Column() {
+          LoadingProgress()
+            .width(40)
+            .height(40)
+            .color(AppColors.PRIMARY)
+          Text('加载中...')
+            .fontSize(14)
+            .fontColor(AppColors.TEXT_SECONDARY)
+            .margin({ top: 8 })
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .justifyContent(FlexAlign.Center)
+      } else if (this.loadFailed) {
+        Column() {
+          Text('加载失败，请检查数据后重试')
+            .fontSize(14)
+            .fontColor(AppColors.TEXT_SECONDARY)
+          Button('重新加载')
+            .height(40)
+            .backgroundColor(AppColors.PRIMARY)
+            .fontColor(Color.White)
+            .borderRadius(20)
+            .padding({ left: 24, right: 24 })
+            .margin({ top: 12 })
+            .onClick(() => {
+              this.applyFilters();
+            })
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .justifyContent(FlexAlign.Center)
+      } else if (this.dataSource.totalCount() === 0) {
+        Column() {
+          EmptyBlock({ message: '还没有错题，快去录入吧' })
+        }
+        .width('100%')
+        .layoutWeight(1)
       } else {
         List({ space: 8 }) {
-          ForEach(this.mistakes, (item: Mistake) => {
+          LazyForEach(this.dataSource, (item: Mistake) => {
             ListItem() {
               Row() {
                 Column() {
@@ -130,7 +298,7 @@ export struct MistakesPage {
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
 
                   if (item.ocrText.length > 0) {
-                    Text(item.ocrText.length > 40 ? item.ocrText.substring(0, 40) + '...' : item.ocrText)
+                    Text(truncateText(item.ocrText, 40))
                       .fontSize(12)
                       .fontColor(AppColors.TEXT_SECONDARY)
                       .maxLines(1)
@@ -139,8 +307,8 @@ export struct MistakesPage {
                   }
 
                   Row({ space: 4 }) {
-                    SubjectTag({ subjectText: subjectLabel(item.subject), subjectColor: AppColors.PRIMARY })
-                    StatusTag({ statusText: statusLabel(item.status), statusColor: statusColor(item.status) })
+                    SubjectTag({ subjectText: subjectLabel(item.subject), subjectKey: item.subject })
+                    StatusTag({ statusText: statusLabel(item.status), statusKey: item.status })
                     Text(formatDate(item.createdAt))
                       .fontSize(11)
                       .fontColor(AppColors.TEXT_SECONDARY)
@@ -154,6 +322,7 @@ export struct MistakesPage {
                   Image(toFileUri(item.imageUrl))
                     .width(64).height(64).borderRadius(AppSizes.CORNER_RADIUS_XS)
                     .objectFit(ImageFit.Cover)
+                    .sourceSize({ width: 200, height: 200 })
                     .margin({ left: 10 })
                 } else {
                   Column() {
@@ -173,7 +342,7 @@ export struct MistakesPage {
               .padding(14)
               .backgroundColor(AppColors.BG_CARD)
               .borderRadius(AppSizes.CORNER_RADIUS_SM)
-              .shadow({ radius: 6, color: '#101F2E26', offsetY: 2 })
+              .shadow({ radius: 6, color: AppColors.SHADOW_SOFT, offsetY: 2 })
               .onClick(() => {
                 this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeDetailPage', params: { mistakeId: item.id } });
               })
@@ -181,16 +350,36 @@ export struct MistakesPage {
             .swipeAction({
               end: {
                 builder: () => {
-                  this.DeleteAction(item)
+                  this.DeleteAction(item);
                 }
               }
             })
           }, (item: Mistake) => item.id)
+
+          ListItem() {
+            Column() {
+              if (this.loadingMore) {
+                Text('加载更多...')
+                  .fontSize(13)
+                  .fontColor(AppColors.TEXT_SECONDARY)
+              } else if (!this.hasMore) {
+                Text('已加载全部错题')
+                  .fontSize(13)
+                  .fontColor(AppColors.TEXT_PLACEHOLDER)
+              }
+            }
+            .width('100%')
+            .padding({ top: 8, bottom: 8 })
+            .alignItems(HorizontalAlign.Center)
+          }
         }
         .width('100%')
         .layoutWeight(1)
         .padding({ left: 16, right: 16, top: 8 })
         .scrollBar(BarState.Auto)
+        .onReachEnd(() => {
+          this.loadMore();
+        })
       }
     }
     .width('100%')
@@ -217,14 +406,46 @@ export struct MistakesPage {
       return item.knowledgeSummary;
     }
     if (item.ocrText.length > 0) {
-      return item.ocrText.length > 30 ? item.ocrText.substring(0, 30) + '...' : item.ocrText;
+      return truncateText(item.ocrText, 30);
     }
     return '未命名错题';
   }
 
-  private async confirmDelete(item: Mistake): Promise<void> {
-    await dbHelper.deleteMistake(item.id);
+  /**
+   * 删除二次确认（T029/FR-008）：确认后调用事务化 deleteMistake 并联动删除本机图片。
+   */
+  private confirmDelete(item: Mistake): void {
+    this.getUIContext().showAlertDialog({
+      title: '删除错题',
+      message: '删除后该错题及其全部复习记录将一并删除，且无法恢复。确定删除吗？',
+      primaryButton: {
+        value: '取消',
+        action: (): void => {
+        }
+      },
+      secondaryButton: {
+        value: '删除',
+        fontColor: AppColors.DANGER,
+        action: (): void => {
+          this.executeDelete(item);
+        }
+      }
+    });
+  }
+
+  private async executeDelete(item: Mistake): Promise<void> {
+    const result = await dbHelper.deleteMistake(item.id);
+    if (!result.success) {
+      Toast.show('删除失败，请重试');
+      return;
+    }
+    await MediaService.deleteImageIfOwned(item.imageUrl);
     Toast.show('已删除该错题');
-    this.loadMistakes();
+    // 删除后按当前列表规模整页刷新
+    const size: number = Math.max(this.dataSource.totalCount(), PAGE_SIZE);
+    const refreshed: Mistake[] = await dbHelper.queryMistakes(this.currentSubject(), this.currentStatus(),
+      this.currentKeyword(), this.currentErrorType(), 0, size);
+    this.hasMore = refreshed.length === size;
+    this.dataSource.reload(refreshed);
   }
 }

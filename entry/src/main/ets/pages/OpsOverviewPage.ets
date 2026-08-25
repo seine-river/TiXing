@@ -1,8 +1,6 @@
 import { dbHelper } from '../repository/DatabaseHelper';
-import { Mistake } from '../models/Mistake';
-import { MistakeStatus } from '../models/Enums';
-import { MetricSummary, ReviewStats } from '../models/AnalyticsEvent';
-import { AppColors, AppSizes } from '../common/Constants';
+import { MistakeStats, MetricSummary, ReviewStats } from '../models/AnalyticsEvent';
+import { AppColors, AppSizes, AppStrings } from '../common/Constants';
 import { PageHeader } from '../components/CommonComponents';
 
 @Entry
@@ -15,6 +13,7 @@ struct OpsOverviewPage {
   @State reviewAccuracy: number = 0;
   @State ocrConfirmCount: number = 0;
   @State avgOcrConfidence: number = 0;
+  private loading: boolean = false;
 
   aboutToAppear(): void {
     this.loadMetrics();
@@ -25,23 +24,33 @@ struct OpsOverviewPage {
   }
 
   async loadMetrics(): Promise<void> {
-    const all: Mistake[] = await dbHelper.queryMistakes();
-    this.totalMistakes = all.length;
-    this.masteredCount = all.filter((m: Mistake) => m.status === MistakeStatus.MASTERED).length;
-    this.masteryRate = this.totalMistakes > 0 ? this.masteredCount / this.totalMistakes : 0;
+    // 初始化去重（T036）：并发/重复触发时跳过
+    if (this.loading) {
+      return;
+    }
+    this.loading = true;
+    try {
+      // 统计改 SQL 聚合（T036/FR-019）
+      const stats: MistakeStats = await dbHelper.queryMistakeStats('stu_default');
+      this.totalMistakes = stats.total;
+      this.masteredCount = stats.mastered;
+      this.masteryRate = this.totalMistakes > 0 ? this.masteredCount / this.totalMistakes : 0;
 
-    const reviewStats: ReviewStats = await dbHelper.queryReviewStats();
-    this.reviewTotal = reviewStats.total;
-    this.reviewAccuracy = reviewStats.total > 0 ? reviewStats.correct / reviewStats.total : 0;
+      const reviewStats: ReviewStats = await dbHelper.queryReviewStats();
+      this.reviewTotal = reviewStats.total;
+      this.reviewAccuracy = reviewStats.total > 0 ? reviewStats.correct / reviewStats.total : 0;
 
-    const summary: MetricSummary = await dbHelper.queryMetricSummary();
-    this.ocrConfirmCount = summary.ocrConfirmCount;
-    this.avgOcrConfidence = summary.avgOcrConfidence;
+      const summary: MetricSummary = await dbHelper.queryMetricSummary();
+      this.ocrConfirmCount = summary.ocrConfirmCount;
+      this.avgOcrConfidence = summary.avgOcrConfidence;
+    } finally {
+      this.loading = false;
+    }
   }
 
   build() {
     Column() {
-      PageHeader({ title: '家长中心' })
+      PageHeader({ title: AppStrings.PARENT_CENTER })
       Scroll() {
         Column() {
           Text('本地聚合统计（脱敏），对应 FR-OPS 基础运营看板')

@@ -45,10 +45,4 @@ export class MasteryEvaluator {
 
     return MistakeStatus.MASTERED;
   }
-
-  static resetMastery(mistake: Mistake): void {
-    mistake.status = MistakeStatus.REVIEWING;
-    mistake.intervalIndex = 0;
-    mistake.nextReviewDate = Date.now() + 24 * 60 * 60 * 1000;
-  }
 }

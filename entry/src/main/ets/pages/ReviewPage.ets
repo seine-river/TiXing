@@ -1,15 +1,32 @@
 import { Mistake } from '../models/Mistake';
 import { ReviewLog } from '../models/ReviewLog';
-import { MistakeStatus, Subject, AnswerType, GradingMethod, InputMethod, PointsActionType } from '../models/Enums';
+import { AnswerType, GradingMethod, InputMethod, PointsActionType, Subject } from '../models/Enums';
+import { ReminderSettings } from '../models/ReminderSettings';
 import { dbHelper } from '../repository/DatabaseHelper';
-import { ReviewScheduler } from '../usecases/ReviewScheduler';
-import { MasteryEvaluator } from '../usecases/MasteryEvaluator';
+import { ReviewSubmitter, ReviewSubmitResult } from '../usecases/ReviewSubmitter';
 import { PointsCalculator } from '../usecases/PointsCalculator';
 import { KnowledgeProfileAggregator } from '../usecases/KnowledgeProfileAggregator';
-import { AnalyticsTracker } from '../usecases/AnalyticsTracker';
 import { PerformanceMonitor } from '../services/PerformanceMonitor';
-import { AppColors, AppSizes, AppStrings, subjectLabel, generateId } from '../common/Constants';
+import { AppColors, AppSizes, AppStrings, generateId, isAnswerEqual } from '../common/Constants';
+import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
+
+function enabledSubjects(settings: ReminderSettings): Subject[] {
+  const list: Subject[] = [];
+  if (settings.mathEnabled) {
+    list.push(Subject.MATH);
+  }
+  if (settings.chineseEnabled) {
+    list.push(Subject.CHINESE);
+  }
+  if (settings.englishEnabled) {
+    list.push(Subject.ENGLISH);
+  }
+  if (settings.scienceEnabled) {
+    list.push(Subject.SCIENCE);
+  }
+  return list;
+}
 
 @Entry
 @Component
@@ -19,23 +36,81 @@ struct ReviewPage {
   @State studentAnswer: string = '';
   @State isCorrect: boolean = false;
   @State showResult: boolean = false;
+  @State submitBusy: boolean = false;
   @State correctCount: number = 0;
   @State totalCount: number = 0;
   @State totalPoints: number = 0;
   @State isFinished: boolean = false;
   @State startTime: number = 0;
-  @State reviewMode: string = 'today';
   @State selectedAnswer: number = -1;
   @State showSelfEval: boolean = false;
+  private alive: boolean = true;
+  private profileDirty: boolean = false;
 
   aboutToAppear(): void {
     this.startTime = Date.now();
     this.loadReviewList();
   }
 
+  aboutToDisappear(): void {
+    this.alive = false;
+    this.recomputeProfileIfDirty();
+  }
+
+  /**
+   * 画像重算移至会话结束（T018/FR-021）：onBackPress / 完成时一次性触发。
+   */
+  private async recomputeProfileIfDirty(): Promise<void> {
+    if (!this.profileDirty) {
+      return;
+    }
+    this.profileDirty = false;
+    try {
+      await KnowledgeProfileAggregator.recomputeForStudent('stu_default');
+    } catch (e) {
+      PerformanceMonitor.warn('recompute profile at session end failed');
+    }
+  }
+
+  /**
+   * 复习队列（T034/FR-012）：按当前学生 + 每日上限 + 科目开关消费。
+   */
   async loadReviewList(): Promise<void> {
-    this.reviewList = await dbHelper.queryTodayReviewMistakes();
+    const settings: ReminderSettings = await dbHelper.queryReminderSettings('stu_default');
+    const subjects: Subject[] = enabledSubjects(settings);
+    this.reviewList = await dbHelper.queryTodayReviewMistakes('stu_default', settings.dailyLimit, subjects);
     this.totalCount = this.reviewList.length;
+  }
+
+  onBackPress(): boolean {
+    if (this.isFinished || this.reviewList.length === 0 || this.currentIndex >= this.totalCount) {
+      return false;
+    }
+    this.confirmExit();
+    return true;
+  }
+
+  private confirmExit(): void {
+    this.getUIContext().showAlertDialog({
+      title: '退出复习',
+      message: '本次复习尚未完成，退出后已提交的记录会保留，确定退出吗？',
+      primaryButton: {
+        value: '继续复习',
+        action: (): void => {
+        }
+      },
+      secondaryButton: {
+        value: '退出',
+        action: (): void => {
+          this.exitNow();
+        }
+      }
+    });
+  }
+
+  private exitNow(): void {
+    this.recomputeProfileIfDirty();
+    this.getUIContext().getRouter().back();
   }
 
   build() {
@@ -43,7 +118,7 @@ struct ReviewPage {
       if (this.isFinished) {
         this.SummaryView()
       } else {
-        PageHeader({ title: '复习错题' })
+        PageHeader({ title: AppStrings.PAGE_REVIEW })
         if (this.reviewList.length === 0) {
           Column() {
             Text('📭')
@@ -51,7 +126,7 @@ struct ReviewPage {
               .margin({ bottom: 12 })
             Text(AppStrings.NO_REVIEW_TODAY)
               .fontSize(16)
-              .fontColor('#909399')
+              .fontColor(AppColors.TEXT_SECONDARY)
           }
           .width('100%')
           .layoutWeight(1)
@@ -136,13 +211,14 @@ struct ReviewPage {
             .padding({ left: 16, top: 4 })
         }
 
-        Button(mistake.answerType === AnswerType.SUBJECTIVE ? AppStrings.REVIEW_SUBMIT : AppStrings.REVIEW_SUBMIT)
+        Button(this.submitBusy ? '提交中...' : AppStrings.REVIEW_SUBMIT)
           .width('90%')
           .height(44)
           .backgroundColor(AppColors.PRIMARY)
           .fontColor(Color.White)
           .borderRadius(22)
           .margin({ top: 24, bottom: 24 })
+          .enabled(!this.submitBusy)
           .onClick(() => {
             this.onSubmitTap(mistake);
           })
@@ -180,8 +256,9 @@ struct ReviewPage {
           .fontColor(Color.White)
           .borderRadius(22)
           .margin({ right: 8 })
+          .enabled(!this.submitBusy)
           .onClick(() => {
-            this.recordSubjective(mistake, true);
+            this.recordReview(mistake, true, GradingMethod.SUBJECTIVE_SELFREPORT);
           })
         Button('✗ 不一致')
           .layoutWeight(1)
@@ -189,8 +266,9 @@ struct ReviewPage {
           .backgroundColor(AppColors.DANGER)
           .fontColor(Color.White)
           .borderRadius(22)
+          .enabled(!this.submitBusy)
           .onClick(() => {
-            this.recordSubjective(mistake, false);
+            this.recordReview(mistake, false, GradingMethod.SUBJECTIVE_SELFREPORT);
           })
       }
       .width('100%')
@@ -220,7 +298,7 @@ struct ReviewPage {
         }
         .width('100%')
         .padding(12)
-        .backgroundColor(this.selectedAnswer === idx ? '#EBF1FA' : AppColors.BG_CARD)
+        .backgroundColor(this.selectedAnswer === idx ? AppColors.ROW_SELECTED : AppColors.BG_CARD)
         .borderRadius(AppSizes.CORNER_RADIUS_SM)
         .margin({ top: 6 })
       }, (option: string) => option)
@@ -374,64 +452,52 @@ struct ReviewPage {
   }
 
   private onSubmitTap(mistake: Mistake): void {
+    if (this.submitBusy) {
+      return;
+    }
     const answer = this.studentAnswer.trim();
     if (mistake.answerType === AnswerType.SUBJECTIVE) {
       this.showSelfEval = true;
       return;
     }
     if (answer.length === 0) {
+      Toast.show('请先输入答案');
       return;
     }
-    let correct = answer === mistake.standardAnswer;
-    this.recordReview(mistake, correct, GradingMethod.OBJECTIVE_AUTO);
+    // 归一化判分（T035/FR-017）：不受全半角/空格/大小写差异影响
+    this.recordReview(mistake, isAnswerEqual(mistake.standardAnswer, answer), GradingMethod.OBJECTIVE_AUTO);
   }
 
-  private recordSubjective(mistake: Mistake, correct: boolean): void {
-    this.recordReview(mistake, correct, GradingMethod.SUBJECTIVE_SELFREPORT);
-  }
-
-  private recordReview(mistake: Mistake, correct: boolean, gradingMethod: GradingMethod): void {
+  /**
+   * 提交走 ReviewSubmitter（T018/FR-006）：页面不再直接编排多步 DB 写。
+   */
+  private async recordReview(mistake: Mistake, correct: boolean, gradingMethod: GradingMethod): Promise<void> {
+    if (this.submitBusy) {
+      return;
+    }
+    this.submitBusy = true;
     const durationSeconds = Math.round((Date.now() - this.startTime) / 1000);
-
+    const inputMethod = this.getInputMethod(mistake.answerType);
+    const pointsAwarded = correct ? PointsCalculator.getPointsForAction(PointsActionType.ON_TIME_REVIEW) : 0;
+    const log: ReviewLog = ReviewLog.create(generateId(), mistake.id, gradingMethod, inputMethod,
+      correct, durationSeconds, pointsAwarded);
+    const result: ReviewSubmitResult = await ReviewSubmitter.submit(mistake, log);
+    if (!this.alive) {
+      return;
+    }
+    this.submitBusy = false;
+    if (!result.success) {
+      Toast.show('提交失败，请重试');
+      PerformanceMonitor.warn('review submit failed: ' + result.reason);
+      return;
+    }
     this.isCorrect = correct;
-    this.showResult = true;
-
     if (correct) {
       this.correctCount++;
     }
-
-    ReviewScheduler.scheduleNextReview(mistake, correct);
-
-    const logId = generateId();
-    const inputMethod = this.getInputMethod(mistake.answerType);
-    const pointsAwarded = correct ? PointsCalculator.getPointsForAction(PointsActionType.ON_TIME_REVIEW) : 0;
-    this.totalPoints += pointsAwarded;
-
-    const log = ReviewLog.create(logId, mistake.id, gradingMethod, inputMethod, correct, durationSeconds, pointsAwarded);
-    dbHelper.insertReviewLog(log);
-    if (mistake.firstReviewDuration === 0) {
-      mistake.firstReviewDuration = durationSeconds;
-    }
-    dbHelper.updateMistake(mistake);
-
-    AnalyticsTracker.trackReviewSubmit(mistake.studentId, correct, inputMethod);
-    PerformanceMonitor.writeBehavior('review_submit', {
-      'correct': correct, 'input_method': inputMethod, 'duration': durationSeconds
-    });
-
-    const existingLogs = dbHelper.queryReviewLogs(mistake.id);
-    existingLogs.then((logs: ReviewLog[]) => {
-      const newStatus = MasteryEvaluator.evaluateMastery(mistake, logs);
-      if (newStatus === MistakeStatus.MASTERED && mistake.status !== MistakeStatus.MASTERED) {
-        mistake.status = MistakeStatus.MASTERED;
-        dbHelper.updateMistake(mistake);
-        const pointsLog = PointsCalculator.createPointsLog(generateId(), mistake.studentId, PointsActionType.MASTERY_ACHIEVED);
-        dbHelper.insertPointsLog(pointsLog);
-        this.totalPoints += pointsLog.points;
-        AnalyticsTracker.trackMastery(mistake.studentId);
-      }
-      KnowledgeProfileAggregator.recomputeForStudent(mistake.studentId);
-    });
+    this.totalPoints += result.pointsAwarded;
+    this.profileDirty = true;
+    this.showResult = true;
   }
 
   private nextQuestion(): void {
@@ -443,12 +509,17 @@ struct ReviewPage {
     this.startTime = Date.now();
     if (this.currentIndex >= this.totalCount) {
       this.isFinished = true;
+      this.recomputeProfileIfDirty();
     }
   }
 
   private getInputMethod(answerType: AnswerType): InputMethod {
-    if (answerType === AnswerType.CHOICE) return InputMethod.SELECT;
-    if (answerType === AnswerType.NUMERIC) return InputMethod.NUMERIC_KEYPAD;
+    if (answerType === AnswerType.CHOICE) {
+      return InputMethod.SELECT;
+    }
+    if (answerType === AnswerType.NUMERIC) {
+      return InputMethod.NUMERIC_KEYPAD;
+    }
     return InputMethod.KEYBOARD;
   }
 }

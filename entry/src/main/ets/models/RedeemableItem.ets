@@ -11,5 +11,4 @@ export class RedeemableItem {
   category: RedeemableCategory = RedeemableCategory.AVATAR;
   cost: number = 0;
   icon: string = '';
-  owned: boolean = false;
 }

@@ -88,7 +88,11 @@ export class PerformanceMonitor {
         eventType: hiAppEvent.EventType.FAULT,
         params: params as object
       };
-      hiAppEvent.write(info);
+      // 补 rejection 处理（T040）：write 返回 Promise，需显式消费避免未处理拒绝
+      hiAppEvent.write(info).then((): void => {
+      }).catch((e: Error): void => {
+        PerformanceMonitor.errorRaw('write fault event failed: ' + name);
+      });
     } catch (e) {
     }
   }

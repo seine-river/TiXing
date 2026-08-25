@@ -1,10 +1,30 @@
 import { Mistake } from '../models/Mistake';
 import { dbHelper } from '../repository/DatabaseHelper';
-import { MistakeStatus, Subject } from '../models/Enums';
-import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor, toFileUri } from '../common/Constants';
+import { Subject } from '../models/Enums';
+import { MistakeStats } from '../models/AnalyticsEvent';
+import { ReminderSettings } from '../models/ReminderSettings';
+import { AppColors, AppSizes, AppStrings } from '../common/Constants';
 import { TabController } from '../common/TabController';
-import { SystemBarHelper } from '../common/SystemBarHelper';
-import { StatusTag, SubjectTag, EmptyPlaceholder } from '../components/CommonComponents';
+import { GradientHeader } from '../components/GradientHeader';
+import { MistakeCard } from '../components/MistakeCard';
+import { PrimaryButton, EmptyBlock } from '../components/BasicWidgets';
+
+function enabledSubjectsOf(settings: ReminderSettings): Subject[] {
+  const list: Subject[] = [];
+  if (settings.mathEnabled) {
+    list.push(Subject.MATH);
+  }
+  if (settings.chineseEnabled) {
+    list.push(Subject.CHINESE);
+  }
+  if (settings.englishEnabled) {
+    list.push(Subject.ENGLISH);
+  }
+  if (settings.scienceEnabled) {
+    list.push(Subject.SCIENCE);
+  }
+  return list;
+}
 
 @Component
 export struct HomePage {
@@ -15,25 +35,26 @@ export struct HomePage {
   @State reviewingCount: number = 0;
   @State recentMistakes: Mistake[] = [];
   @State studentPoints: number = 0;
-  @State statusBarHeight: number = 38;
   private studentId: string = 'stu_default';
 
   aboutToAppear(): void {
-    this.controller.reload = (): void => { this.loadData(); };
+    this.controller.reload = (): void => {
+      this.loadData();
+    };
     this.loadData();
-    SystemBarHelper.statusBarHeightVp(this.getUIContext()).then((h: number) => {
-      this.statusBarHeight = h;
-    });
   }
 
   async loadData(): Promise<void> {
-    const todayList = await dbHelper.queryTodayReviewMistakes();
+    const settings: ReminderSettings = await dbHelper.queryReminderSettings(this.studentId);
+    const todayList = await dbHelper.queryTodayReviewMistakes(this.studentId, settings.dailyLimit,
+      enabledSubjectsOf(settings));
     this.todayReviewCount = todayList.length;
-    const allMistakes = await dbHelper.queryMistakes();
-    this.totalMistakes = allMistakes.length;
-    this.masteredCount = allMistakes.filter((m: Mistake) => m.status === MistakeStatus.MASTERED).length;
-    this.reviewingCount = allMistakes.filter((m: Mistake) => m.status === MistakeStatus.REVIEWING || m.status === MistakeStatus.UNMASTERED).length;
-    this.recentMistakes = allMistakes.slice(0, 5);
+    // 统计改 SQL 聚合（T036/FR-019），recent 限条数
+    const stats: MistakeStats = await dbHelper.queryMistakeStats(this.studentId);
+    this.totalMistakes = stats.total;
+    this.masteredCount = stats.mastered;
+    this.reviewingCount = stats.reviewing + stats.unmastered;
+    this.recentMistakes = await dbHelper.queryMistakesByStudent(this.studentId, 0, 5);
     const summary = await dbHelper.queryPointsSummary(this.studentId);
     this.studentPoints = summary.totalPoints;
   }
@@ -41,7 +62,43 @@ export struct HomePage {
   build() {
     Scroll() {
       Column() {
-        this.HeroBanner()
+        GradientHeader({
+          title: AppStrings.APP_NAME,
+          subtitle: '今日学习概览，加油进步每一天',
+          badgeText: `⭐ ${this.studentPoints}`
+        }) {
+          Row() {
+            Column() {
+              Text(`${this.todayReviewCount}`)
+                .fontSize(44)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(Color.White)
+                .accessibilityText(`今日待复习 ${this.todayReviewCount} 题`)
+              Text('今日待复习')
+                .fontSize(13)
+                .fontColor(AppColors.HERO_TEXT_DIM)
+                .margin({ top: 2 })
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+
+            Button(this.todayReviewCount > 0 ? '开始复习' : '暂无待复习')
+              .height(AppSizes.TOUCH_TARGET)
+              .backgroundColor(Color.White)
+              .fontColor(AppColors.PRIMARY)
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .borderRadius(22)
+              .padding({ left: 24, right: 24 })
+              .enabled(this.todayReviewCount > 0)
+              .accessibilityText('开始复习今日错题')
+              .onClick(() => {
+                this.getUIContext().getRouter().pushUrl({ url: 'pages/ReviewPage' });
+              })
+          }
+          .width('100%')
+          .margin({ top: 20 })
+        }
 
         Row() {
           this.StatCard('总错题', `${this.totalMistakes}`, AppColors.PRIMARY, '📒')
@@ -52,19 +109,18 @@ export struct HomePage {
         .padding({ left: 16, right: 16, top: 16 })
         .justifyContent(FlexAlign.SpaceBetween)
 
-        Button('📷  录入错题')
-          .width('100%')
-          .height(50)
-          .backgroundColor(AppColors.PRIMARY)
-          .fontColor(Color.White)
-          .fontSize(17)
-          .fontWeight(FontWeight.Medium)
-          .borderRadius(AppSizes.CORNER_RADIUS)
-          .shadow({ radius: 12, color: '#263A7BD5', offsetY: 4 })
-          .margin({ left: 16, right: 16, top: 16 })
-          .onClick(() => {
-            this.getUIContext().getRouter().pushUrl({ url: 'pages/CapturePage' });
+        Column() {
+          PrimaryButton({
+            text: '📷  录入错题',
+            isEnabled: true,
+            onTap: (): void => {
+              this.getUIContext().getRouter().pushUrl({ url: 'pages/CapturePage' });
+            }
           })
+            .shadow({ radius: 12, color: AppColors.SHADOW_PRIMARY, offsetY: 4 })
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 16 })
 
         Row() {
           Text('最近错题')
@@ -77,10 +133,15 @@ export struct HomePage {
         .padding({ left: 16, right: 16, top: 24, bottom: 8 })
 
         if (this.recentMistakes.length === 0) {
-          EmptyPlaceholder({ message: '还没有错题，点击上方按钮录入吧' })
+          EmptyBlock({ message: '还没有错题，点击上方按钮录入吧' })
         } else {
           ForEach(this.recentMistakes, (item: Mistake) => {
-            this.RecentCard(item)
+            MistakeCard({
+              mistake: item,
+              onItemClick: (m: Mistake): void => {
+                this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeDetailPage', params: { mistakeId: m.id } });
+              }
+            })
           }, (item: Mistake) => item.id)
         }
       }
@@ -95,81 +156,7 @@ export struct HomePage {
   }
 
   @Builder
-  HeroBanner() {
-    Stack({ alignContent: Alignment.TopEnd }) {
-      Column() {
-        Row() {
-          Column() {
-            Text(AppStrings.APP_NAME)
-              .fontSize(26)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(Color.White)
-            Text('今日学习概览，加油进步每一天')
-              .fontSize(13)
-              .fontColor('#E8F1FF')
-              .margin({ top: 4 })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-        }
-        .width('100%')
-
-        Row() {
-          Column() {
-            Text(`${this.todayReviewCount}`)
-              .fontSize(44)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(Color.White)
-            Text('今日待复习')
-              .fontSize(13)
-              .fontColor('#DCEBFF')
-              .margin({ top: 2 })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-
-          Button(this.todayReviewCount > 0 ? '开始复习' : '暂无待复习')
-            .height(44)
-            .backgroundColor(Color.White)
-            .fontColor(AppColors.PRIMARY)
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .borderRadius(22)
-            .padding({ left: 24, right: 24 })
-            .enabled(this.todayReviewCount > 0)
-            .onClick(() => {
-              this.getUIContext().getRouter().pushUrl({ url: 'pages/ReviewPage' });
-            })
-        }
-        .width('100%')
-        .margin({ top: 20 })
-      }
-      .width('100%')
-      .padding({ left: 20, right: 20, top: this.statusBarHeight + 20, bottom: 24 })
-
-      Row() {
-        Text('⭐')
-          .fontSize(14)
-        Text(`${this.studentPoints}`)
-          .fontSize(16)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(Color.White)
-          .margin({ left: 4 })
-      }
-      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-      .borderRadius(16)
-      .backgroundColor('#331A2A4D')
-      .margin({ top: this.statusBarHeight + 10, right: 14 })
-    }
-    .width('100%')
-    .linearGradient({
-      angle: 135,
-      colors: [[AppColors.GRADIENT_START, 0], [AppColors.GRADIENT_END, 1]]
-    })
-  }
-
-  @Builder
-  StatCard(label: string, value: string, color: string, icon: string) {
+  StatCard(label: string, value: string, color: Resource, icon: string) {
     Column() {
       Text(icon)
         .fontSize(22)
@@ -189,68 +176,6 @@ export struct HomePage {
     .backgroundColor(AppColors.BG_CARD)
     .borderRadius(AppSizes.CORNER_RADIUS_SM)
     .margin({ left: 4, right: 4 })
-    .shadow({ radius: 8, color: '#14223640', offsetY: 2 })
-  }
-
-  @Builder
-  RecentCard(item: Mistake) {
-    Row() {
-      Column() {
-        Text(this.recentTitle(item))
-          .fontSize(15)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(AppColors.TEXT_PRIMARY)
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .lineHeight(22)
-        Row({ space: 6 }) {
-          SubjectTag({ subjectText: subjectLabel(item.subject) })
-          StatusTag({ statusText: statusLabel(item.status), statusColor: statusColor(item.status) })
-        }
-        .margin({ top: 8 })
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-
-      if (item.imageUrl.length > 0) {
-        Image(toFileUri(item.imageUrl))
-          .width(64)
-          .height(64)
-          .borderRadius(AppSizes.CORNER_RADIUS_XS)
-          .objectFit(ImageFit.Cover)
-          .margin({ left: 10 })
-      } else {
-        Column() {
-          Text('📷')
-            .fontSize(28)
-        }
-        .width(64)
-        .height(64)
-        .borderRadius(AppSizes.CORNER_RADIUS_XS)
-        .backgroundColor(AppColors.BG_CHIP)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
-        .margin({ left: 10 })
-      }
-    }
-    .width('100%')
-    .padding(14)
-    .backgroundColor(AppColors.BG_CARD)
-    .borderRadius(AppSizes.CORNER_RADIUS_SM)
-    .margin({ left: 16, right: 16, top: 6, bottom: 6 })
-    .shadow({ radius: 6, color: '#101F2E30', offsetY: 2 })
-    .onClick(() => {
-      this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeDetailPage', params: { mistakeId: item.id } });
-    })
-  }
-
-  private recentTitle(item: Mistake): string {
-    if (item.knowledgeSummary.length > 0) {
-      return item.knowledgeSummary;
-    }
-    if (item.ocrText.length > 0) {
-      return item.ocrText.length > 36 ? item.ocrText.substring(0, 36) + '...' : item.ocrText;
-    }
-    return '未命名错题';
+    .shadow({ radius: 8, color: AppColors.SHADOW_CARD, offsetY: 2 })
   }
 }

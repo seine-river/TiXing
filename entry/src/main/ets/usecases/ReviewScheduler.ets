@@ -1,5 +1,5 @@
 import { Mistake } from '../models/Mistake';
-import { MistakeStatus, AnswerType, GradingMethod } from '../models/Enums';
+import { MistakeStatus } from '../models/Enums';
 
 const INTERVALS_DAYS: number[] = [1, 3, 7, 15, 30];
 const MS_PER_DAY: number = 24 * 60 * 60 * 1000;

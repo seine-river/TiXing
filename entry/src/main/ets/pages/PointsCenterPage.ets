@@ -1,8 +1,10 @@
-import { PointsLog, PointsSummary } from '../models/PointsLog';
+import { PointsLog } from '../models/PointsLog';
 import { RedeemableItem, RedeemableCategory } from '../models/RedeemableItem';
+import { PointsActionType } from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { PreferenceService } from '../services/PreferenceService';
-import { AppColors, AppSizes, AppStrings } from '../common/Constants';
+import { StreakCalculator } from '../usecases/StreakCalculator';
+import { AppColors, AppSizes, AppStrings, formatDateTime } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
 
@@ -12,6 +14,7 @@ struct PointsCenterPage {
   @State earnedTotal: number = 0;
   @State spentTotal: number = 0;
   @State todayPoints: number = 0;
+  @State streakDays: number = 0;
   @State pointsLogs: PointsLog[] = [];
   @State redeemItems: RedeemableItem[] = [];
   @State ownedIds: string[] = [];
@@ -27,6 +30,9 @@ struct PointsCenterPage {
     const summary = await dbHelper.queryPointsSummary(this.studentId);
     this.earnedTotal = summary.totalPoints;
     this.todayPoints = summary.todayPoints;
+    // 真实连续学习天数（T033/FR-016）：与积分发放口径一致
+    const activeDays: string[] = await dbHelper.queryActiveDays(this.studentId);
+    this.streakDays = StreakCalculator.compute(activeDays);
     this.spentTotal = await dbHelper.queryTotalSpent(this.studentId);
     this.pointsLogs = await dbHelper.queryPointsLogs(this.studentId);
     this.ownedIds = await dbHelper.queryRedeemedItemIds(this.studentId);
@@ -59,6 +65,17 @@ struct PointsCenterPage {
                 .fontWeight(FontWeight.Medium)
                 .fontColor(AppColors.SECONDARY)
               Text('今日获得')
+                .fontSize(12)
+                .fontColor(AppColors.TEXT_SECONDARY)
+                .margin({ top: 2 })
+            }
+            .layoutWeight(1)
+            Column() {
+              Text(`${this.streakDays}`)
+                .fontSize(20)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(AppColors.PRIMARY)
+              Text('连续学习(天)')
                 .fontSize(12)
                 .fontColor(AppColors.TEXT_SECONDARY)
                 .margin({ top: 2 })
@@ -117,7 +134,7 @@ struct PointsCenterPage {
                 Button(`${item.cost}积分`)
                   .height(32)
                   .fontSize(13)
-                  .backgroundColor(this.availablePoints() >= item.cost ? AppColors.PRIMARY : '#C0C4CC')
+                  .backgroundColor(this.availablePoints() >= item.cost ? AppColors.PRIMARY : AppColors.DISABLED)
                   .fontColor(Color.White)
                   .borderRadius(16)
                   .enabled(this.availablePoints() >= item.cost)
@@ -183,7 +200,7 @@ struct PointsCenterPage {
                   Text(this.actionLabel(log.actionType))
                     .fontSize(15)
                     .fontColor(AppColors.TEXT_PRIMARY)
-                  Text(this.formatDate(log.createdAt))
+                  Text(formatDateTime(log.createdAt))
                     .fontSize(12)
                     .fontColor(AppColors.TEXT_SECONDARY)
                     .margin({ top: 2 })
@@ -254,14 +271,14 @@ struct PointsCenterPage {
       Toast.show('积分不足，无法兑换');
       return;
     }
-    try {
-      await dbHelper.insertRedemption(this.studentId, item.id, item.cost);
+    const result = await dbHelper.insertRedemption(this.studentId, item.id, item.cost);
+    if (result.success) {
       this.spentTotal = await dbHelper.queryTotalSpent(this.studentId);
       this.ownedIds = await dbHelper.queryRedeemedItemIds(this.studentId);
       this.statusMsg = `✅ 兑换成功：${item.name}`;
       Toast.show(`兑换成功：${item.name}`);
-    } catch (e) {
-      Toast.show('兑换失败，请重试');
+    } else {
+      Toast.show('兑换失败：' + (result.reason.length > 0 ? result.reason : '请重试'));
     }
   }
 
@@ -272,17 +289,23 @@ struct PointsCenterPage {
     return '成长树';
   }
 
+  /** PointsActionType 枚举映射（T040）：标签与枚举值一一对应。 */
   private actionLabel(actionType: string): string {
-    if (actionType === 'capture') return '录入错题';
-    if (actionType === 'on_time_review') return '按时复习';
-    if (actionType === 'mastery_achieved') return '掌握判定通过';
-    if (actionType === 'streak') return '连续打卡';
-    if (actionType === 'community_contribution') return '社区贡献';
+    if (actionType === PointsActionType.CAPTURE) {
+      return '录入错题';
+    }
+    if (actionType === PointsActionType.ON_TIME_REVIEW) {
+      return '按时复习';
+    }
+    if (actionType === PointsActionType.MASTERY_ACHIEVED) {
+      return '掌握判定通过';
+    }
+    if (actionType === PointsActionType.STREAK) {
+      return '连续打卡';
+    }
+    if (actionType === PointsActionType.COMMUNITY_CONTRIBUTION) {
+      return '社区贡献';
+    }
     return actionType;
-  }
-
-  private formatDate(timestamp: number): string {
-    const d = new Date(timestamp);
-    return `${d.getMonth() + 1}月${d.getDate()}日 ${d.getHours()}:${d.getMinutes() < 10 ? '0' : ''}${d.getMinutes()}`;
   }
 }

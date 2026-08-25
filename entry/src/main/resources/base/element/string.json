@@ -15,6 +15,10 @@
     {
       "name": "reason_reminder",
       "value": "用于在设定时间推送复习提醒通知"
+    },
+    {
+      "name": "reason_internet",
+      "value": "用于拍照识别错题时调用智能识别服务"
     }
   ]
 }

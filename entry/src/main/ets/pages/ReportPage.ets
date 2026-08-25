@@ -1,11 +1,9 @@
-import { KnowledgeTag, KnowledgeProfile } from '../models/KnowledgeTag';
-import { Mistake } from '../models/Mistake';
-import { MistakeStatus, Subject } from '../models/Enums';
+import { KnowledgeProfile } from '../models/KnowledgeTag';
+import { MistakeStats, SubjectCount } from '../models/AnalyticsEvent';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { AppColors, AppSizes, AppStrings, subjectLabel } from '../common/Constants';
 import { TabController } from '../common/TabController';
-import { SystemBarHelper } from '../common/SystemBarHelper';
-import { PageTitle } from '../components/CommonComponents';
+import { GradientHeader } from '../components/GradientHeader';
 
 @Component
 export struct ReportPage {
@@ -17,41 +15,30 @@ export struct ReportPage {
   @State knowledgeProfiles: KnowledgeProfile[] = [];
   @State weakPoints: WeakPoint[] = [];
   @State subjectDistribution: SubjectDist[] = [];
-  @State statusBarHeight: number = 38;
 
   aboutToAppear(): void {
     this.controller.reload = (): void => { this.loadReport(); };
     this.loadReport();
-    SystemBarHelper.statusBarHeightVp(this.getUIContext()).then((h: number) => {
-      this.statusBarHeight = h;
-    });
   }
 
   async loadReport(): Promise<void> {
-    const allMistakes = await dbHelper.queryMistakes();
-    this.totalMistakes = allMistakes.length;
-    this.masteredCount = allMistakes.filter((m: Mistake) => m.status === MistakeStatus.MASTERED).length;
-    this.reviewingCount = allMistakes.filter((m: Mistake) => m.status === MistakeStatus.REVIEWING).length;
-    this.unmasteredCount = allMistakes.filter((m: Mistake) => m.status === MistakeStatus.UNMASTERED).length;
+    // 统计改 SQL 聚合（T036/FR-019）
+    const stats: MistakeStats = await dbHelper.queryMistakeStats('stu_default');
+    this.totalMistakes = stats.total;
+    this.masteredCount = stats.mastered;
+    this.reviewingCount = stats.reviewing;
+    this.unmasteredCount = stats.unmastered;
 
     const profiles = await dbHelper.queryKnowledgeProfiles('stu_default');
     this.knowledgeProfiles = profiles;
 
-    const subjectCount: Record<string, number> = {};
-    for (const m of allMistakes) {
-      const key = m.subject;
-      const existing = subjectCount[key];
-      subjectCount[key] = (existing !== undefined ? existing : 0) + 1;
-    }
-    const distList: SubjectDist[] = [];
-    const keys = Object.keys(subjectCount);
-    for (const k of keys) {
-      const d = new SubjectDist();
-      d.subject = k;
-      d.count = subjectCount[k];
-      distList.push(d);
-    }
-    this.subjectDistribution = distList;
+    const distList: SubjectCount[] = await dbHelper.querySubjectDistribution('stu_default');
+    this.subjectDistribution = distList.map((d: SubjectCount): SubjectDist => {
+      const s = new SubjectDist();
+      s.subject = d.subject;
+      s.count = d.count;
+      return s;
+    });
 
     const weakList: WeakPoint[] = [];
     for (const p of profiles) {
@@ -70,11 +57,13 @@ export struct ReportPage {
   build() {
     Scroll() {
       Column() {
+        GradientHeader({ title: AppStrings.PAGE_REPORT, subtitle: '错题掌握与薄弱知识点分析' }) {
+        }
         this.OverviewSection()
         this.SubjectSection()
         this.WeakPointsSection()
       }
-      .padding({ top: this.statusBarHeight + 8, bottom: 24 })
+      .padding({ bottom: 24 })
       .width('100%')
       .height('100%')
     }
@@ -127,11 +116,11 @@ export struct ReportPage {
     .backgroundColor(AppColors.BG_CARD)
     .borderRadius(AppSizes.CORNER_RADIUS)
     .margin({ left: 16, right: 16, top: 8 })
-    .shadow({ radius: 8, color: '#101F2E26', offsetY: 2 })
+    .shadow({ radius: 8, color: AppColors.SHADOW_SOFT, offsetY: 2 })
   }
 
   @Builder
-  OverviewItem(label: string, value: string, color: string) {
+  OverviewItem(label: string, value: string, color: ResourceColor) {
     Column() {
       Text(value)
         .fontSize(24)
@@ -186,7 +175,7 @@ export struct ReportPage {
     .backgroundColor(AppColors.BG_CARD)
     .borderRadius(AppSizes.CORNER_RADIUS)
     .margin({ left: 16, right: 16, top: 12 })
-    .shadow({ radius: 8, color: '#101F2E26', offsetY: 2 })
+    .shadow({ radius: 8, color: AppColors.SHADOW_SOFT, offsetY: 2 })
   }
 
   @Builder
@@ -239,7 +228,7 @@ export struct ReportPage {
     .backgroundColor(AppColors.BG_CARD)
     .borderRadius(AppSizes.CORNER_RADIUS)
     .margin({ left: 16, right: 16, top: 12, bottom: 24 })
-    .shadow({ radius: 8, color: '#101F2E26', offsetY: 2 })
+    .shadow({ radius: 8, color: AppColors.SHADOW_SOFT, offsetY: 2 })
   }
 }
 

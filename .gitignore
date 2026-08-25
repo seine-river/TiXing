@@ -10,3 +10,9 @@
 /.clang-tidy
 **/.test
 /.appanalyzer
+/Key/
+/.cache/
+.DS_Store
+/App截图/
+/build-profile.signing.json5
+entry/src/main/resources/rawfile/ai_config.json

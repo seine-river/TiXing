@@ -1,15 +1,12 @@
 import { Mistake } from '../models/Mistake';
 import { ReviewLog } from '../models/ReviewLog';
-import { MistakeStatus, Subject, AnswerType, GradingMethod, InputMethod } from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
-import { ReviewScheduler } from '../usecases/ReviewScheduler';
-import { MasteryEvaluator } from '../usecases/MasteryEvaluator';
-import { PointsCalculator } from '../usecases/PointsCalculator';
 import { MediaService } from '../services/MediaService';
 import { AiService } from '../services/AiService';
-import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, statusColor, formatDate, generateId, toFileUri } from '../common/Constants';
+import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, formatDate, toFileUri } from '../common/Constants';
 import { Toast } from '../common/Toast';
-import { StatusTag, SubjectTag, PageTitle, EmptyPlaceholder, PageHeader } from '../components/CommonComponents';
+import { StatusTag, SubjectTag, PageHeader } from '../components/CommonComponents';
+import { EmptyBlock } from '../components/BasicWidgets';
 import { MistakeDetailParams } from '../common/RouteParams';
 
 @Entry
@@ -23,18 +20,20 @@ struct MistakeDetailPage {
   @State editMyAnswer: string = '';
   @State editKnowledge: string = '';
   @State fieldBusy: string = '';
-  @State isLoaded: boolean = false;
+  @State notFound: boolean = false;
 
   aboutToAppear(): void {
     const params = this.getUIContext().getRouter().getParams() as MistakeDetailParams;
     const id: string = params?.mistakeId ?? '';
     if (id.length > 0) {
       this.loadMistake(id);
+    } else {
+      this.notFound = true;
     }
   }
 
   async loadMistake(id: string): Promise<void> {
-    const m = await dbHelper.queryMistakeById(id);
+    const m: Mistake | undefined = await dbHelper.queryMistakeById(id);
     if (m !== undefined) {
       this.mistake = m;
       this.notesText = m.notes;
@@ -42,10 +41,11 @@ struct MistakeDetailPage {
       this.editStdAnswer = m.standardAnswer;
       this.editMyAnswer = m.studentAnswer;
       this.editKnowledge = m.knowledgeSummary;
+    } else {
+      this.notFound = true;
+      return;
     }
-    const logs = await dbHelper.queryReviewLogs(id);
-    this.reviewLogs = logs;
-    this.isLoaded = true;
+    this.reviewLogs = await dbHelper.queryReviewLogs(id);
   }
 
   @Builder
@@ -71,27 +71,33 @@ struct MistakeDetailPage {
           .fontColor(AppColors.TEXT_PRIMARY)
           .borderRadius(AppSizes.CORNER_RADIUS_SM)
           .backgroundColor(AppColors.BG_PAGE)
-          .onChange((v: string) => { this.editQuestion = v; })
+          .onChange((v: string) => {
+            this.editQuestion = v;
+          })
       } else if (target === 'standard') {
         TextArea({ text: this.editStdAnswer, placeholder: '输入或修改标准答案' })
           .fontSize(16)
           .fontColor(AppColors.SECONDARY)
           .borderRadius(AppSizes.CORNER_RADIUS_SM)
           .backgroundColor(AppColors.BG_PAGE)
-          .onChange((v: string) => { this.editStdAnswer = v; })
+          .onChange((v: string) => {
+            this.editStdAnswer = v;
+          })
       } else {
         TextArea({ text: this.editMyAnswer, placeholder: '输入或修改我的答案' })
           .fontSize(16)
           .fontColor(AppColors.DANGER)
           .borderRadius(AppSizes.CORNER_RADIUS_SM)
           .backgroundColor(AppColors.BG_PAGE)
-          .onChange((v: string) => { this.editMyAnswer = v; })
+          .onChange((v: string) => {
+            this.editMyAnswer = v;
+          })
       }
 
-      Button('📷 拍照重新识别')
+      Button('🖼️ 相册选图识别')
         .height(32)
         .fontSize(12)
-        .backgroundColor('#E8EAED')
+        .backgroundColor(AppColors.CHIP_BG)
         .fontColor(AppColors.TEXT_REGULAR)
         .borderRadius(16)
         .margin({ top: 8 })
@@ -116,6 +122,9 @@ struct MistakeDetailPage {
     return '题目内容';
   }
 
+  /**
+   * 相册选图重新识别（T030/FR-027）：题图更换后 imageUrl 立即落库（updateMistake 含 imageUrl）。
+   */
   private async reRecognizeField(target: string): Promise<void> {
     const path = await MediaService.pickFromAlbum();
     if (path === undefined || path.length === 0) {
@@ -131,181 +140,209 @@ struct MistakeDetailPage {
       } else if (target === 'question') {
         this.editQuestion = cleaned;
         this.mistake.imageUrl = path;
+        const saveRes = await dbHelper.updateMistake(this.mistake);
+        if (!saveRes.success) {
+          Toast.show('图片路径保存失败，请点击保存修改重试');
+        } else {
+          Toast.show('题图已更新');
+        }
       } else if (target === 'standard') {
         this.editStdAnswer = cleaned;
       } else {
         this.editMyAnswer = cleaned;
       }
     } catch (e) {
-      Toast.show('识别失败，请检查网络');
+      Toast.show('识别失败，请检查网络或 AI 配置');
     }
     this.fieldBusy = '';
   }
 
   build() {
     Column() {
-      PageHeader({ title: '错题详情' })
-      Scroll() {
+      PageHeader({ title: AppStrings.PAGE_DETAIL })
+      if (this.notFound) {
         Column() {
-          Row({ space: 6 }) {
-            SubjectTag({ subjectText: subjectLabel(this.mistake.subject), subjectColor: AppColors.PRIMARY })
-            StatusTag({ statusText: statusLabel(this.mistake.status), statusColor: statusColor(this.mistake.status) })
-            Text(formatDate(this.mistake.createdAt))
-              .fontSize(12)
-              .fontColor(AppColors.TEXT_SECONDARY)
-          }
-          .padding({ left: 16, right: 16, top: 4 })
-
-        Column() {
-          Text('知识点总结')
-            .fontSize(14)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .margin({ bottom: 6 })
-          TextInput({ text: this.editKnowledge, placeholder: '知识点总结' })
-            .fontSize(16)
-            .borderRadius(AppSizes.CORNER_RADIUS_SM)
-            .backgroundColor(AppColors.BG_PAGE)
-            .onChange((v: string) => { this.editKnowledge = v; })
+          EmptyBlock({ message: '错题不存在或已被删除' })
+          Button('返回')
+            .height(44)
+            .backgroundColor(AppColors.PRIMARY)
+            .fontColor(Color.White)
+            .borderRadius(22)
+            .padding({ left: 32, right: 32 })
+            .margin({ top: 16 })
+            .onClick(() => {
+              this.getUIContext().getRouter().back();
+            })
         }
         .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .margin({ left: 16, right: 16, top: 8 })
+        .layoutWeight(1)
+        .justifyContent(FlexAlign.Center)
+      } else {
+        Scroll() {
+          Column() {
+            Row({ space: 6 }) {
+              SubjectTag({ subjectText: subjectLabel(this.mistake.subject), subjectKey: this.mistake.subject })
+              StatusTag({ statusText: statusLabel(this.mistake.status), statusKey: this.mistake.status })
+              Text(formatDate(this.mistake.createdAt))
+                .fontSize(12)
+                .fontColor(AppColors.TEXT_SECONDARY)
+            }
+            .padding({ left: 16, right: 16, top: 4 })
 
-        this.EditableCard('question')
-
-        this.EditableCard('standard')
-
-        this.EditableCard('mine')
-
-        Column() {
-          Text('掌握度信息')
-            .fontSize(14)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .margin({ bottom: 8 })
-          Row() {
-            Text('间隔级别:')
-              .fontSize(14)
-              .fontColor(AppColors.TEXT_REGULAR)
-            Text(`${this.mistake.intervalIndex + 1}/5`)
-              .fontSize(14)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(AppColors.PRIMARY)
-              .margin({ left: 4 })
-            Text('  下次复习:')
-              .fontSize(14)
-              .fontColor(AppColors.TEXT_REGULAR)
-              .margin({ left: 12 })
-            Text(formatDate(this.mistake.nextReviewDate))
-              .fontSize(14)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(AppColors.WARNING)
-              .margin({ left: 4 })
-          }
-          Progress({ value: this.mistake.intervalIndex + 1, total: 5, type: ProgressType.Linear })
+            Column() {
+              Text('知识点总结')
+                .fontSize(14)
+                .fontColor(AppColors.TEXT_SECONDARY)
+                .margin({ bottom: 6 })
+              TextInput({ text: this.editKnowledge, placeholder: '知识点总结' })
+                .fontSize(16)
+                .borderRadius(AppSizes.CORNER_RADIUS_SM)
+                .backgroundColor(AppColors.BG_PAGE)
+                .onChange((v: string) => {
+                  this.editKnowledge = v;
+                })
+            }
             .width('100%')
-            .color(AppColors.PRIMARY)
-            .margin({ top: 8 })
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .margin({ left: 16, right: 16, top: 8 })
+            .padding(16)
+            .backgroundColor(AppColors.BG_CARD)
+            .borderRadius(AppSizes.CORNER_RADIUS_SM)
+            .margin({ left: 16, right: 16, top: 8 })
 
-        Column() {
-          Row() {
-            Text(AppStrings.ADD_NOTES)
-              .fontSize(14)
-              .fontColor(AppColors.TEXT_SECONDARY)
-              .layoutWeight(1)
-            Button('📷 拍照笔记')
-              .height(32)
-              .fontSize(12)
-              .backgroundColor('#E8EAED')
-              .fontColor(AppColors.TEXT_REGULAR)
-              .borderRadius(16)
+            this.EditableCard('question')
+
+            this.EditableCard('standard')
+
+            this.EditableCard('mine')
+
+            Column() {
+              Text('掌握度信息')
+                .fontSize(14)
+                .fontColor(AppColors.TEXT_SECONDARY)
+                .margin({ bottom: 8 })
+              Row() {
+                Text('间隔级别:')
+                  .fontSize(14)
+                  .fontColor(AppColors.TEXT_REGULAR)
+                Text(`${this.mistake.intervalIndex + 1}/5`)
+                  .fontSize(14)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(AppColors.PRIMARY)
+                  .margin({ left: 4 })
+                Text('  下次复习:')
+                  .fontSize(14)
+                  .fontColor(AppColors.TEXT_REGULAR)
+                  .margin({ left: 12 })
+                Text(formatDate(this.mistake.nextReviewDate))
+                  .fontSize(14)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(AppColors.WARNING)
+                  .margin({ left: 4 })
+              }
+              Progress({ value: this.mistake.intervalIndex + 1, total: 5, type: ProgressType.Linear })
+                .width('100%')
+                .color(AppColors.PRIMARY)
+                .margin({ top: 8 })
+            }
+            .width('100%')
+            .padding(16)
+            .backgroundColor(AppColors.BG_CARD)
+            .borderRadius(AppSizes.CORNER_RADIUS_SM)
+            .margin({ left: 16, right: 16, top: 8 })
+
+            Column() {
+              Row() {
+                Text(AppStrings.ADD_NOTES)
+                  .fontSize(14)
+                  .fontColor(AppColors.TEXT_SECONDARY)
+                  .layoutWeight(1)
+                Button('🖼️ 相册选图笔记')
+                  .height(32)
+                  .fontSize(12)
+                  .backgroundColor(AppColors.CHIP_BG)
+                  .fontColor(AppColors.TEXT_REGULAR)
+                  .borderRadius(16)
+                  .onClick(() => {
+                    this.attachNotePhoto();
+                  })
+              }
+              .width('100%')
+              .margin({ bottom: 6 })
+              TextInput({ text: this.notesText, placeholder: '添加讲解笔记（可使用输入法语音/手写）...' })
+                .fontSize(16)
+                .onChange((value: string) => {
+                  this.notesText = value;
+                })
+                .borderRadius(AppSizes.CORNER_RADIUS_SM)
+                .backgroundColor(AppColors.BG_PAGE)
+              if (this.mistake.notesAttachmentUrl.length > 0) {
+                Image(toFileUri(this.mistake.notesAttachmentUrl))
+                  .width('100%')
+                  .height(160)
+                  .objectFit(ImageFit.Contain)
+                  .sourceSize({ width: 1080, height: 800 })
+                  .borderRadius(AppSizes.CORNER_RADIUS_SM)
+                  .margin({ top: 8 })
+              }
+            }
+            .width('100%')
+            .padding(16)
+            .backgroundColor(AppColors.BG_CARD)
+            .borderRadius(AppSizes.CORNER_RADIUS_SM)
+            .margin({ left: 16, right: 16, top: 8 })
+
+            Column() {
+              Text('复习历史')
+                .fontSize(14)
+                .fontColor(AppColors.TEXT_SECONDARY)
+                .margin({ bottom: 8 })
+
+              if (this.reviewLogs.length === 0) {
+                Text('暂无复习记录')
+                  .fontSize(14)
+                  .fontColor(AppColors.TEXT_PLACEHOLDER)
+              } else {
+                ForEach(this.reviewLogs, (log: ReviewLog) => {
+                  Row() {
+                    Text(formatDate(log.reviewTime))
+                      .fontSize(13)
+                      .fontColor(AppColors.TEXT_SECONDARY)
+                      .layoutWeight(1)
+                    Text(log.correct ? '✓ 正确' : '✗ 错误')
+                      .fontSize(13)
+                      .fontColor(log.correct ? AppColors.SECONDARY : AppColors.DANGER)
+                    Text(`${log.durationSeconds}秒`)
+                      .fontSize(13)
+                      .fontColor(AppColors.TEXT_SECONDARY)
+                      .margin({ left: 8 })
+                  }
+                  .width('100%')
+                  .padding({ top: 6, bottom: 6 })
+                }, (log: ReviewLog) => log.id)
+              }
+            }
+            .width('100%')
+            .padding(16)
+            .backgroundColor(AppColors.BG_CARD)
+            .borderRadius(AppSizes.CORNER_RADIUS_SM)
+            .margin({ left: 16, right: 16, top: 8 })
+
+            Button('保存修改')
+              .width('90%')
+              .height(44)
+              .backgroundColor(AppColors.PRIMARY)
+              .fontColor(Color.White)
+              .borderRadius(22)
+              .margin({ top: 24, bottom: 32 })
               .onClick(() => {
-                this.attachNotePhoto();
+                this.saveAll();
               })
           }
           .width('100%')
-          .margin({ bottom: 6 })
-          TextInput({ text: this.notesText, placeholder: '添加讲解笔记（可使用输入法语音/手写）...' })
-            .fontSize(16)
-            .onChange((value: string) => {
-              this.notesText = value;
-            })
-            .borderRadius(AppSizes.CORNER_RADIUS_SM)
-            .backgroundColor(AppColors.BG_PAGE)
-          if (this.mistake.notesAttachmentUrl.length > 0) {
-            Image(toFileUri(this.mistake.notesAttachmentUrl))
-              .width('100%')
-              .height(160)
-              .objectFit(ImageFit.Contain)
-              .borderRadius(AppSizes.CORNER_RADIUS_SM)
-              .margin({ top: 8 })
-          }
         }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .margin({ left: 16, right: 16, top: 8 })
-
-        Column() {
-          Text('复习历史')
-            .fontSize(14)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .margin({ bottom: 8 })
-
-          if (this.reviewLogs.length === 0) {
-            Text('暂无复习记录')
-              .fontSize(14)
-              .fontColor(AppColors.TEXT_PLACEHOLDER)
-          } else {
-            ForEach(this.reviewLogs, (log: ReviewLog) => {
-              Row() {
-                Text(formatDate(log.reviewTime))
-                  .fontSize(13)
-                  .fontColor(AppColors.TEXT_SECONDARY)
-                  .layoutWeight(1)
-                Text(log.correct ? '✓ 正确' : '✗ 错误')
-                  .fontSize(13)
-                  .fontColor(log.correct ? AppColors.SECONDARY : AppColors.DANGER)
-                Text(`${log.durationSeconds}秒`)
-                  .fontSize(13)
-                  .fontColor(AppColors.TEXT_SECONDARY)
-                  .margin({ left: 8 })
-              }
-              .width('100%')
-              .padding({ top: 6, bottom: 6 })
-            }, (log: ReviewLog) => log.id)
-          }
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .margin({ left: 16, right: 16, top: 8 })
-
-        Button('保存修改')
-          .width('90%')
-          .height(44)
-          .backgroundColor(AppColors.PRIMARY)
-          .fontColor(Color.White)
-          .borderRadius(22)
-          .margin({ top: 24, bottom: 32 })
-          .onClick(() => {
-            this.saveAll();
-          })
-        }
-        .width('100%')
+        .layoutWeight(1)
+        .backgroundColor(AppColors.BG_PAGE)
+        .scrollBar(BarState.Auto)
       }
-      .layoutWeight(1)
-      .backgroundColor(AppColors.BG_PAGE)
-      .scrollBar(BarState.Auto)
     }
     .width('100%')
     .height('100%')
@@ -318,11 +355,11 @@ struct MistakeDetailPage {
     this.mistake.standardAnswer = this.editStdAnswer;
     this.mistake.studentAnswer = this.editMyAnswer;
     this.mistake.knowledgeSummary = this.editKnowledge;
-    try {
-      await dbHelper.updateMistake(this.mistake);
+    const result = await dbHelper.updateMistake(this.mistake);
+    if (result.success) {
       Toast.show('已保存修改');
-    } catch (e) {
-      Toast.show('保存失败，请重试');
+    } else {
+      Toast.show('保存失败：' + (result.reason.length > 0 ? result.reason : '请重试'));
     }
   }
 
@@ -333,10 +370,10 @@ struct MistakeDetailPage {
       return;
     }
     this.mistake.notesAttachmentUrl = path;
-    try {
-      await dbHelper.updateMistake(this.mistake);
-      Toast.show('已添加拍照笔记');
-    } catch (e) {
+    const result = await dbHelper.updateMistake(this.mistake);
+    if (result.success) {
+      Toast.show('已添加图片笔记');
+    } else {
       Toast.show('附件保存失败，请重试');
     }
   }

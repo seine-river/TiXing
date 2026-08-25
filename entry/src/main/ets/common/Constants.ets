@@ -1,25 +1,40 @@
+/**
+ * 颜色常量（T042/D7）：全部改为 $r 资源引用，调用点 API 不变；
+ * 深色模式经 resources/dark/element/color.json 自动适配。
+ */
 export class AppColors {
-  static readonly PRIMARY: string = '#3A7BD5';
-  static readonly PRIMARY_LIGHT: string = '#5B9BE8';
-  static readonly PRIMARY_DARK: string = '#2E64A8';
-  static readonly GRADIENT_START: string = '#3A7BD5';
-  static readonly GRADIENT_END: string = '#5BB6F0';
-  static readonly SECONDARY: string = '#34C759';
-  static readonly WARNING: string = '#FF9F0A';
-  static readonly DANGER: string = '#F56C6C';
-  static readonly BG_PAGE: string = '#F2F4F8';
-  static readonly BG_CARD: string = '#FFFFFF';
-  static readonly BG_CHIP: string = '#EEF2F7';
-  static readonly TEXT_PRIMARY: string = '#1D2129';
-  static readonly TEXT_REGULAR: string = '#4E5969';
-  static readonly TEXT_SECONDARY: string = '#86909C';
-  static readonly TEXT_PLACEHOLDER: string = '#C9CDD4';
-  static readonly BORDER: string = '#E5E6EB';
-  static readonly DIVIDER: string = '#F2F3F5';
-  static readonly SHADOW: string = '#1F2A3D';
-  static readonly MASTERY_MASTERED: string = '#34C759';
-  static readonly MASTERY_REVIEWING: string = '#3A7BD5';
-  static readonly MASTERY_UNMASTERED: string = '#F56C6C';
+  static readonly PRIMARY: Resource = $r('app.color.primary');
+  static readonly PRIMARY_LIGHT: Resource = $r('app.color.primary_light');
+  static readonly PRIMARY_DARK: Resource = $r('app.color.primary_dark');
+  static readonly GRADIENT_START: Resource = $r('app.color.gradient_start');
+  static readonly GRADIENT_END: Resource = $r('app.color.gradient_end');
+  static readonly SECONDARY: Resource = $r('app.color.secondary');
+  static readonly WARNING: Resource = $r('app.color.warning');
+  static readonly DANGER: Resource = $r('app.color.danger');
+  static readonly BG_PAGE: Resource = $r('app.color.bg_page');
+  static readonly BG_CARD: Resource = $r('app.color.bg_card');
+  static readonly BG_CHIP: Resource = $r('app.color.bg_chip');
+  static readonly CHIP_BG: Resource = $r('app.color.chip_bg');
+  static readonly ROW_SELECTED: Resource = $r('app.color.row_selected');
+  static readonly DISABLED: Resource = $r('app.color.disabled');
+  static readonly TEXT_PRIMARY: Resource = $r('app.color.text_primary');
+  static readonly TEXT_REGULAR: Resource = $r('app.color.text_regular');
+  static readonly TEXT_SECONDARY: Resource = $r('app.color.text_secondary');
+  static readonly TEXT_PLACEHOLDER: Resource = $r('app.color.text_placeholder');
+  static readonly BORDER: Resource = $r('app.color.border');
+  static readonly DIVIDER: Resource = $r('app.color.divider');
+  static readonly SHADOW: Resource = $r('app.color.shadow');
+  static readonly SHADOW_CARD: Resource = $r('app.color.shadow_card');
+  static readonly SHADOW_SOFT: Resource = $r('app.color.shadow_soft');
+  static readonly SHADOW_PRIMARY: Resource = $r('app.color.shadow_primary');
+  static readonly HERO_TEXT: Resource = $r('app.color.hero_text');
+  static readonly HERO_TEXT_DIM: Resource = $r('app.color.hero_text_dim');
+  static readonly BADGE_BG: Resource = $r('app.color.badge_bg');
+  static readonly CROP_MASK: Resource = $r('app.color.crop_mask');
+  static readonly IMAGE_VIEWER_BG: Resource = $r('app.color.image_viewer_bg');
+  static readonly MASTERY_MASTERED: Resource = $r('app.color.mastery_mastered');
+  static readonly MASTERY_REVIEWING: Resource = $r('app.color.mastery_reviewing');
+  static readonly MASTERY_UNMASTERED: Resource = $r('app.color.mastery_unmastered');
 }
 
 export class AppSizes {
@@ -77,6 +92,18 @@ export class AppStrings {
   static readonly LEARNING_PROFILE: string = '学习档案';
   static readonly PARENT_CENTER: string = '家长中心';
   static readonly POINTS_CENTER: string = '积分中心';
+  static readonly PAGE_CAPTURE: string = '录入错题';
+  static readonly PAGE_REVIEW: string = '复习错题';
+  static readonly PAGE_DETAIL: string = '错题详情';
+  static readonly PAGE_DATA: string = '导出与导入';
+  static readonly PAGE_REMINDER: string = '复习提醒设置';
+  static readonly PAGE_REPORT: string = '学习报告';
+  static readonly DELETE: string = '删除';
+  static readonly CANCEL: string = '取消';
+  static readonly SAVE_SUCCESS: string = '已保存';
+  static readonly LOAD_FAILED: string = '加载失败，请检查数据后重试';
+  static readonly RETRY: string = '重新加载';
+  static readonly NO_MORE_DATA: string = '已加载全部错题';
 }
 
 export function subjectLabel(subject: string): string {
@@ -93,10 +120,27 @@ export function statusLabel(status: string): string {
   return AppStrings.STATUS_UNMASTERED;
 }
 
-export function statusColor(status: string): string {
-  if (status === 'mastered') return AppColors.MASTERY_MASTERED;
-  if (status === 'reviewing') return AppColors.MASTERY_REVIEWING;
+export function statusColor(status: string): Resource {
+  if (status === 'mastered') {
+    return AppColors.MASTERY_MASTERED;
+  }
+  if (status === 'reviewing') {
+    return AppColors.MASTERY_REVIEWING;
+  }
   return AppColors.MASTERY_UNMASTERED;
+}
+
+export function subjectColor(subject: string): Resource {
+  if (subject === 'chinese') {
+    return AppColors.WARNING;
+  }
+  if (subject === 'english') {
+    return AppColors.SECONDARY;
+  }
+  if (subject === 'science') {
+    return AppColors.PRIMARY_DARK;
+  }
+  return AppColors.PRIMARY;
 }
 
 export function formatDate(timestamp: number): string {
@@ -105,6 +149,50 @@ export function formatDate(timestamp: number): string {
   const m = d.getMonth() + 1;
   const day = d.getDate();
   return `${y}-${m < 10 ? '0' + m : m}-${day < 10 ? '0' + day : day}`;
+}
+
+export function formatDateTime(timestamp: number): string {
+  const d = new Date(timestamp);
+  const hh = d.getHours();
+  const mm = d.getMinutes();
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${hh < 10 ? '0' + hh : hh}:${mm < 10 ? '0' + mm : mm}`;
+}
+
+/** 标题截断（T047）：统一收敛的文本截断工具。 */
+export function truncateText(text: string, maxLen: number): string {
+  if (text.length > maxLen) {
+    return text.substring(0, maxLen) + '...';
+  }
+  return text;
+}
+
+/**
+ * 答案归一化（T035/FR-017）：trim + 小写 + 全角转半角 + 去空格，
+ * 判分不受全半角/空格/大小写差异影响。
+ */
+export function normalizeAnswer(s: string): string {
+  if (s.length === 0) {
+    return '';
+  }
+  const lower: string = s.trim().toLowerCase();
+  let out: string = '';
+  for (let i: number = 0; i < lower.length; i++) {
+    const code: number = lower.charCodeAt(i);
+    let c: string = lower.charAt(i);
+    if (code >= 0xFF01 && code <= 0xFF5E) {
+      // 全角 ASCII → 半角
+      c = String.fromCharCode(code - 0xFEE0);
+    } else if (code === 0x3000) {
+      c = ' ';
+    }
+    out += c;
+  }
+  return out.replace(new RegExp('\\s+', 'g'), '');
+}
+
+/** 归一化答案比较（判分入口）。 */
+export function isAnswerEqual(standard: string, student: string): boolean {
+  return normalizeAnswer(standard) === normalizeAnswer(student);
 }
 
 export function generateId(): string {

@@ -3,7 +3,7 @@ import { Grade, TextbookVersion } from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { AppColors, AppSizes, AppStrings } from '../common/Constants';
 import { TabController } from '../common/TabController';
-import { SystemBarHelper } from '../common/SystemBarHelper';
+import { GradientHeader } from '../components/GradientHeader';
 import { PointsSummary } from '../models/PointsLog';
 
 @Component
@@ -12,13 +12,10 @@ export struct ProfilePage {
   @State student: Student = new Student();
   @State pointsSummary: PointsSummary = new PointsSummary();
   @State isLoaded: boolean = false;
-  @State statusBarHeight: number = 0;
+
   aboutToAppear(): void {
     this.controller.reload = (): void => { this.loadData(); };
     this.loadData();
-    SystemBarHelper.statusBarHeightVp(this.getUIContext()).then((h: number) => {
-      this.statusBarHeight = h;
-    });
   }
 
   async loadData(): Promise<void> {
@@ -68,7 +65,7 @@ export struct ProfilePage {
         .backgroundColor(AppColors.BG_CARD)
         .borderRadius(AppSizes.CORNER_RADIUS)
         .margin({ left: 16, right: 16, top: 14 })
-        .shadow({ radius: 8, color: '#101F2E26', offsetY: 2 })
+        .shadow({ radius: 8, color: AppColors.SHADOW_SOFT, offsetY: 2 })
       }
       .width('100%')
       .height('100%')
@@ -82,49 +79,20 @@ export struct ProfilePage {
 
   @Builder
   UserInfoCard() {
-    Stack({ alignContent: Alignment.TopEnd }) {
+    GradientHeader({
+      title: this.student.nickname,
+      subtitle: `年级: ${this.student.grade} · 教材: ${this.student.textbookVersion === TextbookVersion.PEP ? '人教版' : '其他'}`,
+      badgeText: `⭐ ${this.pointsSummary.totalPoints}`
+    }) {
       Row() {
-        Column() {
-          Text(this.student.nickname)
-            .fontSize(22)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Color.White)
-          Text(`年级: ${this.student.grade} · 教材: ${this.student.textbookVersion === TextbookVersion.PEP ? '人教版' : '其他'}`)
-            .fontSize(13)
-            .fontColor('#E8F1FF')
-            .margin({ top: 6 })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-
-        Column() {
-          Row() {
-            Text('⭐')
-              .fontSize(14)
-            Text(`${this.pointsSummary.totalPoints}`)
-              .fontSize(20)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(Color.White)
-              .margin({ left: 4 })
-          }
-          Text('积分')
-            .fontSize(12)
-            .fontColor('#DCEBFF')
-            .margin({ top: 2 })
-        }
-        .alignItems(HorizontalAlign.Center)
-        .backgroundColor('#331A2A4D')
-        .borderRadius(14)
-        .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+        Text('积分')
+          .fontSize(13)
+          .fontColor(AppColors.HERO_TEXT)
+          .accessibilityText(`当前积分 ${this.pointsSummary.totalPoints}`)
       }
       .width('100%')
-      .padding({ left: 20, right: 20, top: this.statusBarHeight + 24, bottom: 28 })
+      .margin({ top: 14 })
     }
-    .width('100%')
-    .linearGradient({
-      angle: 135,
-      colors: [[AppColors.GRADIENT_START, 0], [AppColors.GRADIENT_END, 1]]
-    })
   }
 
   @Builder

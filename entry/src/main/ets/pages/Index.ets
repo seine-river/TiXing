@@ -3,10 +3,14 @@ import { MistakesPage } from './MistakesPage';
 import { ReportPage } from './ReportPage';
 import { ProfilePage } from './ProfilePage';
 import { dbHelper } from '../repository/DatabaseHelper';
+import { DbResult } from '../common/DbResult';
 import { AppColors, AppStrings } from '../common/Constants';
 import { AppContextHolder } from '../common/AppContext';
 import { TabController } from '../common/TabController';
 import { Toast } from '../common/Toast';
+import { PerformanceMonitor } from '../services/PerformanceMonitor';
+import { MediaService } from '../services/MediaService';
+import { AiConfig } from '../common/AiConfig';
 import { ReminderService } from '../services/ReminderService';
 import { ReminderSettings } from '../models/ReminderSettings';
 
@@ -21,15 +25,33 @@ struct Index {
   private profileController: TabController = new TabController();
 
   aboutToAppear(): void {
-    Toast.setContext(this.getUIContext());
     if (!this.dbInitialized) {
       const ctx = this.getUIContext().getHostContext() as Context;
       AppContextHolder.set(ctx);
-      dbHelper.init(ctx).then(() => {
-        this.applyReminder();
-      });
       this.dbInitialized = true;
+      this.bootstrapApp(ctx);
     }
+  }
+
+  /**
+   * 冷启动引导（T016/D3）：等待数据库就绪后再触发各 Tab 首次加载；
+   * init 失败给出用户可见提示与致命日志；顺带加载本地 AI 配置与应用提醒。
+   */
+  private async bootstrapApp(ctx: Context): Promise<void> {
+    AiConfig.load().catch((_e: Object): void => {
+      PerformanceMonitor.warn('ai config load failed');
+    });
+    MediaService.cleanupTemp().catch((_e: Object): void => {
+      PerformanceMonitor.warn('cleanup temp files failed');
+    });
+    const initResult: DbResult = await dbHelper.init(ctx);
+    if (!initResult.success) {
+      PerformanceMonitor.errorRaw('db init failed: ' + initResult.reason);
+      Toast.show('数据库初始化失败，数据可能暂时不可用，请重启应用');
+    }
+    // 就绪（或失败提示）后再触发当前 Tab 数据加载，避免首屏空数据假象
+    await this.applyReminder();
+    this.reloadTab(this.currentTab);
   }
 
   onPageShow(): void {
@@ -37,8 +59,15 @@ struct Index {
   }
 
   private async applyReminder(): Promise<void> {
-    const s: ReminderSettings = await dbHelper.queryReminderSettings('stu_default');
-    await ReminderService.applySettings(s);
+    try {
+      const s: ReminderSettings = await dbHelper.queryReminderSettings('stu_default');
+      const result: DbResult = await ReminderService.syncAndApply(s);
+      if (!result.success) {
+        PerformanceMonitor.warn('startup reminder sync failed: ' + result.reason);
+      }
+    } catch (e) {
+      PerformanceMonitor.warn('apply reminder failed on startup');
+    }
   }
 
   private reloadTab(index: number): void {

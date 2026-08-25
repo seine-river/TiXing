@@ -73,13 +73,6 @@ export enum CommunityPostStatus {
   REJECTED = 'rejected'
 }
 
-export enum SubscriptionPlanType {
-  MONTHLY = 'monthly',
-  SEMESTER = 'semester',
-  ANNUAL = 'annual',
-  SINGLE_REPORT = 'single_report'
-}
-
 export enum SubscriptionStatus {
   NONE = 'none',
   ACTIVE = 'active',

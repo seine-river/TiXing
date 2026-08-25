@@ -1,123 +1,122 @@
-import { Mistake } from '../models/Mistake';
-import { MistakeStatus, Subject } from '../models/Enums';
-import { dbHelper } from '../repository/DatabaseHelper';
-import { DataPortabilityService, ImportPreview } from '../services/DataPortabilityService';
-import { KnowledgeProfileAggregator } from '../usecases/KnowledgeProfileAggregator';
-import { AppColors, AppSizes, subjectLabel, formatDate } from '../common/Constants';
+import { DbResult } from '../common/DbResult';
+import { DataPortabilityService, BundlePreview, BundlePreviewItem } from '../services/DataPortabilityService';
+import { AppColors, AppSizes, AppStrings, subjectLabel, formatDate } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
 
 @Entry
 @Component
 struct DataManagementPage {
-  @State statusMsg: string = '';
-  @State importPath: string = '';
-  @State importPreview: ImportPreview = new ImportPreview();
   @State busy: boolean = false;
+  @State busyMsg: string = '';
+  @State statusMsg: string = '';
+  @State statusOk: boolean = false;
+  @State preview: BundlePreview = new BundlePreview();
 
   build() {
     Column() {
-      PageHeader({ title: '导出与导入' })
+      PageHeader({ title: AppStrings.PAGE_DATA })
       Scroll() {
         Column() {
           Column() {
             Text('导出数据')
               .fontSize(16)
               .fontWeight(FontWeight.Medium)
-            .fontColor(AppColors.TEXT_PRIMARY)
-            .width('100%')
-            .margin({ bottom: 8 })
-          Text('将错题与复习记录导出为 JSON 结构化文件，可用于换机备份或分享。')
-            .fontSize(13)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .margin({ bottom: 12 })
-          Button('导出 JSON')
-            .width('100%')
-            .height(44)
-            .backgroundColor(this.busy ? '#C0C4CC' : AppColors.PRIMARY)
-            .fontColor(Color.White)
-            .borderRadius(22)
-            .enabled(!this.busy)
-            .onClick(() => {
-              this.doExport();
-            })
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS)
-        .margin({ left: 16, right: 16, top: 8 })
-
-        Column() {
-          Text('导入数据')
-            .fontSize(16)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(AppColors.TEXT_PRIMARY)
-            .width('100%')
-            .margin({ bottom: 8 })
-          Text('导入本应用备份文件，导入前需逐条核对确认。')
-            .fontSize(13)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .margin({ bottom: 12 })
-          Button('选择文件并预览')
-            .width('100%')
-            .height(44)
-            .backgroundColor(this.busy ? '#C0C4CC' : AppColors.BG_PAGE)
-            .fontColor(AppColors.PRIMARY)
-            .borderRadius(22)
-            .enabled(!this.busy)
-            .onClick(() => {
-              this.doPickImport();
-            })
-
-          if (this.importPreview.mistakes.length > 0) {
-            Text(`预览：${this.importPreview.mistakes.length} 道错题，${this.importPreview.logCount} 条复习记录`)
-              .fontSize(13)
-              .fontColor(AppColors.TEXT_REGULAR)
-              .margin({ top: 12, bottom: 8 })
-
-            ForEach(this.importPreview.mistakes.slice(0, 10), (item: Mistake) => {
-              Row() {
-                Column() {
-                  Text(item.ocrText.length > 30 ? item.ocrText.substring(0, 30) + '...' : item.ocrText)
-                    .fontSize(13)
-                    .fontColor(AppColors.TEXT_PRIMARY)
-                  Text(`${subjectLabel(item.subject)} · ${formatDate(item.createdAt)}`)
-                    .fontSize(11)
-                    .fontColor(AppColors.TEXT_SECONDARY)
-                    .margin({ top: 2 })
-                }
-                .alignItems(HorizontalAlign.Start)
-                .layoutWeight(1)
-              }
+              .fontColor(AppColors.TEXT_PRIMARY)
               .width('100%')
-              .padding({ top: 6, bottom: 6 })
-            }, (item: Mistake) => item.id)
-
-            Button('确认导入（已核对）')
+              .margin({ bottom: 8 })
+            Text('将错题、复习记录与错题图片打包为 zip 备份文件，可用于换机备份或分享。')
+              .fontSize(13)
+              .fontColor(AppColors.TEXT_SECONDARY)
+              .margin({ bottom: 12 })
+            Button(this.busy && this.busyMsg.length > 0 ? this.busyMsg : '导出备份（zip）')
               .width('100%')
               .height(44)
-              .backgroundColor(AppColors.SECONDARY)
+              .backgroundColor(this.busy ? AppColors.DISABLED : AppColors.PRIMARY)
               .fontColor(Color.White)
               .borderRadius(22)
-              .margin({ top: 12 })
+              .enabled(!this.busy)
               .onClick(() => {
-                this.doImport();
+                this.doExport();
               })
           }
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS)
-        .margin({ left: 16, right: 16, top: 12 })
+          .width('100%')
+          .padding(16)
+          .backgroundColor(AppColors.BG_CARD)
+          .borderRadius(AppSizes.CORNER_RADIUS)
+          .margin({ left: 16, right: 16, top: 8 })
 
-        if (this.statusMsg.length > 0) {
-          Text(this.statusMsg)
-            .fontSize(14)
-            .fontColor(AppColors.SECONDARY)
-            .padding({ left: 16, right: 16, top: 16 })
-        }
+          Column() {
+            Text('导入数据')
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(AppColors.TEXT_PRIMARY)
+              .width('100%')
+              .margin({ bottom: 8 })
+            Text('选择本应用导出的 zip 备份文件，导入前会先解析预览，需逐条核对确认。')
+              .fontSize(13)
+              .fontColor(AppColors.TEXT_SECONDARY)
+              .margin({ bottom: 12 })
+            Button(this.busy && this.busyMsg.length > 0 ? this.busyMsg : '选择文件并预览')
+              .width('100%')
+              .height(44)
+              .backgroundColor(this.busy ? AppColors.DISABLED : AppColors.BG_PAGE)
+              .fontColor(AppColors.PRIMARY)
+              .borderRadius(22)
+              .enabled(!this.busy)
+              .onClick(() => {
+                this.doPickImport();
+              })
+
+            if (this.preview.mistakeCount > 0) {
+              Text(`预览：${this.preview.mistakeCount} 道错题，${this.preview.logCount} 条复习记录，${this.preview.imageCount} 张图片`)
+                .fontSize(13)
+                .fontColor(AppColors.TEXT_REGULAR)
+                .margin({ top: 12, bottom: 8 })
+
+              ForEach(this.preview.previewItems, (item: BundlePreviewItem) => {
+                Row() {
+                  Column() {
+                    Text(item.ocrText.length > 0 ? item.ocrText : '（无题目文本）')
+                      .fontSize(13)
+                      .fontColor(AppColors.TEXT_PRIMARY)
+                    Text(`${subjectLabel(item.subject)} · ${formatDate(item.createdAt)}`)
+                      .fontSize(11)
+                      .fontColor(AppColors.TEXT_SECONDARY)
+                      .margin({ top: 2 })
+                  }
+                  .alignItems(HorizontalAlign.Start)
+                  .layoutWeight(1)
+                }
+                .width('100%')
+                .padding({ top: 6, bottom: 6 })
+              }, (item: BundlePreviewItem) => item.id)
+
+              Button('确认导入（已核对）')
+                .width('100%')
+                .height(44)
+                .backgroundColor(AppColors.SECONDARY)
+                .fontColor(Color.White)
+                .borderRadius(22)
+                .margin({ top: 12 })
+                .enabled(!this.busy)
+                .onClick(() => {
+                  this.doImport();
+                })
+            }
+          }
+          .width('100%')
+          .padding(16)
+          .backgroundColor(AppColors.BG_CARD)
+          .borderRadius(AppSizes.CORNER_RADIUS)
+          .margin({ left: 16, right: 16, top: 12 })
+
+          if (this.statusMsg.length > 0) {
+            Text(this.statusMsg)
+              .fontSize(14)
+              .fontColor(this.statusOk ? AppColors.SECONDARY : AppColors.DANGER)
+              .padding({ left: 16, right: 16, top: 16 })
+          }
         }
         .width('100%')
       }
@@ -129,50 +128,79 @@ struct DataManagementPage {
     .backgroundColor(AppColors.BG_PAGE)
   }
 
-  private async doExport(): Promise<void> {
+  private setBusy(msg: string): void {
     this.busy = true;
+    this.busyMsg = msg;
+  }
+
+  private clearBusy(): void {
+    this.busy = false;
+    this.busyMsg = '';
+  }
+
+  private async doExport(): Promise<void> {
+    if (this.busy) {
+      return;
+    }
+    this.setBusy('导出中...');
     try {
-      const path = await DataPortabilityService.exportToJson('stu_default');
+      const path: string = await DataPortabilityService.exportBundle('stu_default');
+      this.statusOk = true;
       this.statusMsg = `✅ 已导出到：${path}`;
       Toast.show('导出成功');
     } catch (e) {
-      this.statusMsg = '❌ 导出失败';
+      const reason: string = e instanceof Error ? e.message : '未知错误';
+      this.statusOk = false;
+      this.statusMsg = '❌ 导出失败：' + reason;
       Toast.show('导出失败，请重试');
     }
-    this.busy = false;
+    this.clearBusy();
   }
 
   private async doPickImport(): Promise<void> {
-    this.busy = true;
-    const path = await DataPortabilityService.pickImportFile();
-    this.busy = false;
-    if (path === undefined) {
-      this.statusMsg = '未选择文件';
-      Toast.show('未选择文件');
+    if (this.busy) {
       return;
     }
-    this.importPath = path;
-    this.importPreview = DataPortabilityService.parsePreview(path);
-    if (this.importPreview.mistakes.length === 0) {
-      this.statusMsg = '解析失败或文件为空';
-      Toast.show('解析失败，请确认是本应用的备份文件');
-    } else {
-      this.statusMsg = `已解析 ${this.importPreview.mistakes.length} 道错题，请核对后确认导入`;
+    this.setBusy('选择文件...');
+    const path: string | undefined = await DataPortabilityService.pickBundleFile();
+    if (path === undefined) {
+      this.clearBusy();
+      this.statusOk = false;
+      this.statusMsg = '未选择文件';
+      return;
     }
+    this.setBusy('解析中...');
+    try {
+      this.preview = await DataPortabilityService.parseBundlePreview(path);
+      this.statusOk = true;
+      this.statusMsg = `已解析 ${this.preview.mistakeCount} 道错题，请核对后确认导入`;
+    } catch (e) {
+      const reason: string = e instanceof Error ? e.message : '文件解析失败';
+      this.preview = new BundlePreview();
+      this.statusOk = false;
+      this.statusMsg = '❌ ' + reason;
+      Toast.show(reason);
+    }
+    this.clearBusy();
   }
 
   private async doImport(): Promise<void> {
-    this.busy = true;
-    try {
-      const count = await DataPortabilityService.applyImport(this.importPreview);
-      await KnowledgeProfileAggregator.recomputeForStudent('stu_default');
-      this.statusMsg = `✅ 成功导入 ${count} 道错题`;
-      Toast.show(`成功导入 ${count} 道错题`);
-      this.importPreview = new ImportPreview();
-    } catch (e) {
-      this.statusMsg = '❌ 导入失败';
+    if (this.busy || this.preview.mistakeCount === 0) {
+      return;
+    }
+    this.setBusy('导入中...');
+    const result: DbResult = await DataPortabilityService.importBundle(this.preview);
+    if (result.success) {
+      DataPortabilityService.cleanupImportCache(this.preview);
+      this.statusOk = true;
+      this.statusMsg = `✅ 导入完成：${this.preview.mistakeCount} 道错题（重复项已自动跳过）`;
+      Toast.show('导入成功');
+      this.preview = new BundlePreview();
+    } else {
+      this.statusOk = false;
+      this.statusMsg = '❌ 导入失败：' + result.reason;
       Toast.show('导入失败，请重试');
     }
-    this.busy = false;
+    this.clearBusy();
   }
 }

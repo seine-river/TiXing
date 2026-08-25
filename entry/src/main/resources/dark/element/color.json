@@ -2,7 +2,135 @@
   "color": [
     {
       "name": "start_window_background",
+      "value": "#121317"
+    },
+    {
+      "name": "primary",
+      "value": "#5B9BE8"
+    },
+    {
+      "name": "primary_light",
+      "value": "#7FB4F0"
+    },
+    {
+      "name": "primary_dark",
+      "value": "#4A80BE"
+    },
+    {
+      "name": "gradient_start",
+      "value": "#31689F"
+    },
+    {
+      "name": "gradient_end",
+      "value": "#3E8BC4"
+    },
+    {
+      "name": "secondary",
+      "value": "#3DDC84"
+    },
+    {
+      "name": "warning",
+      "value": "#FFB340"
+    },
+    {
+      "name": "danger",
+      "value": "#FF7875"
+    },
+    {
+      "name": "bg_page",
+      "value": "#121317"
+    },
+    {
+      "name": "bg_card",
+      "value": "#1E2026"
+    },
+    {
+      "name": "bg_chip",
+      "value": "#2A2D34"
+    },
+    {
+      "name": "chip_bg",
+      "value": "#33363D"
+    },
+    {
+      "name": "text_primary",
+      "value": "#E5EAF3"
+    },
+    {
+      "name": "text_regular",
+      "value": "#C0C7D1"
+    },
+    {
+      "name": "text_secondary",
+      "value": "#8E96A3"
+    },
+    {
+      "name": "text_placeholder",
+      "value": "#5C6370"
+    },
+    {
+      "name": "border",
+      "value": "#32353C"
+    },
+    {
+      "name": "divider",
+      "value": "#2A2D34"
+    },
+    {
+      "name": "shadow",
       "value": "#000000"
+    },
+    {
+      "name": "mastery_mastered",
+      "value": "#3DDC84"
+    },
+    {
+      "name": "mastery_reviewing",
+      "value": "#5B9BE8"
+    },
+    {
+      "name": "mastery_unmastered",
+      "value": "#FF7875"
+    },
+    {
+      "name": "hero_text",
+      "value": "#E8F1FF"
+    },
+    {
+      "name": "hero_text_dim",
+      "value": "#DCEBFF"
+    },
+    {
+      "name": "badge_bg",
+      "value": "#331A2A4D"
+    },
+    {
+      "name": "crop_mask",
+      "value": "#333A7BD5"
+    },
+    {
+      "name": "image_viewer_bg",
+      "value": "#000000"
+    },
+    {
+      "name": "disabled",
+      "value": "#4A5058"
+    },
+    {
+      "name": "row_selected",
+      "value": "#263447"
+    },
+    {
+      "name": "shadow_card",
+      "value": "#00000059"
+    },
+    {
+      "name": "shadow_soft",
+      "value": "#00000040"
+    },
+    {
+      "name": "shadow_primary",
+      "value": "#333A7BD5"
     }
   ]
 }

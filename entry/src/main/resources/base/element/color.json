@@ -2,15 +2,135 @@
   "color": [
     {
       "name": "start_window_background",
-      "value": "#F5F7FA"
+      "value": "#F2F4F8"
     },
     {
       "name": "primary",
-      "value": "#4A90D9"
+      "value": "#3A7BD5"
+    },
+    {
+      "name": "primary_light",
+      "value": "#5B9BE8"
+    },
+    {
+      "name": "primary_dark",
+      "value": "#2E64A8"
+    },
+    {
+      "name": "gradient_start",
+      "value": "#3A7BD5"
+    },
+    {
+      "name": "gradient_end",
+      "value": "#5BB6F0"
+    },
+    {
+      "name": "secondary",
+      "value": "#34C759"
+    },
+    {
+      "name": "warning",
+      "value": "#FF9F0A"
+    },
+    {
+      "name": "danger",
+      "value": "#F56C6C"
+    },
+    {
+      "name": "bg_page",
+      "value": "#F2F4F8"
+    },
+    {
+      "name": "bg_card",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "bg_chip",
+      "value": "#EEF2F7"
+    },
+    {
+      "name": "chip_bg",
+      "value": "#E8EAED"
     },
     {
       "name": "text_primary",
-      "value": "#303133"
+      "value": "#1D2129"
+    },
+    {
+      "name": "text_regular",
+      "value": "#4E5969"
+    },
+    {
+      "name": "text_secondary",
+      "value": "#86909C"
+    },
+    {
+      "name": "text_placeholder",
+      "value": "#C9CDD4"
+    },
+    {
+      "name": "border",
+      "value": "#E5E6EB"
+    },
+    {
+      "name": "divider",
+      "value": "#F2F3F5"
+    },
+    {
+      "name": "shadow",
+      "value": "#1F2A3D"
+    },
+    {
+      "name": "mastery_mastered",
+      "value": "#34C759"
+    },
+    {
+      "name": "mastery_reviewing",
+      "value": "#3A7BD5"
+    },
+    {
+      "name": "mastery_unmastered",
+      "value": "#F56C6C"
+    },
+    {
+      "name": "hero_text",
+      "value": "#E8F1FF"
+    },
+    {
+      "name": "hero_text_dim",
+      "value": "#DCEBFF"
+    },
+    {
+      "name": "badge_bg",
+      "value": "#331A2A4D"
+    },
+    {
+      "name": "crop_mask",
+      "value": "#333A7BD5"
+    },
+    {
+      "name": "image_viewer_bg",
+      "value": "#000000"
+    },
+    {
+      "name": "disabled",
+      "value": "#C0C4CC"
+    },
+    {
+      "name": "row_selected",
+      "value": "#EBF1FA"
+    },
+    {
+      "name": "shadow_card",
+      "value": "#14223640"
+    },
+    {
+      "name": "shadow_soft",
+      "value": "#101F2E26"
+    },
+    {
+      "name": "shadow_primary",
+      "value": "#263A7BD5"
     }
   ]
 }

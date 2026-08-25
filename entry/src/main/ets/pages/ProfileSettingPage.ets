@@ -69,7 +69,7 @@ struct ProfileSettingPage {
                 .height(36)
                 .fontSize(14)
                 .borderRadius(18)
-                .backgroundColor(this.selectedGradeIndex === idx ? AppColors.PRIMARY : '#E8EAED')
+                .backgroundColor(this.selectedGradeIndex === idx ? AppColors.PRIMARY : AppColors.CHIP_BG)
                 .fontColor(this.selectedGradeIndex === idx ? Color.White : AppColors.TEXT_REGULAR)
                 .layoutWeight(1)
                 .margin({ left: 2, right: 2 })
@@ -97,7 +97,7 @@ struct ProfileSettingPage {
                 .height(36)
                 .fontSize(14)
                 .borderRadius(18)
-                .backgroundColor(this.selectedVersionIndex === idx ? AppColors.PRIMARY : '#E8EAED')
+                .backgroundColor(this.selectedVersionIndex === idx ? AppColors.PRIMARY : AppColors.CHIP_BG)
                 .fontColor(this.selectedVersionIndex === idx ? Color.White : AppColors.TEXT_REGULAR)
                 .layoutWeight(1)
                 .margin({ left: 2, right: 2 })
@@ -178,12 +178,12 @@ struct ProfileSettingPage {
   private async saveProfile(): Promise<void> {
     this.student.communityBrowseEnabled = this.communityBrowseEnabled;
     this.student.communityShareEnabled = this.communityShareEnabled;
-    try {
-      await dbHelper.updateStudent(this.student);
+    const result = await dbHelper.updateStudent(this.student);
+    if (result.success) {
       Toast.show('档案已保存');
       this.getUIContext().getRouter().back();
-    } catch (e) {
-      Toast.show('保存失败，请重试');
+    } else {
+      Toast.show('保存失败：' + (result.reason.length > 0 ? result.reason : '请重试'));
     }
   }
 }
