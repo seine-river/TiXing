@@ -32,7 +32,7 @@ struct DataManagementPage {
             Button(this.busy && this.busyMsg.length > 0 ? this.busyMsg : '导出备份（zip）')
               .width('100%')
               .height(44)
-              .backgroundColor(this.busy ? AppColors.DISABLED : AppColors.PRIMARY)
+              .backgroundColor(this.busy ? AppColors.DISABLED : AppColors.SOLID_PRIMARY)
               .fontColor(Color.White)
               .borderRadius(22)
               .enabled(!this.busy)
@@ -95,7 +95,7 @@ struct DataManagementPage {
               Button('确认导入（已核对）')
                 .width('100%')
                 .height(44)
-                .backgroundColor(AppColors.SECONDARY)
+                .backgroundColor(AppColors.SOLID_SECONDARY)
                 .fontColor(Color.White)
                 .borderRadius(22)
                 .margin({ top: 12 })
@@ -122,6 +122,7 @@ struct DataManagementPage {
       }
       .layoutWeight(1)
       .scrollBar(BarState.Auto)
+      .edgeEffect(EdgeEffect.Spring)
     }
     .width('100%')
     .height('100%')

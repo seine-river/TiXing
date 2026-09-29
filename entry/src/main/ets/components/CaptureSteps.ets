@@ -121,6 +121,7 @@ export struct SourceSelectStep {
       .width('100%')
     }
     .scrollBar(BarState.Auto)
+    .edgeEffect(EdgeEffect.Spring)
   }
 
   @Builder
@@ -257,7 +258,7 @@ export struct RegionSelectStep {
           })
         Button(this.confirmLabel)
           .height(40)
-          .backgroundColor(this.busy ? AppColors.DISABLED : AppColors.PRIMARY)
+          .backgroundColor(this.busy ? AppColors.DISABLED : AppColors.SOLID_PRIMARY)
           .fontColor(Color.White)
           .borderRadius(20)
           .enabled(!this.busy)
@@ -288,7 +289,7 @@ export struct RegionSelectStep {
       .width(28)
       .height(28)
       .borderRadius(14)
-      .backgroundColor(AppColors.PRIMARY)
+      .backgroundColor(AppColors.SOLID_PRIMARY)
       .border({ width: 3, color: Color.White })
     }
     .width(44)
@@ -782,7 +783,7 @@ export struct OcrConfirmStep {
         Button(this.anyAiBusy() ? 'AI 识别中，请稍候...' : AppStrings.CONFIRM_COMPLETE)
           .width('90%')
           .height(44)
-          .backgroundColor((this.questionText.length > 0 && !this.anyAiBusy()) ? AppColors.PRIMARY : AppColors.DISABLED)
+          .backgroundColor((this.questionText.length > 0 && !this.anyAiBusy()) ? AppColors.SOLID_PRIMARY : AppColors.DISABLED)
           .fontColor(Color.White)
           .borderRadius(22)
           .margin({ top: 24, bottom: 24 })
@@ -794,6 +795,7 @@ export struct OcrConfirmStep {
       .width('100%')
     }
     .scrollBar(BarState.Auto)
+    .edgeEffect(EdgeEffect.Spring)
   }
 
   private onSaveClick(): void {
@@ -923,7 +925,7 @@ export struct OcrConfirmStep {
             Button('🔍 智能分析')
               .height(32)
               .fontSize(12)
-              .backgroundColor(AppColors.PRIMARY)
+              .backgroundColor(AppColors.SOLID_PRIMARY)
               .fontColor(Color.White)
               .borderRadius(16)
               .enabled(!this.answerAnalyzing(target))
@@ -992,7 +994,7 @@ export struct ResultStep {
         .fontColor(AppColors.TEXT_SECONDARY)
         .margin({ top: 8 })
       Button('继续录入')
-        .backgroundColor(AppColors.PRIMARY)
+        .backgroundColor(AppColors.SOLID_PRIMARY)
         .fontColor(Color.White)
         .borderRadius(22)
         .height(44)

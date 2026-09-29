@@ -134,7 +134,7 @@ struct PointsCenterPage {
                 Button(`${item.cost}积分`)
                   .height(32)
                   .fontSize(13)
-                  .backgroundColor(this.availablePoints() >= item.cost ? AppColors.PRIMARY : AppColors.DISABLED)
+                  .backgroundColor(this.availablePoints() >= item.cost ? AppColors.SOLID_PRIMARY : AppColors.DISABLED)
                   .fontColor(Color.White)
                   .borderRadius(16)
                   .enabled(this.availablePoints() >= item.cost)
@@ -240,6 +240,7 @@ struct PointsCenterPage {
       }
       .layoutWeight(1)
       .scrollBar(BarState.Auto)
+      .edgeEffect(EdgeEffect.Spring)
     }
     .width('100%')
     .height('100%')

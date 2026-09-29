@@ -59,6 +59,21 @@ export struct HomePage {
     this.studentPoints = summary.totalPoints;
   }
 
+  // ===== [临时-故障注入] 仅用于 jscrash 定位演练，分析完成后删除 =====
+  // 模拟"后端返回数据不足"场景：越界索引在编译期类型是 number，运行期是 undefined
+  private triggerInjectedCrash(): void {
+    const badgeList: number[] = [1, 2, 3];
+    const badge: number = badgeList[7]; // 越界 → 运行时为 undefined，编译期不报错
+    this.renderBadgeText(badge);
+  }
+
+  private renderBadgeText(badge: number): void {
+    // undefined.toFixed() → TypeError: Cannot read property 'toFixed' of undefined（jscrash 崩溃点）
+    const text: string = badge.toFixed(0);
+    console.info('[FaultInject] badge=' + text);
+  }
+  // ===== [临时-故障注入] 结束 =====
+
   build() {
     Scroll() {
       Column() {
@@ -118,6 +133,16 @@ export struct HomePage {
             }
           })
             .shadow({ radius: 12, color: AppColors.SHADOW_PRIMARY, offsetY: 4 })
+
+          // [临时-故障注入] 点击触发 jscrash，演练完成后删除
+          Text('🧪 故障注入测试')
+            .fontSize(12)
+            .fontColor(AppColors.TEXT_SECONDARY)
+            .margin({ top: 8 })
+            .padding(8)
+            .onClick(() => {
+              this.triggerInjectedCrash();
+            })
         }
         .width('100%')
         .padding({ left: 16, right: 16, top: 16 })

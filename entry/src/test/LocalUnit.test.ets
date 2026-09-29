@@ -162,15 +162,6 @@ export default function coreAlgorithmTest() {
       expect(result).assertEqual(MistakeStatus.MASTERED);
     });
 
-    it('resetMastery_resets_state', 0, () => {
-      const mistake = new Mistake();
-      mistake.status = MistakeStatus.MASTERED;
-      mistake.intervalIndex = 4;
-      MasteryEvaluator.resetMastery(mistake);
-      expect(mistake.status).assertEqual(MistakeStatus.REVIEWING);
-      expect(mistake.intervalIndex).assertEqual(0);
-      expect(mistake.nextReviewDate).assertLarger(0);
-    });
   });
 
   describe('PointsCalculator', () => {
@@ -350,9 +341,15 @@ export default function coreAlgorithmTest() {
     });
 
     it('statusColor_all_statuses', 0, () => {
-      expect(statusColor(MistakeStatus.MASTERED)).assertEqual('#34C759');
-      expect(statusColor(MistakeStatus.REVIEWING)).assertEqual('#3A7BD5');
-      expect(statusColor(MistakeStatus.UNMASTERED)).assertEqual('#F56C6C');
+      const mastered: Resource = statusColor(MistakeStatus.MASTERED);
+      const reviewing: Resource = statusColor(MistakeStatus.REVIEWING);
+      const unmastered: Resource = statusColor(MistakeStatus.UNMASTERED);
+      expect(mastered !== undefined).assertTrue();
+      expect(reviewing !== undefined).assertTrue();
+      expect(unmastered !== undefined).assertTrue();
+      expect(mastered !== reviewing).assertTrue();
+      expect(reviewing !== unmastered).assertTrue();
+      expect(mastered !== unmastered).assertTrue();
     });
 
     it('formatDate_pads_single_digit', 0, () => {

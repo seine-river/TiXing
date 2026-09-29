@@ -20,7 +20,7 @@ export struct FilterChip {
     }
     .constraintSize({ minHeight: AppSizes.TOUCH_TARGET })
     .justifyContent(FlexAlign.Center)
-    .backgroundColor(this.selected ? AppColors.PRIMARY : AppColors.CHIP_BG)
+    .backgroundColor(this.selected ? AppColors.SOLID_PRIMARY : AppColors.CHIP_BG)
     .borderRadius(22)
     .onClick(() => {
       this.onTap();
@@ -40,7 +40,7 @@ export struct PrimaryButton {
     Button(this.text)
       .width('100%')
       .height(AppSizes.TOUCH_TARGET)
-      .backgroundColor(this.isEnabled ? AppColors.PRIMARY : AppColors.DISABLED)
+      .backgroundColor(this.isEnabled ? AppColors.SOLID_PRIMARY : AppColors.DISABLED)
       .fontColor(Color.White)
       .borderRadius(22)
       .enabled(this.isEnabled)

@@ -6,35 +6,35 @@
     },
     {
       "name": "primary",
-      "value": "#3A7BD5"
+      "value": "#2A5FA6"
     },
     {
       "name": "primary_light",
-      "value": "#5B9BE8"
+      "value": "#4A80BE"
     },
     {
       "name": "primary_dark",
-      "value": "#2E64A8"
+      "value": "#24508D"
     },
     {
       "name": "gradient_start",
-      "value": "#3A7BD5"
+      "value": "#27548F"
     },
     {
       "name": "gradient_end",
-      "value": "#5BB6F0"
+      "value": "#2F6BB3"
     },
     {
       "name": "secondary",
-      "value": "#34C759"
+      "value": "#157A34"
     },
     {
       "name": "warning",
-      "value": "#FF9F0A"
+      "value": "#9C5700"
     },
     {
       "name": "danger",
-      "value": "#F56C6C"
+      "value": "#C4362F"
     },
     {
       "name": "bg_page",
@@ -62,11 +62,11 @@
     },
     {
       "name": "text_secondary",
-      "value": "#86909C"
+      "value": "#5C6874"
     },
     {
       "name": "text_placeholder",
-      "value": "#C9CDD4"
+      "value": "#616D7A"
     },
     {
       "name": "border",
@@ -82,23 +82,39 @@
     },
     {
       "name": "mastery_mastered",
-      "value": "#34C759"
+      "value": "#157A34"
     },
     {
       "name": "mastery_reviewing",
-      "value": "#3A7BD5"
+      "value": "#2A5FA6"
     },
     {
       "name": "mastery_unmastered",
-      "value": "#F56C6C"
+      "value": "#C4362F"
     },
     {
       "name": "hero_text",
-      "value": "#E8F1FF"
+      "value": "#FFFFFF"
     },
     {
       "name": "hero_text_dim",
-      "value": "#DCEBFF"
+      "value": "#E8F1FF"
+    },
+    {
+      "name": "solid_primary",
+      "value": "#2A5FA6"
+    },
+    {
+      "name": "solid_secondary",
+      "value": "#157A34"
+    },
+    {
+      "name": "solid_danger",
+      "value": "#C4362F"
+    },
+    {
+      "name": "solid_warning",
+      "value": "#9C5700"
     },
     {
       "name": "badge_bg",

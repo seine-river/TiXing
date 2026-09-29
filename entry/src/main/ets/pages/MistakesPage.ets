@@ -187,6 +187,7 @@ export struct MistakesPage {
       }
       .scrollable(ScrollDirection.Horizontal)
       .scrollBar(BarState.Off)
+      .edgeEffect(EdgeEffect.Spring)
       .width('100%')
       .padding({ left: 16, right: 16, top: 6, bottom: 4 })
 
@@ -201,7 +202,7 @@ export struct MistakesPage {
           })
         Button('搜索')
           .height(40)
-          .backgroundColor(AppColors.PRIMARY)
+          .backgroundColor(AppColors.SOLID_PRIMARY)
           .fontColor(Color.White)
           .borderRadius(AppSizes.CORNER_RADIUS_SM)
           .margin({ left: 8 })
@@ -242,6 +243,7 @@ export struct MistakesPage {
       }
       .scrollable(ScrollDirection.Horizontal)
       .scrollBar(BarState.Off)
+      .edgeEffect(EdgeEffect.Spring)
       .width('100%')
       .padding({ left: 16, right: 16, bottom: 4 })
 
@@ -266,7 +268,7 @@ export struct MistakesPage {
             .fontColor(AppColors.TEXT_SECONDARY)
           Button('重新加载')
             .height(40)
-            .backgroundColor(AppColors.PRIMARY)
+            .backgroundColor(AppColors.SOLID_PRIMARY)
             .fontColor(Color.White)
             .borderRadius(20)
             .padding({ left: 24, right: 24 })
@@ -377,6 +379,7 @@ export struct MistakesPage {
         .layoutWeight(1)
         .padding({ left: 16, right: 16, top: 8 })
         .scrollBar(BarState.Auto)
+        .edgeEffect(EdgeEffect.Spring)
         .onReachEnd(() => {
           this.loadMore();
         })
@@ -391,7 +394,7 @@ export struct MistakesPage {
   DeleteAction(item: Mistake) {
     Button('删除')
       .height('100%')
-      .backgroundColor(AppColors.DANGER)
+      .backgroundColor(AppColors.SOLID_DANGER)
       .fontColor(Color.White)
       .fontSize(15)
       .borderRadius(0)

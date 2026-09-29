@@ -11,6 +11,10 @@ export class AppColors {
   static readonly SECONDARY: Resource = $r('app.color.secondary');
   static readonly WARNING: Resource = $r('app.color.warning');
   static readonly DANGER: Resource = $r('app.color.danger');
+  static readonly SOLID_PRIMARY: Resource = $r('app.color.solid_primary');
+  static readonly SOLID_SECONDARY: Resource = $r('app.color.solid_secondary');
+  static readonly SOLID_DANGER: Resource = $r('app.color.solid_danger');
+  static readonly SOLID_WARNING: Resource = $r('app.color.solid_warning');
   static readonly BG_PAGE: Resource = $r('app.color.bg_page');
   static readonly BG_CARD: Resource = $r('app.color.bg_card');
   static readonly BG_CHIP: Resource = $r('app.color.bg_chip');
@@ -120,27 +124,31 @@ export function statusLabel(status: string): string {
   return AppStrings.STATUS_UNMASTERED;
 }
 
+/**
+ * 状态/学科标签底色（白字反色场景）：使用 solid_* 深色填充，
+ * 保证白字对比度 ≥4.5:1（深色模式经 dark/color.json 单独适配）。
+ */
 export function statusColor(status: string): Resource {
   if (status === 'mastered') {
-    return AppColors.MASTERY_MASTERED;
+    return AppColors.SOLID_SECONDARY;
   }
   if (status === 'reviewing') {
-    return AppColors.MASTERY_REVIEWING;
+    return AppColors.SOLID_PRIMARY;
   }
-  return AppColors.MASTERY_UNMASTERED;
+  return AppColors.SOLID_DANGER;
 }
 
 export function subjectColor(subject: string): Resource {
   if (subject === 'chinese') {
-    return AppColors.WARNING;
+    return AppColors.SOLID_WARNING;
   }
   if (subject === 'english') {
-    return AppColors.SECONDARY;
+    return AppColors.SOLID_SECONDARY;
   }
   if (subject === 'science') {
-    return AppColors.PRIMARY_DARK;
+    return AppColors.SOLID_PRIMARY;
   }
-  return AppColors.PRIMARY;
+  return AppColors.SOLID_PRIMARY;
 }
 
 export function formatDate(timestamp: number): string {

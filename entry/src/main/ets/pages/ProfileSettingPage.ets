@@ -159,7 +159,7 @@ struct ProfileSettingPage {
         Button('保存')
           .width('90%')
           .height(44)
-          .backgroundColor(AppColors.PRIMARY)
+          .backgroundColor(AppColors.SOLID_PRIMARY)
           .fontColor(Color.White)
           .borderRadius(22)
           .margin({ top: 24, bottom: 32 })
@@ -173,6 +173,7 @@ struct ProfileSettingPage {
     .height('100%')
     .backgroundColor(AppColors.BG_PAGE)
     .scrollBar(BarState.Auto)
+    .edgeEffect(EdgeEffect.Spring)
   }
 
   private async saveProfile(): Promise<void> {

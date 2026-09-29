@@ -165,7 +165,7 @@ struct MistakeDetailPage {
           EmptyBlock({ message: '错题不存在或已被删除' })
           Button('返回')
             .height(44)
-            .backgroundColor(AppColors.PRIMARY)
+            .backgroundColor(AppColors.SOLID_PRIMARY)
             .fontColor(Color.White)
             .borderRadius(22)
             .padding({ left: 32, right: 32 })
@@ -329,7 +329,7 @@ struct MistakeDetailPage {
             Button('保存修改')
               .width('90%')
               .height(44)
-              .backgroundColor(AppColors.PRIMARY)
+              .backgroundColor(AppColors.SOLID_PRIMARY)
               .fontColor(Color.White)
               .borderRadius(22)
               .margin({ top: 24, bottom: 32 })
@@ -342,6 +342,7 @@ struct MistakeDetailPage {
         .layoutWeight(1)
         .backgroundColor(AppColors.BG_PAGE)
         .scrollBar(BarState.Auto)
+        .edgeEffect(EdgeEffect.Spring)
       }
     }
     .width('100%')

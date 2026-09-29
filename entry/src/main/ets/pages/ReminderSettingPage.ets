@@ -200,7 +200,7 @@ struct ReminderSettingPage {
           Button(this.saving ? '保存中...' : '保存设置')
             .width('90%')
             .height(44)
-            .backgroundColor(AppColors.PRIMARY)
+            .backgroundColor(AppColors.SOLID_PRIMARY)
             .fontColor(Color.White)
             .borderRadius(22)
             .margin({ top: 24, bottom: 32 })
@@ -213,6 +213,7 @@ struct ReminderSettingPage {
       }
       .layoutWeight(1)
       .scrollBar(BarState.Auto)
+      .edgeEffect(EdgeEffect.Spring)
     }
     .width('100%')
     .height('100%')

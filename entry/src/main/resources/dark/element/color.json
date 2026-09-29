@@ -18,11 +18,11 @@
     },
     {
       "name": "gradient_start",
-      "value": "#31689F"
+      "value": "#274F80"
     },
     {
       "name": "gradient_end",
-      "value": "#3E8BC4"
+      "value": "#2F5F96"
     },
     {
       "name": "secondary",
@@ -62,11 +62,11 @@
     },
     {
       "name": "text_secondary",
-      "value": "#8E96A3"
+      "value": "#969EA9"
     },
     {
       "name": "text_placeholder",
-      "value": "#5C6370"
+      "value": "#8F97A3"
     },
     {
       "name": "border",
@@ -94,11 +94,27 @@
     },
     {
       "name": "hero_text",
-      "value": "#E8F1FF"
+      "value": "#FFFFFF"
     },
     {
       "name": "hero_text_dim",
-      "value": "#DCEBFF"
+      "value": "#E8F1FF"
+    },
+    {
+      "name": "solid_primary",
+      "value": "#3172B5"
+    },
+    {
+      "name": "solid_secondary",
+      "value": "#1F7A40"
+    },
+    {
+      "name": "solid_danger",
+      "value": "#B03A3A"
+    },
+    {
+      "name": "solid_warning",
+      "value": "#8F5300"
     },
     {
       "name": "badge_bg",
