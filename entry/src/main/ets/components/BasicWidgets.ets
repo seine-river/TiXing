@@ -41,7 +41,7 @@ export struct PrimaryButton {
       .width('100%')
       .height(AppSizes.TOUCH_TARGET)
       .backgroundColor(this.isEnabled ? AppColors.SOLID_PRIMARY : AppColors.DISABLED)
-      .fontColor(Color.White)
+      .fontColor(this.isEnabled ? Color.White : AppColors.TEXT_PRIMARY)
       .borderRadius(22)
       .enabled(this.isEnabled)
       .onClick(() => {

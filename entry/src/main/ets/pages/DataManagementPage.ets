@@ -33,7 +33,7 @@ struct DataManagementPage {
               .width('100%')
               .height(44)
               .backgroundColor(this.busy ? AppColors.DISABLED : AppColors.SOLID_PRIMARY)
-              .fontColor(Color.White)
+              .fontColor(this.busy ? AppColors.TEXT_PRIMARY : Color.White)
               .borderRadius(22)
               .enabled(!this.busy)
               .onClick(() => {

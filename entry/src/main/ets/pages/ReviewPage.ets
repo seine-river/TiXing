@@ -146,40 +146,45 @@ struct ReviewPage {
 
   @Builder
   ReviewQuestionView() {
-    Column() {
-      Row() {
-        Text(`第 ${this.currentIndex + 1} / ${this.totalCount} 题`)
-          .fontSize(14)
-          .fontColor(AppColors.TEXT_SECONDARY)
-        Progress({ value: this.currentIndex + 1, total: this.totalCount, type: ProgressType.Linear })
-          .layoutWeight(1)
-          .margin({ left: 12 })
-          .color(AppColors.PRIMARY)
-      }
-      .width('100%')
-      .padding({ left: 16, right: 16, top: 12 })
-
+    Scroll() {
       Column() {
-        Text(this.reviewList[this.currentIndex].ocrText)
-          .fontSize(18)
-          .fontColor(AppColors.TEXT_PRIMARY)
-          .lineHeight(28)
-          .width('100%')
+        Row() {
+          Text(`第 ${this.currentIndex + 1} / ${this.totalCount} 题`)
+            .fontSize(14)
+            .fontColor(AppColors.TEXT_SECONDARY)
+          Progress({ value: this.currentIndex + 1, total: this.totalCount, type: ProgressType.Linear })
+            .layoutWeight(1)
+            .margin({ left: 12 })
+            .color(AppColors.PRIMARY)
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 12 })
+
+        Column() {
+          Text(this.reviewList[this.currentIndex].ocrText)
+            .fontSize(18)
+            .fontColor(AppColors.TEXT_PRIMARY)
+            .lineHeight(28)
+            .width('100%')
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor(AppColors.BG_CARD)
+        .borderRadius(AppSizes.CORNER_RADIUS_SM)
+        .margin({ left: 16, right: 16, top: 12 })
+
+        if (!this.showResult) {
+          this.AnswerInput(this.reviewList[this.currentIndex])
+        } else {
+          this.AnswerResult(this.reviewList[this.currentIndex])
+        }
       }
       .width('100%')
-      .padding(16)
-      .backgroundColor(AppColors.BG_CARD)
-      .borderRadius(AppSizes.CORNER_RADIUS_SM)
-      .margin({ left: 16, right: 16, top: 12 })
-
-      if (!this.showResult) {
-        this.AnswerInput(this.reviewList[this.currentIndex])
-      } else {
-        this.AnswerResult(this.reviewList[this.currentIndex])
-      }
     }
     .width('100%')
     .layoutWeight(1)
+    .scrollBar(BarState.Off)
+    .edgeEffect(EdgeEffect.Spring)
   }
 
   @Builder

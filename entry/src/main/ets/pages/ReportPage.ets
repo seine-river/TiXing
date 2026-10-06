@@ -65,7 +65,6 @@ export struct ReportPage {
       }
       .padding({ bottom: 24 })
       .width('100%')
-      .height('100%')
     }
     .backgroundColor(AppColors.BG_PAGE)
     .scrollBar(BarState.Auto)

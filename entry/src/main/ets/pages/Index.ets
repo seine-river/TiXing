@@ -23,6 +23,7 @@ struct Index {
   private mistakesController: TabController = new TabController();
   private reportController: TabController = new TabController();
   private profileController: TabController = new TabController();
+  private swiperController: SwiperController = new SwiperController();
 
   aboutToAppear(): void {
     if (!this.dbInitialized) {
@@ -83,52 +84,144 @@ struct Index {
   }
 
   build() {
-    Tabs({ barPosition: BarPosition.End, index: this.currentTab }) {
-      TabContent() {
+    Column() {
+      Swiper(this.swiperController) {
         HomePage({ controller: this.homeController })
-      }
-      .tabBar(this.TabBuilder(0, '🏠', AppStrings.TAB_HOME))
-
-      TabContent() {
         MistakesPage({ controller: this.mistakesController })
-      }
-      .tabBar(this.TabBuilder(1, '📒', AppStrings.TAB_MISTAKES))
-
-      TabContent() {
         ReportPage({ controller: this.reportController })
-      }
-      .tabBar(this.TabBuilder(2, '📊', AppStrings.TAB_REPORT))
-
-      TabContent() {
         ProfilePage({ controller: this.profileController })
       }
-      .tabBar(this.TabBuilder(3, '👤', AppStrings.TAB_PROFILE))
+      .loop(false)
+      .indicator(false)
+      .effectMode(EdgeEffect.Spring)
+      .width('100%')
+      .layoutWeight(1)
+      .onChange((index: number) => {
+        if (this.currentTab !== index) {
+          this.currentTab = index;
+          this.reloadTab(index);
+        }
+      })
+
+      Row() {
+        this.TabBarItem(0, 'home', AppStrings.TAB_HOME)
+        this.TabBarItem(1, 'book', AppStrings.TAB_MISTAKES)
+        this.TabBarItem(2, 'chart', AppStrings.TAB_REPORT)
+        this.TabBarItem(3, 'user', AppStrings.TAB_PROFILE)
+      }
+      .width('100%')
+      .height(60)
     }
     .width('100%')
     .height('100%')
     .backgroundColor(AppColors.BG_PAGE)
-    .barHeight(60)
-    .onChange((index: number) => {
-      this.currentTab = index;
-      this.reloadTab(index);
-    })
   }
 
   @Builder
-  TabBuilder(index: number, icon: string, label: string) {
+  TabIcon(kind: string, color: Resource) {
+    Stack() {
+      if (kind === 'home') {
+        Polygon()
+          .points([[2, 9], [12, 0], [22, 9]])
+          .fill(color)
+          .width(20)
+          .height(9)
+          .position({ x: 2, y: 2 })
+        Rect()
+          .fill(color)
+          .width(13)
+          .height(10)
+          .position({ x: 5.5, y: 11 })
+        Rect()
+          .fill(AppColors.BG_PAGE)
+          .width(4)
+          .height(6)
+          .position({ x: 10, y: 15 })
+      } else if (kind === 'book') {
+        Rect()
+          .fill(color)
+          .width(16)
+          .height(19)
+          .radius(2.5)
+          .position({ x: 4, y: 2 })
+        Rect()
+          .fill(AppColors.BG_PAGE)
+          .width(1.5)
+          .height(15)
+          .position({ x: 11.25, y: 4 })
+        Rect()
+          .fill(AppColors.BG_PAGE)
+          .width(6.5)
+          .height(1.4)
+          .position({ x: 5.5, y: 7 })
+        Rect()
+          .fill(AppColors.BG_PAGE)
+          .width(6.5)
+          .height(1.4)
+          .position({ x: 12, y: 7 })
+        Rect()
+          .fill(AppColors.BG_PAGE)
+          .width(6.5)
+          .height(1.4)
+          .position({ x: 5.5, y: 11 })
+        Rect()
+          .fill(AppColors.BG_PAGE)
+          .width(6.5)
+          .height(1.4)
+          .position({ x: 12, y: 11 })
+      } else if (kind === 'chart') {
+        Rect()
+          .fill(color)
+          .width(4)
+          .height(8)
+          .position({ x: 4, y: 13 })
+        Rect()
+          .fill(color)
+          .width(4)
+          .height(15)
+          .position({ x: 10, y: 6 })
+        Rect()
+          .fill(color)
+          .width(4)
+          .height(11)
+          .position({ x: 16, y: 10 })
+      } else {
+        Circle({ width: 8.5, height: 8.5 })
+          .fill(color)
+          .position({ x: 7.75, y: 2 })
+        Rect()
+          .fill(color)
+          .width(14)
+          .height(9)
+          .radiusWidth(7)
+          .radiusHeight(7)
+          .position({ x: 5, y: 13.5 })
+      }
+    }
+    .width(24)
+    .height(24)
+  }
+
+  @Builder
+  TabBarItem(index: number, kind: string, label: string) {
     Column() {
-      Text(icon)
-        .fontSize(22)
-        .opacity(this.currentTab === index ? 1 : 0.5)
+      this.TabIcon(kind, this.currentTab === index ? AppColors.PRIMARY : AppColors.TEXT_SECONDARY)
       Text(label)
         .fontSize(11)
         .fontWeight(this.currentTab === index ? FontWeight.Bold : FontWeight.Normal)
         .fontColor(this.currentTab === index ? AppColors.PRIMARY : AppColors.TEXT_SECONDARY)
         .margin({ top: 3 })
     }
-    .width('100%')
-    .height('100%')
+    .layoutWeight(1)
+    .height(60)
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
+    .onClick(() => {
+      if (this.currentTab !== index) {
+        this.currentTab = index;
+        this.reloadTab(index);
+      }
+      this.swiperController.changeIndex(index, true);
+    })
   }
 }

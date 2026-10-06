@@ -135,7 +135,7 @@ struct PointsCenterPage {
                   .height(32)
                   .fontSize(13)
                   .backgroundColor(this.availablePoints() >= item.cost ? AppColors.SOLID_PRIMARY : AppColors.DISABLED)
-                  .fontColor(Color.White)
+                  .fontColor(this.availablePoints() >= item.cost ? Color.White : AppColors.TEXT_PRIMARY)
                   .borderRadius(16)
                   .enabled(this.availablePoints() >= item.cost)
                   .onClick(() => {

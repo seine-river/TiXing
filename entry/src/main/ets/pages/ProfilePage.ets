@@ -68,7 +68,6 @@ export struct ProfilePage {
         .shadow({ radius: 8, color: AppColors.SHADOW_SOFT, offsetY: 2 })
       }
       .width('100%')
-      .height('100%')
       .padding({ bottom: 24 })
     }
     .backgroundColor(AppColors.BG_PAGE)
