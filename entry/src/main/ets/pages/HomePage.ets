@@ -85,7 +85,7 @@ export struct HomePage {
             Button(this.todayReviewCount > 0 ? '开始复习' : '暂无待复习')
               .height(AppSizes.TOUCH_TARGET)
               .backgroundColor(Color.White)
-              .fontColor(AppColors.PRIMARY)
+              .fontColor(AppColors.HERO_BTN_TEXT)
               .fontSize(16)
               .fontWeight(FontWeight.Bold)
               .borderRadius(22)

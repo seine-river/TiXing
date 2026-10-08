@@ -97,6 +97,10 @@
       "value": "#FFFFFF"
     },
     {
+      "name": "hero_btn_text",
+      "value": "#2A5FA6"
+    },
+    {
       "name": "hero_text_dim",
       "value": "#E8F1FF"
     },

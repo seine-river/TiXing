@@ -33,6 +33,7 @@ export class AppColors {
   static readonly SHADOW_PRIMARY: Resource = $r('app.color.shadow_primary');
   static readonly HERO_TEXT: Resource = $r('app.color.hero_text');
   static readonly HERO_TEXT_DIM: Resource = $r('app.color.hero_text_dim');
+  static readonly HERO_BTN_TEXT: Resource = $r('app.color.hero_btn_text');
   static readonly BADGE_BG: Resource = $r('app.color.badge_bg');
   static readonly CROP_MASK: Resource = $r('app.color.crop_mask');
   static readonly IMAGE_VIEWER_BG: Resource = $r('app.color.image_viewer_bg');
