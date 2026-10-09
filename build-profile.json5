@@ -7,24 +7,24 @@
         "material": {
           "certpath": "/Users/dfx/.ohos/config/default_TiXing_qf7zbaZc5C_h9W0SbE-fJHWdyuWh46x1c73yrb5V8d8=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001B387B6F6A74B0A152F409CA0B98F7EE8C19DA9E8031354399B5D2D6EE80C7D7CB7B51D103010CCA",
+          "keyPassword": "0000001BBEB5EBC1A0E094C82AEDD15C8335D5EFB36A814554ABCBF338F816E40E028C0CA26FDC7912E509",
           "profile": "/Users/dfx/.ohos/config/default_TiXing_qf7zbaZc5C_h9W0SbE-fJHWdyuWh46x1c73yrb5V8d8=.p7b",
           "signAlg": "SHA256withECDSA",
           "storeFile": "/Users/dfx/.ohos/config/default_TiXing_qf7zbaZc5C_h9W0SbE-fJHWdyuWh46x1c73yrb5V8d8=.p12",
-          "storePassword": "0000001B2841FBBEF2AFFBA82B7E285C3B43578C651052ADEC76ECE46B922861AC1C0D905EC1FA652DED71"
+          "storePassword": "0000001B097814A1A65D0EDB20CA3BB9E7937EA62B08732DA16367687CC13EE28CD4917788870359EF4F0E"
         }
       },
       {
         "name": "Release",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "/Users/dfx/.ohos/config/Release_TiXing_qf7zbaZc5C_h9W0SbE-fJHWdyuWh46x1c73yrb5V8d8=.cer",
-          "keyAlias": "debugKey",
-          "keyPassword": "0000001B47989C91D174CB670D40950B249F8A6CE69AE9BF48A7352E7339E2EDA5BC08D721FF368055B07A",
-          "profile": "/Users/dfx/.ohos/config/Release_TiXing_qf7zbaZc5C_h9W0SbE-fJHWdyuWh46x1c73yrb5V8d8=.p7b",
+          "storeFile": "/Users/dfx/TiXing/Key/TiXingRelease.p12",
+          "storePassword": "0000001B72F4F0BDF06B1312263B8B289464424992BE63704AFA26CB0CC7470F9BAF9AA81CE8F7916176CB",
+          "keyAlias": "TiXingRelease",
+          "keyPassword": "0000001BE681B91A9CD1587ADE3C9C591FE55A0D6C49911A8DB42A1CECB705108D99D52B27DA05AE1153CE",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "/Users/dfx/.ohos/config/Release_TiXing_qf7zbaZc5C_h9W0SbE-fJHWdyuWh46x1c73yrb5V8d8=.p12",
-          "storePassword": "0000001BE76F7255EA6DC4DC1B404D295866836DBBE4B2C12B5C9B68AA2EFA7D7292849A5A03476D121726"
+          "profile": "/Users/dfx/TiXing/Key/TiXingReleaseRelease.p7b",
+          "certpath": "/Users/dfx/TiXing/Key/TiXingRelease.cer"
         }
       }
     ],
