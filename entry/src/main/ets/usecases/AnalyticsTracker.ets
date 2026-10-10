@@ -24,8 +24,9 @@ export class AnalyticsTracker {
     AnalyticsTracker.track('capture', studentId, {});
   }
 
-  static trackOcrConfirm(studentId: string, confidence: number, lowConfidence: boolean): void {
-    AnalyticsTracker.track('ocr_confirm', studentId, { 'confidence': confidence, 'low_confidence': lowConfidence });
+  /** AI 识别确认（原 ocr_confirm）：记录识别来源与结果，供运营观测 AI 通道成功率。 */
+  static trackAiConfirm(studentId: string, success: boolean, byManual: boolean): void {
+    AnalyticsTracker.track('ai_confirm', studentId, { 'success': success, 'by_manual': byManual });
   }
 
   static trackReviewSubmit(studentId: string, correct: boolean, inputMethod: string): void {

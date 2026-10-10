@@ -2,43 +2,43 @@
   "color": [
     {
       "name": "start_window_background",
-      "value": "#F2F4F8"
+      "value": "#F5F6FB"
     },
     {
       "name": "primary",
-      "value": "#2A5FA6"
+      "value": "#6C5CE7"
     },
     {
       "name": "primary_light",
-      "value": "#4A80BE"
+      "value": "#8B7CF7"
     },
     {
       "name": "primary_dark",
-      "value": "#24508D"
+      "value": "#5946D6"
     },
     {
       "name": "gradient_start",
-      "value": "#27548F"
+      "value": "#7B5CF0"
     },
     {
       "name": "gradient_end",
-      "value": "#2F6BB3"
+      "value": "#4E9BFF"
     },
     {
       "name": "secondary",
-      "value": "#157A34"
+      "value": "#00875A"
     },
     {
       "name": "warning",
-      "value": "#9C5700"
+      "value": "#B45309"
     },
     {
       "name": "danger",
-      "value": "#C4362F"
+      "value": "#DC2626"
     },
     {
       "name": "bg_page",
-      "value": "#F2F4F8"
+      "value": "#F5F6FB"
     },
     {
       "name": "bg_card",
@@ -46,51 +46,51 @@
     },
     {
       "name": "bg_chip",
-      "value": "#EEF2F7"
+      "value": "#EEF0F8"
     },
     {
       "name": "chip_bg",
-      "value": "#E8EAED"
+      "value": "#EDEFF6"
     },
     {
       "name": "text_primary",
-      "value": "#1D2129"
+      "value": "#191D33"
     },
     {
       "name": "text_regular",
-      "value": "#4E5969"
+      "value": "#3D4257"
     },
     {
       "name": "text_secondary",
-      "value": "#5C6874"
+      "value": "#7B8194"
     },
     {
       "name": "text_placeholder",
-      "value": "#616D7A"
+      "value": "#9AA0B0"
     },
     {
       "name": "border",
-      "value": "#E5E6EB"
+      "value": "#E6E8F2"
     },
     {
       "name": "divider",
-      "value": "#F2F3F5"
+      "value": "#F0F1F7"
     },
     {
       "name": "shadow",
-      "value": "#1F2A3D"
+      "value": "#23264A"
     },
     {
       "name": "mastery_mastered",
-      "value": "#157A34"
+      "value": "#00875A"
     },
     {
       "name": "mastery_reviewing",
-      "value": "#2A5FA6"
+      "value": "#2563EB"
     },
     {
       "name": "mastery_unmastered",
-      "value": "#C4362F"
+      "value": "#DC2626"
     },
     {
       "name": "hero_text",
@@ -98,59 +98,99 @@
     },
     {
       "name": "hero_btn_text",
-      "value": "#2A5FA6"
+      "value": "#5B46E0"
     },
     {
       "name": "hero_text_dim",
-      "value": "#E8F1FF"
+      "value": "#E9E6FF"
     },
     {
       "name": "solid_primary",
-      "value": "#2A5FA6"
+      "value": "#6C5CE7"
     },
     {
       "name": "solid_secondary",
-      "value": "#157A34"
+      "value": "#00875A"
     },
     {
       "name": "solid_danger",
-      "value": "#C4362F"
+      "value": "#DC2626"
     },
     {
       "name": "solid_warning",
-      "value": "#9C5700"
+      "value": "#B45309"
+    },
+    {
+      "name": "solid_info",
+      "value": "#2563EB"
     },
     {
       "name": "badge_bg",
-      "value": "#331A2A4D"
+      "value": "#33FFFFFF"
     },
     {
       "name": "crop_mask",
-      "value": "#333A7BD5"
+      "value": "#33000000"
     },
     {
       "name": "image_viewer_bg",
-      "value": "#000000"
+      "value": "#0F1017"
     },
     {
       "name": "disabled",
-      "value": "#C0C4CC"
+      "value": "#C9CDD9"
     },
     {
       "name": "row_selected",
-      "value": "#EBF1FA"
+      "value": "#EEEBFF"
     },
     {
       "name": "shadow_card",
-      "value": "#14223640"
+      "value": "#23264A1F"
     },
     {
       "name": "shadow_soft",
-      "value": "#101F2E26"
+      "value": "#23264A14"
     },
     {
       "name": "shadow_primary",
-      "value": "#263A7BD5"
+      "value": "#6C5CE759"
+    },
+    {
+      "name": "soft_primary",
+      "value": "#EEEBFF"
+    },
+    {
+      "name": "soft_info",
+      "value": "#E8F1FF"
+    },
+    {
+      "name": "soft_secondary",
+      "value": "#E6F7F1"
+    },
+    {
+      "name": "soft_warning",
+      "value": "#FFF3E4"
+    },
+    {
+      "name": "soft_danger",
+      "value": "#FFECEC"
+    },
+    {
+      "name": "mint_start",
+      "value": "#10C08A"
+    },
+    {
+      "name": "mint_end",
+      "value": "#00875A"
+    },
+    {
+      "name": "sunset_start",
+      "value": "#FF9A62"
+    },
+    {
+      "name": "sunset_end",
+      "value": "#F0522D"
     }
   ]
 }

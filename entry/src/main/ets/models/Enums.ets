@@ -85,12 +85,6 @@ export enum Trend {
   DECLINING = 'declining'
 }
 
-export enum ContentType {
-  PRINTED_TEXT = 'printed_text',
-  FORMULA = 'formula',
-  HANDWRITING = 'handwriting'
-}
-
 export enum ImageQualityIssue {
   BLUR = 'blur',
   TILT = 'tilt',

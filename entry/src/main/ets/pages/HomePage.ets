@@ -26,6 +26,23 @@ function enabledSubjectsOf(settings: ReminderSettings): Subject[] {
   return list;
 }
 
+function greetingText(): string {
+  const hour: number = new Date().getHours();
+  if (hour < 6) {
+    return '夜深了';
+  }
+  if (hour < 12) {
+    return '早上好';
+  }
+  if (hour < 14) {
+    return '中午好';
+  }
+  if (hour < 18) {
+    return '下午好';
+  }
+  return '晚上好';
+}
+
 @Component
 export struct HomePage {
   controller: TabController = new TabController();
@@ -59,22 +76,27 @@ export struct HomePage {
     this.studentPoints = summary.totalPoints;
   }
 
+  private todayDateText(): string {
+    const d = new Date();
+    return `${d.getMonth() + 1}月${d.getDate()}日 · 星期${'日一二三四五六'.charAt(d.getDay())}`;
+  }
+
   build() {
     Scroll() {
       Column() {
         GradientHeader({
-          title: AppStrings.APP_NAME,
-          subtitle: '今日学习概览，加油进步每一天',
+          title: greetingText() + '，同学',
+          subtitle: this.todayDateText(),
           badgeText: `⭐ ${this.studentPoints}`
         }) {
           Row() {
             Column() {
               Text(`${this.todayReviewCount}`)
-                .fontSize(44)
+                .fontSize(46)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(Color.White)
                 .accessibilityText(`今日待复习 ${this.todayReviewCount} 题`)
-              Text('今日待复习')
+              Text(this.todayReviewCount > 0 ? '题待复习' : '今日复习已完成')
                 .fontSize(13)
                 .fontColor(AppColors.HERO_TEXT_DIM)
                 .margin({ top: 2 })
@@ -82,14 +104,25 @@ export struct HomePage {
             .alignItems(HorizontalAlign.Start)
             .layoutWeight(1)
 
-            Button(this.todayReviewCount > 0 ? '开始复习' : '暂无待复习')
-              .height(AppSizes.TOUCH_TARGET)
+            Text('🦉')
+              .fontSize(26)
+              .width(52)
+              .height(52)
+              .textAlign(TextAlign.Center)
+              .backgroundColor(AppColors.BADGE_BG)
+              .borderRadius(18)
+              .margin({ right: 10 })
+              .accessibilityText('吉祥物醒醒')
+
+            Button(this.todayReviewCount > 0 ? '开始复习' : '休息一下')
+              .height(AppSizes.TOUCH_TARGET + 2)
               .backgroundColor(Color.White)
               .fontColor(AppColors.HERO_BTN_TEXT)
               .fontSize(16)
               .fontWeight(FontWeight.Bold)
-              .borderRadius(22)
+              .borderRadius(23)
               .padding({ left: 24, right: 24 })
+              .shadow({ radius: 10, color: AppColors.SHADOW_CARD, offsetY: 4 })
               .enabled(this.todayReviewCount > 0)
               .accessibilityText('开始复习今日错题')
               .onClick(() => {
@@ -97,13 +130,16 @@ export struct HomePage {
               })
           }
           .width('100%')
-          .margin({ top: 20 })
+          .margin({ top: 22 })
         }
 
         Row() {
-          this.StatCard('总错题', `${this.totalMistakes}`, AppColors.PRIMARY, '📒')
-          this.StatCard('已掌握', `${this.masteredCount}`, AppColors.MASTERY_MASTERED, '✓')
-          this.StatCard('复习中', `${this.reviewingCount}`, AppColors.WARNING, '🔁')
+          this.GradientStatCard('📒', `${this.totalMistakes}`, '总错题',
+            AppColors.PRIMARY_LIGHT, AppColors.GRADIENT_END)
+          this.GradientStatCard('✅', `${this.masteredCount}`, '已掌握',
+            AppColors.MINT_START, AppColors.MINT_END)
+          this.GradientStatCard('🔁', `${this.reviewingCount}`, '复习中',
+            AppColors.SUNSET_START, AppColors.SUNSET_END)
         }
         .width('100%')
         .padding({ left: 16, right: 16, top: 16 })
@@ -111,13 +147,12 @@ export struct HomePage {
 
         Column() {
           PrimaryButton({
-            text: '📷  录入错题',
+            text: '🤖  AI 录入错题',
             isEnabled: true,
             onTap: (): void => {
               this.getUIContext().getRouter().pushUrl({ url: 'pages/CapturePage' });
             }
           })
-            .shadow({ radius: 12, color: AppColors.SHADOW_PRIMARY, offsetY: 4 })
         }
         .width('100%')
         .padding({ left: 16, right: 16, top: 16 })
@@ -130,7 +165,7 @@ export struct HomePage {
             .layoutWeight(1)
         }
         .width('100%')
-        .padding({ left: 16, right: 16, top: 24, bottom: 8 })
+        .padding({ left: 16, right: 16, top: 26, bottom: 10 })
 
         if (this.recentMistakes.length === 0) {
           EmptyBlock({ message: '还没有错题，点击上方按钮录入吧' })
@@ -155,26 +190,39 @@ export struct HomePage {
   }
 
   @Builder
-  StatCard(label: string, value: string, color: Resource, icon: string) {
+  GradientStatCard(icon: string, value: string, label: string, gradStart: Resource, gradEnd: Resource) {
     Column() {
-      Text(icon)
-        .fontSize(22)
+      Row() {
+        Text(icon)
+          .fontSize(15)
+          .width(28)
+          .height(28)
+          .textAlign(TextAlign.Center)
+          .backgroundColor('#2EFFFFFF')
+          .borderRadius(10)
+        Column() {
+        }
+        .layoutWeight(1)
+      }
+      .width('100%')
+
       Text(value)
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
-        .fontColor(color)
-        .margin({ top: 6 })
+        .fontColor(Color.White)
+        .margin({ top: 8 })
+        .accessibilityText(`${label} ${value}`)
       Text(label)
-        .fontSize(12)
-        .fontColor(AppColors.TEXT_SECONDARY)
+        .fontSize(11)
+        .fontColor('#E6FFFFFF')
         .margin({ top: 2 })
     }
+    .alignItems(HorizontalAlign.Start)
     .layoutWeight(1)
-    .alignItems(HorizontalAlign.Center)
-    .padding({ top: 16, bottom: 16 })
-    .backgroundColor(AppColors.BG_CARD)
-    .borderRadius(AppSizes.CORNER_RADIUS_SM)
+    .padding(12)
+    .linearGradient({ angle: 140, colors: [[gradStart, 0], [gradEnd, 1]] })
+    .borderRadius(AppSizes.CORNER_RADIUS_LG)
     .margin({ left: 4, right: 4 })
-    .shadow({ radius: 8, color: AppColors.SHADOW_CARD, offsetY: 2 })
+    .shadow({ radius: 10, color: AppColors.SHADOW_CARD, offsetY: 4 })
   }
 }

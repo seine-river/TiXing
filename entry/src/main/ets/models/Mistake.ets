@@ -1,5 +1,5 @@
 import {
-  Subject, ErrorType, MistakeStatus, AnswerType, SyncStatus, ContentType
+  Subject, ErrorType, MistakeStatus, AnswerType, SyncStatus
 } from './Enums';
 
 export class Mistake {
@@ -51,25 +51,6 @@ export class Mistake {
     m.syncStatus = SyncStatus.PENDING;
     return m;
   }
-}
-
-export class OcrFieldResult {
-  text: string = '';
-  confidence: number = 0;
-  contentType: ContentType = ContentType.PRINTED_TEXT;
-
-  constructor(text: string, confidence: number, contentType: ContentType) {
-    this.text = text;
-    this.confidence = confidence;
-    this.contentType = contentType;
-  }
-}
-
-export class OcrRecognitionResult {
-  questionText: OcrFieldResult = new OcrFieldResult('', 0, ContentType.PRINTED_TEXT);
-  studentAnswerText: OcrFieldResult = new OcrFieldResult('', 0, ContentType.PRINTED_TEXT);
-  standardAnswerCandidate: OcrFieldResult = new OcrFieldResult('', 0, ContentType.PRINTED_TEXT);
-  contentType: ContentType = ContentType.PRINTED_TEXT;
 }
 
 export class ImageRegion {

@@ -1,5 +1,5 @@
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium';
-import { Mistake, OcrFieldResult, OcrRecognitionResult, ImageRegion, ImageQualityResult } from '../main/ets/models/Mistake';
+import { Mistake, ImageRegion, ImageQualityResult } from '../main/ets/models/Mistake';
 import { ReviewLog } from '../main/ets/models/ReviewLog';
 import { PointsLog, PointsSummary } from '../main/ets/models/PointsLog';
 import { KnowledgeTag, KnowledgeProfile } from '../main/ets/models/KnowledgeTag';
@@ -10,7 +10,7 @@ import { AnalyticsEvent } from '../main/ets/models/AnalyticsEvent';
 import { RedeemableItem, RedeemableCategory } from '../main/ets/models/RedeemableItem';
 import {
   MistakeStatus, AnswerType, GradingMethod, InputMethod, Subject, ErrorType,
-  PointsActionType, ContentType, ImageQualityIssue, Trend, SyncStatus, Grade, TextbookVersion
+  PointsActionType, ImageQualityIssue, Trend, SyncStatus, Grade, TextbookVersion
 } from '../main/ets/models/Enums';
 import { ReviewScheduler } from '../main/ets/usecases/ReviewScheduler';
 import { MasteryEvaluator } from '../main/ets/usecases/MasteryEvaluator';
@@ -243,14 +243,6 @@ export default function coreAlgorithmTest() {
       const fail = ImageQualityResult.fail(ImageQualityIssue.BLUR);
       expect(fail.passed).assertEqual(false);
       expect(fail.issue).assertEqual(ImageQualityIssue.BLUR);
-    });
-
-    it('OcrFieldResult_and_RecognitionResult_defaults', 0, () => {
-      const f = new OcrFieldResult('abc', 0.9, ContentType.PRINTED_TEXT);
-      expect(f.text).assertEqual('abc');
-      expect(f.confidence).assertEqual(0.9);
-      const r = new OcrRecognitionResult();
-      expect(r.questionText.text).assertEqual('');
     });
 
     it('ImageRegion_constructor', 0, () => {

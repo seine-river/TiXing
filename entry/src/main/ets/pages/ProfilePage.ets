@@ -6,6 +6,13 @@ import { TabController } from '../common/TabController';
 import { GradientHeader } from '../components/GradientHeader';
 import { PointsSummary } from '../models/PointsLog';
 
+class MenuEntry {
+  icon: string = '';
+  label: string = '';
+  url: string = '';
+  bubble: Resource = AppColors.SOLID_PRIMARY;
+}
+
 @Component
 export struct ProfilePage {
   controller: TabController = new TabController();
@@ -34,38 +41,80 @@ export struct ProfilePage {
     this.isLoaded = true;
   }
 
+  private menuItems(): MenuEntry[] {
+    const m1 = new MenuEntry();
+    m1.icon = '🤖';
+    m1.label = 'AI 设置';
+    m1.url = 'pages/AiSettingPage';
+    m1.bubble = AppColors.SOLID_PRIMARY;
+
+    const m2 = new MenuEntry();
+    m2.icon = '📚';
+    m2.label = AppStrings.LEARNING_PROFILE;
+    m2.url = 'pages/ProfileSettingPage';
+    m2.bubble = AppColors.SOLID_INFO;
+
+    const m3 = new MenuEntry();
+    m3.icon = '⏰';
+    m3.label = '复习提醒设置';
+    m3.url = 'pages/ReminderSettingPage';
+    m3.bubble = AppColors.SOLID_WARNING;
+
+    const m4 = new MenuEntry();
+    m4.icon = '🎁';
+    m4.label = AppStrings.POINTS_CENTER;
+    m4.url = 'pages/PointsCenterPage';
+    m4.bubble = AppColors.SOLID_SECONDARY;
+
+    const m5 = new MenuEntry();
+    m5.icon = '🔄';
+    m5.label = '导出与导入';
+    m5.url = 'pages/DataManagementPage';
+    m5.bubble = AppColors.SOLID_DANGER;
+
+    const m6 = new MenuEntry();
+    m6.icon = '👨‍👩‍👧';
+    m6.label = AppStrings.PARENT_CENTER;
+    m6.url = 'pages/OpsOverviewPage';
+    m6.bubble = AppColors.SOLID_INFO;
+
+    return [m1, m2, m3, m4, m5, m6];
+  }
+
   build() {
     Scroll() {
       Column() {
-        this.UserInfoCard()
+        GradientHeader({
+          title: this.student.nickname,
+          subtitle: `${this.student.grade}年级 · ${this.student.textbookVersion === TextbookVersion.PEP ? '人教版' : '其他教材'}`,
+          badgeText: `⭐ ${this.pointsSummary.totalPoints}`
+        }) {
+          Row({ space: 10 }) {
+            this.HeroStat('积分', `${this.pointsSummary.totalPoints}`)
+            this.HeroStat('今日', `${this.pointsSummary.todayPoints}`)
+            this.HeroStat('连击', `${this.pointsSummary.streakDays}`)
+          }
+          .width('100%')
+          .margin({ top: 18 })
+        }
 
         Column() {
-          this.MenuItem('📚 ' + AppStrings.LEARNING_PROFILE, () => {
-            this.getUIContext().getRouter().pushUrl({ url: 'pages/ProfileSettingPage' });
-          })
-          this.MenuDivider()
-          this.MenuItem('⏰ 复习提醒设置', () => {
-            this.getUIContext().getRouter().pushUrl({ url: 'pages/ReminderSettingPage' });
-          })
-          this.MenuDivider()
-          this.MenuItem('💰 ' + AppStrings.POINTS_CENTER, () => {
-            this.getUIContext().getRouter().pushUrl({ url: 'pages/PointsCenterPage' });
-          })
-          this.MenuDivider()
-          this.MenuItem('🔄 导出与导入', () => {
-            this.getUIContext().getRouter().pushUrl({ url: 'pages/DataManagementPage' });
-          })
-          this.MenuDivider()
-          this.MenuItem('👨‍👩‍👧 ' + AppStrings.PARENT_CENTER, () => {
-            this.getUIContext().getRouter().pushUrl({ url: 'pages/OpsOverviewPage' });
-          })
+          ForEach(this.menuItems(), (item: MenuEntry, index: number) => {
+            if (index > 0) {
+              Divider()
+                .color(AppColors.DIVIDER)
+                .strokeWidth(1)
+                .margin({ left: 56 })
+            }
+            this.MenuItem(item)
+          }, (item: MenuEntry) => item.url)
         }
         .width('100%')
-        .padding({ left: 16, right: 16 })
+        .padding({ top: 6, bottom: 6 })
         .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS)
-        .margin({ left: 16, right: 16, top: 14 })
-        .shadow({ radius: 8, color: AppColors.SHADOW_SOFT, offsetY: 2 })
+        .borderRadius(AppSizes.CORNER_RADIUS_LG)
+        .margin({ left: 16, right: 16, top: 16 })
+        .shadow({ radius: 10, color: AppColors.SHADOW_SOFT, offsetY: 3 })
       }
       .width('100%')
       .padding({ bottom: 24 })
@@ -77,44 +126,48 @@ export struct ProfilePage {
   }
 
   @Builder
-  UserInfoCard() {
-    GradientHeader({
-      title: this.student.nickname,
-      subtitle: `年级: ${this.student.grade} · 教材: ${this.student.textbookVersion === TextbookVersion.PEP ? '人教版' : '其他'}`,
-      badgeText: `⭐ ${this.pointsSummary.totalPoints}`
-    }) {
-      Row() {
-        Text('积分')
-          .fontSize(13)
-          .fontColor(AppColors.HERO_TEXT)
-          .accessibilityText(`当前积分 ${this.pointsSummary.totalPoints}`)
-      }
-      .width('100%')
-      .margin({ top: 14 })
-    }
-  }
-
-  @Builder
-  MenuDivider() {
-    Divider()
-      .color(AppColors.DIVIDER)
-      .strokeWidth(1)
-      .margin({ left: 4 })
-  }
-
-  @Builder
-  MenuItem(label: string, action: () => void) {
-    Row() {
+  HeroStat(label: string, value: string) {
+    Column() {
+      Text(value)
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+        .accessibilityText(`${label} ${value}`)
       Text(label)
+        .fontSize(11)
+        .fontColor(AppColors.HERO_TEXT_DIM)
+        .margin({ top: 2 })
+    }
+    .layoutWeight(1)
+    .padding({ top: 10, bottom: 10 })
+    .backgroundColor(AppColors.BADGE_BG)
+    .borderRadius(14)
+  }
+
+  @Builder
+  MenuItem(item: MenuEntry) {
+    Row() {
+      Text(item.icon)
         .fontSize(16)
+        .width(36)
+        .height(36)
+        .textAlign(TextAlign.Center)
+        .backgroundColor(item.bubble)
+        .borderRadius(12)
+      Text(item.label)
+        .fontSize(15)
         .fontColor(AppColors.TEXT_PRIMARY)
         .layoutWeight(1)
+        .margin({ left: 12 })
       Text('›')
         .fontSize(20)
         .fontColor(AppColors.TEXT_PLACEHOLDER)
     }
     .width('100%')
-    .padding({ left: 4, right: 4, top: 16, bottom: 16 })
-    .onClick(action)
+    .padding({ left: 12, right: 12, top: 12, bottom: 12 })
+    .accessibilityText(item.label)
+    .onClick(() => {
+      this.getUIContext().getRouter().pushUrl({ url: item.url });
+    })
   }
 }

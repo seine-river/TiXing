@@ -15,6 +15,16 @@ export class AppColors {
   static readonly SOLID_SECONDARY: Resource = $r('app.color.solid_secondary');
   static readonly SOLID_DANGER: Resource = $r('app.color.solid_danger');
   static readonly SOLID_WARNING: Resource = $r('app.color.solid_warning');
+  static readonly SOLID_INFO: Resource = $r('app.color.solid_info');
+  static readonly SOFT_PRIMARY: Resource = $r('app.color.soft_primary');
+  static readonly SOFT_INFO: Resource = $r('app.color.soft_info');
+  static readonly SOFT_SECONDARY: Resource = $r('app.color.soft_secondary');
+  static readonly SOFT_WARNING: Resource = $r('app.color.soft_warning');
+  static readonly SOFT_DANGER: Resource = $r('app.color.soft_danger');
+  static readonly MINT_START: Resource = $r('app.color.mint_start');
+  static readonly MINT_END: Resource = $r('app.color.mint_end');
+  static readonly SUNSET_START: Resource = $r('app.color.sunset_start');
+  static readonly SUNSET_END: Resource = $r('app.color.sunset_end');
   static readonly BG_PAGE: Resource = $r('app.color.bg_page');
   static readonly BG_CARD: Resource = $r('app.color.bg_card');
   static readonly BG_CHIP: Resource = $r('app.color.bg_chip');
@@ -51,6 +61,8 @@ export class AppSizes {
   static readonly CORNER_RADIUS: number = 16;
   static readonly CORNER_RADIUS_SM: number = 12;
   static readonly CORNER_RADIUS_XS: number = 8;
+  static readonly CORNER_RADIUS_LG: number = 20;
+  static readonly CORNER_RADIUS_XL: number = 24;
   static readonly PADDING_PAGE: number = 16;
   static readonly PADDING_CARD: number = 14;
   static readonly TOUCH_TARGET: number = 44;
@@ -119,6 +131,34 @@ export function subjectLabel(subject: string): string {
   return subject;
 }
 
+/** 学科 emoji 身份（家长孩子都可直觉识别）。 */
+export function subjectEmoji(subject: string): string {
+  if (subject === 'chinese') {
+    return '📖';
+  }
+  if (subject === 'english') {
+    return '🔤';
+  }
+  if (subject === 'science') {
+    return '🔬';
+  }
+  return '🔢';
+}
+
+/** 学科柔和底色（emoji 气泡用）。 */
+export function subjectSoftColor(subject: string): Resource {
+  if (subject === 'chinese') {
+    return AppColors.SOFT_WARNING;
+  }
+  if (subject === 'english') {
+    return AppColors.SOFT_SECONDARY;
+  }
+  if (subject === 'science') {
+    return AppColors.SOFT_INFO;
+  }
+  return AppColors.SOFT_PRIMARY;
+}
+
 export function statusLabel(status: string): string {
   if (status === 'mastered') return AppStrings.STATUS_MASTERED;
   if (status === 'reviewing') return AppStrings.STATUS_REVIEWING;
@@ -134,7 +174,7 @@ export function statusColor(status: string): Resource {
     return AppColors.SOLID_SECONDARY;
   }
   if (status === 'reviewing') {
-    return AppColors.SOLID_PRIMARY;
+    return AppColors.SOLID_INFO;
   }
   return AppColors.SOLID_DANGER;
 }
@@ -147,7 +187,7 @@ export function subjectColor(subject: string): Resource {
     return AppColors.SOLID_SECONDARY;
   }
   if (subject === 'science') {
-    return AppColors.SOLID_PRIMARY;
+    return AppColors.SOLID_INFO;
   }
   return AppColors.SOLID_PRIMARY;
 }

@@ -133,7 +133,7 @@ struct MistakeDetailPage {
     }
     this.fieldBusy = target;
     try {
-      const text: string = await AiService.recognizeImage(path, undefined);
+      const text: string = await AiService.recognizeImage(path);
       const cleaned: string = text.trim();
       if (cleaned.length === 0) {
         Toast.show('未识别到文字');
@@ -188,6 +188,32 @@ struct MistakeDetailPage {
                 .fontColor(AppColors.TEXT_SECONDARY)
             }
             .padding({ left: 16, right: 16, top: 4 })
+
+            // 原始照片（录入时拍摄的错题原图）
+            if (this.mistake.imageUrl.length > 0) {
+              Column() {
+                Text('📷 原始照片')
+                  .fontSize(14)
+                  .fontColor(AppColors.TEXT_SECONDARY)
+                  .width('100%')
+                  .margin({ bottom: 8 })
+                Image(toFileUri(this.mistake.imageUrl))
+                  .width('100%')
+                  .height(220)
+                  .objectFit(ImageFit.Contain)
+                  .sourceSize({ width: 1080, height: 1080 })
+                  .backgroundColor(AppColors.IMAGE_VIEWER_BG)
+                  .borderRadius(AppSizes.CORNER_RADIUS_SM)
+                  .draggable(false)
+                  .alt($r('app.media.startIcon'))
+                  .accessibilityText('错题原始照片')
+              }
+              .width('100%')
+              .padding(12)
+              .backgroundColor(AppColors.BG_CARD)
+              .borderRadius(AppSizes.CORNER_RADIUS_SM)
+              .margin({ left: 16, right: 16, top: 8 })
+            }
 
             Column() {
               Text('知识点总结')

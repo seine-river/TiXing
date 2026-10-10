@@ -1,20 +1,19 @@
-import { CropFracs, OcrFieldResult } from '../models/Mistake';
-import { Subject, AnswerType, ErrorType, ImageQualityIssue, ContentType } from '../models/Enums';
+import { Subject, AnswerType, ErrorType, ImageQualityIssue } from '../models/Enums';
 import { KnowledgeTag } from '../models/KnowledgeTag';
 import { dbHelper } from '../repository/DatabaseHelper';
-import { CaptureOrchestrator } from '../usecases/CaptureOrchestrator';
 import { AiService } from '../services/AiService';
 import { MediaService } from '../services/MediaService';
-import { AppColors, AppSizes, AppStrings, subjectLabel, toFileUri } from '../common/Constants';
+import { AppColors, AppSizes, subjectLabel, toFileUri } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { FilterChip } from './BasicWidgets';
+
 /**
- * CapturePage 四步子组件（T046/FR-024）：
- * SourceSelect / RegionSelect / OcrConfirm / Result。
- * 各步骤自持步骤内 UI 状态；跨步骤表单数据由 CapturePage 持有（经 @Link 双向同步）。
+ * 录入流程步骤组件（AI 全图识别版）：
+ * 选图 CaptureSourceStep → AI 识别 AiAnalyzingStep → 核对 AiReviewStep → 完成 CaptureResultStep。
+ * 本地 OCR 与手动框选区域环节已移除，整张照片直接交给多模态 AI 识别。
  */
 
-/** 确认页汇总的表单载荷（保存时回传 CapturePage）。 */
+/** 核对页汇总的表单载荷（保存时回传 CapturePage）。 */
 export class CaptureFormPayload {
   questionText: string = '';
   knowledgeSummary: string = '';
@@ -24,7 +23,6 @@ export class CaptureFormPayload {
   answerType: AnswerType = AnswerType.TEXT;
   errorType: ErrorType = ErrorType.OTHER;
   tagIds: string[] = [];
-  ocrConfidence: number = 0;
 }
 
 class AnswerTypeOption {
@@ -37,300 +35,453 @@ class ErrorTypeOption {
   label: string = '';
 }
 
-function clamp(v: number, min: number, max: number): number {
-  if (v < min) {
-    return min;
-  }
-  if (v > max) {
-    return max;
-  }
-  return v;
+class AnalyzeStage {
+  icon: string = '';
+  title: string = '';
+  desc: string = '';
 }
 
-function toPixels(len: Length): number {
-  if (typeof len === 'number') {
-    return len;
+function qualityHint(issue: string): string {
+  if (issue === ImageQualityIssue.BLUR) {
+    return '⚠️ 照片可能模糊，可能影响 AI 识别准确度';
   }
-  if (typeof len === 'string') {
-    return parseFloat(len);
+  if (issue === ImageQualityIssue.TILT) {
+    return '⚠️ 照片倾斜，建议重新拍摄';
   }
-  return 0;
+  if (issue === ImageQualityIssue.GLARE) {
+    return '⚠️ 照片有反光，建议调整角度重拍';
+  }
+  if (issue === ImageQualityIssue.LOW_LIGHT) {
+    return '⚠️ 光线较暗，建议在明亮处重拍';
+  }
+  if (issue === 'decode_failed') {
+    return '⚠️ 图片读取失败，请重新选择';
+  }
+  return '';
 }
 
-/** 第一步：来源选择。 */
+/** 第一步：拍照 / 相册（AI 全图识别入口）。 */
 @Component
-export struct SourceSelectStep {
+export struct CaptureSourceStep {
   @Prop qualityIssue: string = '';
   onPick: (fromCamera: boolean) => void = (_f: boolean): void => {
   };
 
-  private qualityHint(issue: string): string {
-    if (issue === ImageQualityIssue.BLUR) {
-      return '⚠️ 图片可能模糊，建议重新拍摄以获得更清晰的识别';
-    }
-    if (issue === ImageQualityIssue.TILT) {
-      return '⚠️ 图片倾斜，建议重新拍摄';
-    }
-    if (issue === ImageQualityIssue.GLARE) {
-      return '⚠️ 图片有反光，建议调整角度重拍';
-    }
-    if (issue === ImageQualityIssue.LOW_LIGHT) {
-      return '⚠️ 光线较暗，建议在明亮处重拍';
-    }
-    if (issue === 'decode_failed') {
-      return '⚠️ 图片读取失败，请重新选择';
-    }
-    return '';
-  }
-
   build() {
     Scroll() {
       Column() {
-        Column() {
-          Text('📷')
+        // 顶部视觉区：吉祥物「醒醒」+ 对话气泡
+        Row({ space: 14 }) {
+          Text('🦉')
             .fontSize(40)
-          Text('录入错题')
-            .fontSize(20)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppColors.TEXT_PRIMARY)
-            .margin({ top: 8 })
-          Text('选择图片来源，系统将自动识别题目并判断学科')
-            .fontSize(13)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .margin({ top: 6 })
+            .width(84)
+            .height(84)
             .textAlign(TextAlign.Center)
+            .linearGradient({
+              angle: 135,
+              colors: [[AppColors.GRADIENT_START, 0], [AppColors.GRADIENT_END, 1]]
+            })
+            .borderRadius(30)
+            .shadow({ radius: 14, color: AppColors.SHADOW_PRIMARY, offsetY: 6 })
+            .accessibilityText('吉祥物醒醒')
+          Column() {
+            Text('嗨，我是醒醒！')
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppColors.PRIMARY)
+            Text('拍一道错题照片，我帮你识别题目、\n提取答案、总结知识点')
+              .fontSize(12)
+              .fontColor(AppColors.TEXT_SECONDARY)
+              .margin({ top: 4 })
+              .lineHeight(18)
+          }
+          .alignItems(HorizontalAlign.Start)
+          .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+          .backgroundColor(AppColors.SOFT_PRIMARY)
+          .borderRadius(16)
+          .layoutWeight(1)
         }
         .width('100%')
-        .padding({ left: 20, right: 20, top: 32, bottom: 24 })
-        .alignItems(HorizontalAlign.Center)
+        .alignItems(VerticalAlign.Center)
+        .padding({ left: 20, right: 20, top: 32, bottom: 8 })
 
-        Row() {
-          this.SourceTile('📷', AppStrings.CAPTURE_PHOTO, '拍摄试卷或练习册', true)
-          this.SourceTile('🖼️', AppStrings.CAPTURE_ALBUM, '从相册选取已有图片', false)
+        Text('AI 智能录题')
+          .fontSize(24)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.TEXT_PRIMARY)
+          .margin({ top: 16 })
+
+        // 主操作
+        Column() {
+          Button('📷  拍照识别')
+            .width('100%')
+            .height(52)
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .backgroundColor(AppColors.SOLID_PRIMARY)
+            .fontColor(Color.White)
+            .borderRadius(26)
+            .accessibilityText('拍照识别错题')
+            .onClick(() => {
+              this.onPick(true);
+            })
+          Button('🖼️  从相册选取')
+            .width('100%')
+            .height(48)
+            .fontSize(15)
+            .backgroundColor(AppColors.BG_CARD)
+            .fontColor(AppColors.PRIMARY)
+            .borderRadius(24)
+            .border({ width: 1, color: AppColors.PRIMARY })
+            .margin({ top: 12 })
+            .accessibilityText('从相册选取错题照片')
+            .onClick(() => {
+              this.onPick(false);
+            })
         }
         .width('100%')
         .padding({ left: 16, right: 16 })
 
-        if (this.qualityIssue.length > 0 && this.qualityHint(this.qualityIssue).length > 0) {
-          Text(this.qualityHint(this.qualityIssue))
+        // AI 能力说明
+        Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center }) {
+          this.FeatureChip('🧠', '全图智能识别', AppColors.SOFT_PRIMARY)
+          this.FeatureChip('✍️', '答案提取', AppColors.SOFT_WARNING)
+          this.FeatureChip('📚', '学科判断', AppColors.SOFT_INFO)
+          this.FeatureChip('🏷️', '知识点总结', AppColors.SOFT_SECONDARY)
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 18 })
+
+        // 拍摄小贴士
+        Column() {
+          Row() {
+            Text('💡 拍摄小贴士')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(AppColors.TEXT_PRIMARY)
+          }
+          .width('100%')
+          .margin({ bottom: 8 })
+          this.TipRow('光线充足，整道题目完整入镜')
+          this.TipRow('尽量包含作答与红笔批改痕迹，AI 可提取答案')
+          this.TipRow('手写作答也能识别，拍清晰即可')
+        }
+        .alignItems(HorizontalAlign.Start)
+        .width('100%')
+        .padding(16)
+        .backgroundColor(AppColors.BG_CARD)
+        .borderRadius(AppSizes.CORNER_RADIUS)
+        .margin({ left: 16, right: 16, top: 18 })
+
+        if (this.qualityIssue.length > 0 && qualityHint(this.qualityIssue).length > 0) {
+          Text(qualityHint(this.qualityIssue))
             .fontSize(14)
             .fontColor(AppColors.WARNING)
             .padding({ left: 16, right: 16, top: 16 })
         }
       }
       .width('100%')
+      .padding({ bottom: 24 })
     }
     .scrollBar(BarState.Auto)
     .edgeEffect(EdgeEffect.Spring)
-  }
-
-  @Builder
-  SourceTile(icon: string, title: string, subtitle: string, fromCamera: boolean) {
-    Column() {
-      Text(icon)
-        .fontSize(40)
-      Text(title)
-        .fontSize(16)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(AppColors.TEXT_PRIMARY)
-        .margin({ top: 10 })
-      Text(subtitle)
-        .fontSize(11)
-        .fontColor(AppColors.TEXT_SECONDARY)
-        .margin({ top: 4 })
-        .textAlign(TextAlign.Center)
-    }
-    .layoutWeight(1)
-    .height(150)
-    .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Center)
-    .backgroundColor(AppColors.BG_CARD)
-    .borderRadius(AppSizes.CORNER_RADIUS)
-    .margin({ left: 4, right: 4 })
-    .shadow({ radius: 8, color: AppColors.SHADOW_CARD, offsetY: 2 })
-    .accessibilityText(title)
-    .onClick(() => {
-      this.onPick(fromCamera);
-    })
-  }
-}
-
-/** 第二步：区域框选（步骤内自持拖拽与选区状态）。 */
-@Component
-export struct RegionSelectStep {
-  imagePath: string = '';
-  imageRatio: number = 0.75;
-  @Prop regionHint: string = '拖动四角调整题目识别区域';
-  @Prop confirmLabel: string = '识别此区域';
-  @Prop fullLabel: string = '识别全图';
-  @Prop busy: boolean = false;
-  initialLeftFrac: number = 0.08;
-  initialTopFrac: number = 0.08;
-  initialRightFrac: number = 0.92;
-  initialBottomFrac: number = 0.92;
-  onConfirm: (fracs: CropFracs | undefined) => void = (_f: CropFracs | undefined): void => {
-  };
-  onBack: () => void = (): void => {
-  };
-
-  @State cropLeftFrac: number = 0.08;
-  @State cropTopFrac: number = 0.08;
-  @State cropRightFrac: number = 0.92;
-  @State cropBottomFrac: number = 0.92;
-  @State dragStartLeft: number = 0;
-  @State dragStartTop: number = 0;
-  @State dragStartRight: number = 0;
-  @State dragStartBottom: number = 0;
-  @State dispW: number = 0;
-  @State dispH: number = 0;
-
-  aboutToAppear(): void {
-    this.cropLeftFrac = this.initialLeftFrac;
-    this.cropTopFrac = this.initialTopFrac;
-    this.cropRightFrac = this.initialRightFrac;
-    this.cropBottomFrac = this.initialBottomFrac;
-  }
-
-  build() {
-    Column() {
-      Row() {
-        Text('‹ 返回上一步')
-          .fontSize(14)
-          .fontColor(AppColors.TEXT_SECONDARY)
-          .height(AppSizes.TOUCH_TARGET)
-          .padding({ left: 8, right: 8 })
-          .margin({ left: 8, top: 4 })
-          .accessibilityText('返回上一步')
-          .onClick(() => {
-            this.onBack();
-          })
-        Text(this.regionHint)
-          .fontSize(14)
-          .fontColor(AppColors.TEXT_SECONDARY)
-          .layoutWeight(1)
-          .textAlign(TextAlign.End)
-          .padding({ right: 16 })
-      }
-      .width('100%')
-      .padding({ top: 4 })
-
-      Stack() {
-        Image(toFileUri(this.imagePath))
-          .width('100%')
-          .height('100%')
-          .objectFit(ImageFit.Contain)
-          .sourceSize({ width: 1080, height: 1080 })
-          .draggable(false)
-
-        Column() {
-        }
-        .width((this.cropRightFrac - this.cropLeftFrac) * this.dispW)
-        .height((this.cropBottomFrac - this.cropTopFrac) * this.dispH)
-        .position({ x: this.cropLeftFrac * this.dispW, y: this.cropTopFrac * this.dispH })
-        .border({ width: 2, color: AppColors.PRIMARY })
-        .backgroundColor(AppColors.CROP_MASK)
-        .hitTestBehavior(HitTestMode.Transparent)
-
-        this.DragHandle(this.cropLeftFrac, this.cropTopFrac, true)
-        this.DragHandle(this.cropRightFrac, this.cropBottomFrac, false)
-      }
-      .width('100%')
-      .aspectRatio(this.imageRatio)
-      .margin({ left: 16, right: 16, top: 8 })
-      .backgroundColor(AppColors.IMAGE_VIEWER_BG)
-      .borderRadius(AppSizes.CORNER_RADIUS_SM)
-      .clip(true)
-      .onAreaChange((_o: Area, n: Area) => {
-        this.dispW = toPixels(n.width);
-        this.dispH = toPixels(n.height);
-      })
-
-      Row() {
-        Button(this.fullLabel)
-          .height(40)
-          .backgroundColor(AppColors.BG_CARD)
-          .fontColor(AppColors.PRIMARY)
-          .borderRadius(20)
-          .margin({ right: 12 })
-          .enabled(!this.busy)
-          .onClick(() => {
-            this.onConfirm(undefined);
-          })
-        Button(this.confirmLabel)
-          .height(40)
-          .backgroundColor(this.busy ? AppColors.DISABLED : AppColors.SOLID_PRIMARY)
-          .fontColor(this.busy ? AppColors.TEXT_PRIMARY : Color.White)
-          .borderRadius(20)
-          .enabled(!this.busy)
-          .onClick(() => {
-            this.onConfirm(new CropFracs(this.cropLeftFrac, this.cropTopFrac, this.cropRightFrac, this.cropBottomFrac));
-          })
-      }
-      .width('100%')
-      .justifyContent(FlexAlign.Center)
-      .padding({ top: 16 })
-
-      if (this.busy) {
-        Text('正在识别...')
-          .fontSize(14)
-          .fontColor(AppColors.TEXT_SECONDARY)
-          .margin({ top: 8 })
-      }
-    }
     .width('100%')
     .height('100%')
   }
 
   @Builder
-  DragHandle(posX: number, posY: number, isStart: boolean) {
-    Stack() {
-      Column() {
-      }
-      .width(28)
-      .height(28)
-      .borderRadius(14)
-      .backgroundColor(AppColors.SOLID_PRIMARY)
-      .border({ width: 3, color: Color.White })
+  FeatureChip(icon: string, text: string, softBg: Resource) {
+    Row({ space: 4 }) {
+      Text(icon)
+        .fontSize(14)
+      Text(text)
+        .fontSize(12)
+        .fontColor(AppColors.TEXT_REGULAR)
     }
-    .width(44)
-    .height(44)
-    .position({ x: posX * this.dispW - 22, y: posY * this.dispH - 22 })
-    .gesture(
-      PanGesture()
-        .onActionStart(() => {
-          if (isStart) {
-            this.dragStartLeft = this.cropLeftFrac;
-            this.dragStartTop = this.cropTopFrac;
-          } else {
-            this.dragStartRight = this.cropRightFrac;
-            this.dragStartBottom = this.cropBottomFrac;
-          }
-        })
-        .onActionUpdate((e) => {
-          const dx: number = e.offsetX / (this.dispW > 0 ? this.dispW : 1);
-          const dy: number = e.offsetY / (this.dispH > 0 ? this.dispH : 1);
-          if (isStart) {
-            this.cropLeftFrac = clamp(this.dragStartLeft + dx, 0, this.cropRightFrac - 0.05);
-            this.cropTopFrac = clamp(this.dragStartTop + dy, 0, this.cropBottomFrac - 0.05);
-          } else {
-            this.cropRightFrac = clamp(this.dragStartRight + dx, this.cropLeftFrac + 0.05, 1);
-            this.cropBottomFrac = clamp(this.dragStartBottom + dy, this.cropTopFrac + 0.05, 1);
-          }
-        })
-    )
+    .padding({ left: 12, right: 12, top: 7, bottom: 7 })
+    .backgroundColor(softBg)
+    .borderRadius(16)
+    .margin(4)
+  }
+
+  @Builder
+  TipRow(text: string) {
+    Row({ space: 8 }) {
+      Text('·')
+        .fontSize(14)
+        .fontColor(AppColors.PRIMARY)
+        .fontWeight(FontWeight.Bold)
+      Text(text)
+        .fontSize(13)
+        .fontColor(AppColors.TEXT_SECONDARY)
+        .layoutWeight(1)
+    }
+    .width('100%')
+    .margin({ bottom: 6 })
   }
 }
 
-/** 第三步：OCR 核对与 AI 分析（表单字段经 @Link 与 CapturePage 同步）。 */
+/** 第二步：AI 全图识别中 / 失败兜底。 */
 @Component
-export struct OcrConfirmStep {
+export struct AiAnalyzingStep {
+  @Prop imagePath: string = '';
+  @Prop @Watch('onErrorChange') aiError: string = '';
+  @Prop qualityIssue: string = '';
+  onRetry: () => void = (): void => {
+  };
+  onManual: () => void = (): void => {
+  };
+  onBack: () => void = (): void => {
+  };
+
+  @State stage: number = 0;
+  private timerId: number = -1;
+
+  aboutToAppear(): void {
+    this.startStageTimer();
+  }
+
+  aboutToDisappear(): void {
+    this.stopStageTimer();
+  }
+
+  /** 重试时错误态清空，进度阶段从头播放。 */
+  onErrorChange(): void {
+    if (this.aiError.length === 0) {
+      this.startStageTimer();
+    } else {
+      this.stopStageTimer();
+    }
+  }
+
+  private startStageTimer(): void {
+    this.stopStageTimer();
+    this.stage = 0;
+    this.timerId = setInterval((): void => {
+      if (this.stage < 2) {
+        this.stage = this.stage + 1;
+      }
+    }, 3500);
+  }
+
+  private stopStageTimer(): void {
+    if (this.timerId >= 0) {
+      clearInterval(this.timerId);
+      this.timerId = -1;
+    }
+  }
+
+  private stages(): AnalyzeStage[] {
+    const s1 = new AnalyzeStage();
+    s1.icon = '📷';
+    s1.title = '读取照片';
+    s1.desc = '已完成图像质量检测';
+    const s2 = new AnalyzeStage();
+    s2.icon = '🧠';
+    s2.title = 'AI 识别题目与答案';
+    s2.desc = '理解整张图片，提取题目和作答';
+    const s3 = new AnalyzeStage();
+    s3.icon = '🏷️';
+    s3.title = '总结知识点';
+    s3.desc = '判断学科题型，生成知识标签';
+    return [s1, s2, s3];
+  }
+
+  build() {
+    Scroll() {
+      Column() {
+        // 照片预览
+        Stack({ alignContent: Alignment.BottomEnd }) {
+          Image(toFileUri(this.imagePath))
+            .width('100%')
+            .height(280)
+            .objectFit(ImageFit.Contain)
+            .sourceSize({ width: 1080, height: 1080 })
+            .draggable(false)
+            .accessibilityText('待识别的错题照片')
+        }
+        .width('100%')
+        .backgroundColor(AppColors.IMAGE_VIEWER_BG)
+        .borderRadius(AppSizes.CORNER_RADIUS)
+        .clip(true)
+        .margin({ left: 16, right: 16, top: 12 })
+
+        if (this.qualityIssue.length > 0 && qualityHint(this.qualityIssue).length > 0) {
+          Text(qualityHint(this.qualityIssue))
+            .fontSize(13)
+            .fontColor(AppColors.WARNING)
+            .margin({ left: 16, right: 16, top: 10 })
+        }
+
+        if (this.aiError.length > 0) {
+          this.ErrorCard()
+        } else {
+          this.ProgressCard()
+        }
+      }
+      .width('100%')
+      .padding({ bottom: 24 })
+    }
+    .scrollBar(BarState.Auto)
+    .edgeEffect(EdgeEffect.Spring)
+    .width('100%')
+    .height('100%')
+  }
+
+  @Builder
+  ProgressCard() {
+    Column() {
+      Row({ space: 10 }) {
+        LoadingProgress()
+          .width(28)
+          .height(28)
+          .color(AppColors.PRIMARY)
+        Column() {
+          Text('AI 正在全图识别')
+            .fontSize(16)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(AppColors.TEXT_PRIMARY)
+          Text('通常需要几秒钟，请保持网络畅通')
+            .fontSize(12)
+            .fontColor(AppColors.TEXT_SECONDARY)
+            .margin({ top: 2 })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+      }
+      .width('100%')
+      .padding({ bottom: 14 })
+
+      Divider()
+        .color(AppColors.DIVIDER)
+
+      ForEach(this.stages(), (item: AnalyzeStage, index: number) => {
+        Row({ space: 12 }) {
+          if (index < this.stage) {
+            Text('✓')
+              .fontSize(15)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Color.White)
+              .width(30)
+              .height(30)
+              .textAlign(TextAlign.Center)
+              .backgroundColor(AppColors.MASTERY_MASTERED)
+              .borderRadius(15)
+          } else if (index === this.stage) {
+            LoadingProgress()
+              .width(30)
+              .height(30)
+              .color(AppColors.PRIMARY)
+          } else {
+            Text(item.icon)
+              .fontSize(15)
+              .width(30)
+              .height(30)
+              .textAlign(TextAlign.Center)
+              .backgroundColor(AppColors.CHIP_BG)
+              .borderRadius(15)
+          }
+          Column() {
+            Text(item.title)
+              .fontSize(14)
+              .fontColor(index <= this.stage ? AppColors.TEXT_PRIMARY : AppColors.TEXT_SECONDARY)
+              .fontWeight(index === this.stage ? FontWeight.Medium : FontWeight.Normal)
+            Text(item.desc)
+              .fontSize(11)
+              .fontColor(AppColors.TEXT_PLACEHOLDER)
+              .margin({ top: 1 })
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+        }
+        .width('100%')
+        .margin({ top: 12 })
+      }, (item: AnalyzeStage, index: number) => `${index}_${item.title}`)
+
+      Button('放弃本次识别')
+        .height(40)
+        .fontSize(14)
+        .backgroundColor(AppColors.BG_CARD)
+        .fontColor(AppColors.TEXT_SECONDARY)
+        .borderRadius(20)
+        .margin({ top: 20 })
+        .onClick(() => {
+          this.onBack();
+        })
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor(AppColors.BG_CARD)
+    .borderRadius(AppSizes.CORNER_RADIUS)
+    .margin({ left: 16, right: 16, top: 16 })
+  }
+
+  @Builder
+  ErrorCard() {
+    Column() {
+      Text('😟')
+        .fontSize(44)
+      Text('AI 识别失败')
+        .fontSize(17)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(AppColors.TEXT_PRIMARY)
+        .margin({ top: 8 })
+      Text(this.aiError)
+        .fontSize(12)
+        .fontColor(AppColors.TEXT_SECONDARY)
+        .textAlign(TextAlign.Center)
+        .lineHeight(18)
+        .margin({ top: 6 })
+
+      Button('🔄 重新识别')
+        .width('100%')
+        .height(46)
+        .fontSize(15)
+        .backgroundColor(AppColors.SOLID_PRIMARY)
+        .fontColor(Color.White)
+        .borderRadius(23)
+        .margin({ top: 18 })
+        .onClick(() => {
+          this.onRetry();
+        })
+      Button('✏️ 手动填写')
+        .width('100%')
+        .height(44)
+        .fontSize(14)
+        .backgroundColor(AppColors.BG_CARD)
+        .fontColor(AppColors.PRIMARY)
+        .borderRadius(22)
+        .border({ width: 1, color: AppColors.PRIMARY })
+        .margin({ top: 10 })
+        .onClick(() => {
+          this.onManual();
+        })
+      Button('重新选图')
+        .height(38)
+        .fontSize(13)
+        .backgroundColor(Color.Transparent)
+        .fontColor(AppColors.TEXT_SECONDARY)
+        .borderRadius(19)
+        .margin({ top: 6 })
+        .onClick(() => {
+          this.onBack();
+        })
+    }
+    .width('100%')
+    .padding(20)
+    .alignItems(HorizontalAlign.Center)
+    .backgroundColor(AppColors.BG_CARD)
+    .borderRadius(AppSizes.CORNER_RADIUS)
+    .margin({ left: 16, right: 16, top: 16 })
+  }
+}
+
+/** 第三步：AI 识别结果核对（字段经 @Link 与 CapturePage 同步）。 */
+@Component
+export struct AiReviewStep {
   imagePath: string = '';
-  questionFracs: CropFracs | undefined = undefined;
-  @Prop ocrConfidence: number = 0;
-  stdImagePath: string = '';
-  myImagePath: string = '';
-  stdFracs: CropFracs = new CropFracs(0.05, 0.05, 0.95, 0.95);
-  myFracs: CropFracs = new CropFracs(0.05, 0.05, 0.95, 0.95);
+  @Prop aiRecognized: boolean = false;
+  @Prop aiTagNames: string = '';
 
   @Link questionText: string;
   @Link knowledgeSummary: string;
@@ -341,27 +492,19 @@ export struct OcrConfirmStep {
   @Link selectedErrorType: ErrorType;
   @Link selectedTagIds: string[];
 
-  onRepickQuestion: () => void = (): void => {
-  };
-  onRegionSelect: (target: string) => void = (_t: string): void => {
-  };
-  onAnswerImagePicked: (target: string, path: string) => void = (_t: string, _p: string): void => {
-  };
-  onFracsChanged: (target: string, fracs: CropFracs) => void = (_t: string, _f: CropFracs): void => {
+  onRepick: () => void = (): void => {
   };
   onSave: (payload: CaptureFormPayload) => void = (_p: CaptureFormPayload): void => {
   };
 
-  @State knowledgeBusy: boolean = false;
-  @State stdAnalyzing: boolean = false;
-  @State myAnalyzing: boolean = false;
+  @State knowledgeTags: KnowledgeTag[] = [];
   @State compareBusy: boolean = false;
   @State compareResult: string = '';
-  @State knowledgeTags: KnowledgeTag[] = [];
+  @State stdPhotoBusy: boolean = false;
+  @State myPhotoBusy: boolean = false;
+  private alive: boolean = true;
   private answerTypeOptions: AnswerTypeOption[] = [];
   private errorTypeOptions: ErrorTypeOption[] = [];
-  private alive: boolean = true;
-  private aiStarted: boolean = false;
 
   aboutToAppear(): void {
     this.alive = true;
@@ -392,8 +535,11 @@ export struct OcrConfirmStep {
     e4.type = ErrorType.OTHER;
     e4.label = '其他';
     this.errorTypeOptions = [e1, e2, e3, e4];
-    this.loadTags();
-    this.runAiRecognize();
+    this.loadTags().then((): void => {
+      if (this.alive && this.aiTagNames.length > 0) {
+        this.selectTagsByName(this.aiTagNames.split('\n'));
+      }
+    });
   }
 
   aboutToDisappear(): void {
@@ -402,56 +548,10 @@ export struct OcrConfirmStep {
 
   private async loadTags(): Promise<void> {
     const tags = await dbHelper.queryKnowledgeTags(this.selectedSubject);
-    if (!this.alive) {
-      return;
-    }
     this.knowledgeTags = tags;
   }
 
-  private async runAiRecognize(): Promise<void> {
-    if (this.aiStarted) {
-      return;
-    }
-    this.aiStarted = true;
-    this.knowledgeBusy = true;
-    try {
-      const ai = await AiService.recognizeQuestion(this.imagePath, this.questionFracs, this.questionText);
-      if (!this.alive) {
-        return;
-      }
-      if (ai.ok) {
-        this.questionText = ai.question;
-      }
-      if (ai.knowledgeSummary.length > 0) {
-        this.knowledgeSummary = ai.knowledgeSummary;
-      }
-      this.selectedSubject = ai.subject;
-      this.answerType = ai.answerType;
-      this.selectedErrorType = ai.errorType;
-      await this.loadTags();
-      if (ai.tags.length > 0) {
-        this.selectTagsByName(ai.tags);
-      }
-      if (ai.ok) {
-        Toast.show('AI识别完成');
-      } else {
-        Toast.show('AI未能解析题目，请手动核对');
-      }
-    } catch (e) {
-      if (!this.alive) {
-        return;
-      }
-      if (this.knowledgeSummary.length === 0) {
-        this.knowledgeSummary = subjectLabel(this.selectedSubject) + '错题';
-      }
-      Toast.show(e instanceof Error ? e.message : 'AI识别失败，请检查网络，可手动修改');
-    }
-    if (this.alive) {
-      this.knowledgeBusy = false;
-    }
-  }
-
-  private selectTagsByName(names: string[]): void {
+  selectTagsByName(names: string[]): void {
     this.selectedTagIds = [];
     for (const tag of this.knowledgeTags) {
       for (const name of names) {
@@ -475,74 +575,40 @@ export struct OcrConfirmStep {
     this.selectedTagIds = this.selectedTagIds.slice();
   }
 
-  private answerImageOf(target: string): string {
-    if (target === 'standard') {
-      return this.stdImagePath;
-    }
-    return this.myImagePath;
-  }
-
-  private answerAnalyzing(target: string): boolean {
-    if (target === 'standard') {
-      return this.stdAnalyzing;
-    }
-    return this.myAnalyzing;
-  }
-
-  private fracsOf(target: string): CropFracs {
-    if (target === 'standard') {
-      return this.stdFracs;
-    }
-    return this.myFracs;
-  }
-
-  private async pickAnswerImage(target: string, fromCamera: boolean): Promise<void> {
-    const path = fromCamera ? await MediaService.capturePhoto() : await MediaService.pickFromAlbum();
-    if (!this.alive) {
-      return;
-    }
+  /** 拍照/选图后由 AI 全图识别，直接填入答案框（无框选、无本地 OCR）。 */
+  private async fillAnswerFromPhoto(target: string, fromCamera: boolean): Promise<void> {
+    const path: string | undefined = fromCamera ? await MediaService.capturePhoto()
+      : await MediaService.pickFromAlbum();
     if (path === undefined || path.length === 0) {
       Toast.show('未获取到图片，请重试');
       return;
     }
-    this.onAnswerImagePicked(target, path);
-    this.onRegionSelect(target);
-  }
-
-  private async analyzeAnswer(target: string): Promise<void> {
-    const img: string = this.answerImageOf(target);
-    if (img.length === 0) {
-      Toast.show('请先选择图片');
-      return;
-    }
     if (target === 'standard') {
-      this.stdAnalyzing = true;
+      this.stdPhotoBusy = true;
     } else {
-      this.myAnalyzing = true;
+      this.myPhotoBusy = true;
     }
     try {
-      const text: string = await AiService.recognizeImage(img, this.fracsOf(target));
+      const text: string = await AiService.recognizeImage(path);
       if (!this.alive) {
         return;
       }
       const cleaned: string = text.trim();
       if (cleaned.length === 0) {
-        Toast.show('未识别到文字，请手动输入');
+        Toast.show('AI 未识别到文字，请手动输入');
       } else if (target === 'standard') {
-        this.standardAnswer = this.standardAnswer.length > 0 ? this.standardAnswer + ' ' + cleaned : cleaned;
+        this.standardAnswer = cleaned;
       } else {
-        this.studentAnswer = this.studentAnswer.length > 0 ? this.studentAnswer + ' ' + cleaned : cleaned;
+        this.studentAnswer = cleaned;
       }
     } catch (e) {
-      if (this.alive) {
-        Toast.show(e instanceof Error ? e.message : 'AI 分析失败，请检查网络');
-      }
+      Toast.show(e instanceof Error ? e.message : 'AI 识别失败，请检查网络');
     }
     if (this.alive) {
       if (target === 'standard') {
-        this.stdAnalyzing = false;
+        this.stdPhotoBusy = false;
       } else {
-        this.myAnalyzing = false;
+        this.myPhotoBusy = false;
       }
     }
   }
@@ -561,241 +627,18 @@ export struct OcrConfirmStep {
       if (!this.alive) {
         return;
       }
-      let msg: string = '🔍 AI 分析结果：\n' + analysis.analysis;
+      let msg: string = '🔍 AI 分析：\n' + analysis.analysis;
       if (analysis.tags.length > 0) {
         msg += '\n知识点：' + analysis.tags.join('、');
       }
       this.compareResult = msg;
-      this.answerType = analysis.answerType;
-      this.selectedSubject = analysis.subject;
-      await this.loadTags();
-      this.selectTagsByName(analysis.tags);
-      if (analysis.tags.length > 0) {
-        this.knowledgeSummary = analysis.tags[0];
-      }
     } catch (e) {
-      if (!this.alive) {
-        return;
-      }
       this.compareResult = diffAnswers(s, m);
       Toast.show('AI 分析失败，已使用本地对比');
     }
     if (this.alive) {
       this.compareBusy = false;
     }
-  }
-
-  private anyAiBusy(): boolean {
-    return this.knowledgeBusy || this.stdAnalyzing || this.myAnalyzing || this.compareBusy;
-  }
-
-  build() {
-    Scroll() {
-      Column() {
-        Text(AppStrings.CONFIRM_OCR)
-          .fontSize(16)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(AppColors.TEXT_PRIMARY)
-          .padding({ left: 16, right: 16, bottom: 12 })
-
-        Column() {
-          Row() {
-            Text('知识点总结')
-              .fontSize(14)
-              .fontColor(AppColors.TEXT_SECONDARY)
-              .layoutWeight(1)
-            if (this.knowledgeBusy) {
-              Text('AI 总结中...')
-                .fontSize(11)
-                .fontColor(AppColors.TEXT_PLACEHOLDER)
-            }
-          }
-          .width('100%')
-          .margin({ bottom: 4 })
-          TextInput({ text: this.knowledgeSummary, placeholder: '识别后由AI自动总结（不超过10字，可修改）' })
-            .fontSize(16)
-            .borderRadius(AppSizes.CORNER_RADIUS_SM)
-            .backgroundColor(AppColors.BG_PAGE)
-            .onChange((v: string) => {
-              this.knowledgeSummary = v;
-            })
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .margin({ left: 16, right: 16, top: 8 })
-
-        Column() {
-          Row() {
-            Text('识别学科（自动）')
-              .fontSize(14)
-              .fontColor(AppColors.TEXT_SECONDARY)
-              .layoutWeight(1)
-            Text('识别有误可点击修改')
-              .fontSize(11)
-              .fontColor(AppColors.TEXT_PLACEHOLDER)
-          }
-          .width('100%')
-          .margin({ bottom: 8 })
-          Row({ space: 6 }) {
-            FilterChip({
-              text: subjectLabel(Subject.MATH), selected: this.selectedSubject === Subject.MATH,
-              onTap: (): void => {
-                this.selectedSubject = Subject.MATH;
-                this.loadTags();
-              }
-            })
-            FilterChip({
-              text: subjectLabel(Subject.CHINESE), selected: this.selectedSubject === Subject.CHINESE,
-              onTap: (): void => {
-                this.selectedSubject = Subject.CHINESE;
-                this.loadTags();
-              }
-            })
-            FilterChip({
-              text: subjectLabel(Subject.ENGLISH), selected: this.selectedSubject === Subject.ENGLISH,
-              onTap: (): void => {
-                this.selectedSubject = Subject.ENGLISH;
-                this.loadTags();
-              }
-            })
-            FilterChip({
-              text: subjectLabel(Subject.SCIENCE), selected: this.selectedSubject === Subject.SCIENCE,
-              onTap: (): void => {
-                this.selectedSubject = Subject.SCIENCE;
-                this.loadTags();
-              }
-            })
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .margin({ left: 16, right: 16, top: 8 })
-
-        this.OcrFieldCard()
-
-        this.AnswerFieldCard('标准答案', 'standard')
-        this.AnswerFieldCard('我的答案', 'mine')
-
-        Button(this.compareBusy ? '🔍 AI 分析中...' : '🔍 智能对比分析')
-          .width('90%')
-          .height(42)
-          .backgroundColor(this.anyAiBusy() ? AppColors.DISABLED : AppColors.SECONDARY)
-          .fontColor(this.anyAiBusy() ? AppColors.TEXT_PRIMARY : Color.White)
-          .borderRadius(21)
-          .margin({ top: 12 })
-          .enabled(!this.anyAiBusy())
-          .onClick(() => {
-            this.runCompare();
-          })
-
-        if (this.compareResult.length > 0) {
-          Text(this.compareResult)
-            .fontSize(13)
-            .fontColor(AppColors.TEXT_REGULAR)
-            .lineHeight(20)
-            .width('100%')
-            .padding(14)
-            .backgroundColor(AppColors.BG_CARD)
-            .borderRadius(AppSizes.CORNER_RADIUS_SM)
-            .border({ width: 1, color: AppColors.DIVIDER })
-            .margin({ left: 16, right: 16, top: 8 })
-        }
-
-        Column() {
-          Text('题目类型')
-            .fontSize(14)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .margin({ bottom: 8 })
-          Row({ space: 6 }) {
-            ForEach(this.answerTypeOptions, (item: AnswerTypeOption) => {
-              FilterChip({
-                text: item.label, selected: this.answerType === item.type,
-                onTap: (): void => {
-                  this.answerType = item.type;
-                }
-              })
-            }, (item: AnswerTypeOption) => item.type as string)
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .margin({ left: 16, right: 16, top: 8 })
-
-        Column() {
-          Text('错误类型（可选）')
-            .fontSize(14)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .margin({ bottom: 8 })
-          Row({ space: 6 }) {
-            ForEach(this.errorTypeOptions, (item: ErrorTypeOption) => {
-              FilterChip({
-                text: item.label, selected: this.selectedErrorType === item.type,
-                onTap: (): void => {
-                  this.selectedErrorType = item.type;
-                }
-              })
-            }, (item: ErrorTypeOption) => item.type as string)
-          }
-          .width('100%')
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .margin({ left: 16, right: 16, top: 8 })
-
-        Column() {
-          Text('知识点标签')
-            .fontSize(14)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .margin({ bottom: 8 })
-          if (this.knowledgeTags.length === 0) {
-            Text('暂无匹配标签，可跳过')
-              .fontSize(13)
-              .fontColor(AppColors.TEXT_PLACEHOLDER)
-          } else {
-            Flex({ wrap: FlexWrap.Wrap }) {
-              ForEach(this.knowledgeTags, (tag: KnowledgeTag) => {
-                FilterChip({
-                  text: tag.name, selected: this.selectedTagIds.indexOf(tag.id) >= 0,
-                  onTap: (): void => {
-                    this.toggleTag(tag.id);
-                  }
-                })
-              }, (tag: KnowledgeTag) => tag.id)
-            }
-          }
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .margin({ left: 16, right: 16, top: 8 })
-
-        Button(this.anyAiBusy() ? 'AI 识别中，请稍候...' : AppStrings.CONFIRM_COMPLETE)
-          .width('90%')
-          .height(44)
-          .backgroundColor((this.questionText.length > 0 && !this.anyAiBusy()) ? AppColors.SOLID_PRIMARY : AppColors.DISABLED)
-          .fontColor((this.questionText.length > 0 && !this.anyAiBusy()) ? Color.White : AppColors.TEXT_PRIMARY)
-          .borderRadius(22)
-          .margin({ top: 24, bottom: 24 })
-          .enabled(this.questionText.length > 0 && !this.anyAiBusy())
-          .onClick(() => {
-            this.onSaveClick();
-          })
-      }
-      .width('100%')
-    }
-    .scrollBar(BarState.Auto)
-    .edgeEffect(EdgeEffect.Spring)
   }
 
   private onSaveClick(): void {
@@ -808,172 +651,342 @@ export struct OcrConfirmStep {
     payload.answerType = this.answerType;
     payload.errorType = this.selectedErrorType;
     payload.tagIds = this.selectedTagIds.slice();
-    payload.ocrConfidence = this.ocrConfidence;
     this.onSave(payload);
   }
 
-  @Builder
-  OcrFieldCard() {
-    Column() {
-      Row() {
-        Text('题目内容')
-          .fontSize(14)
-          .fontColor(AppColors.TEXT_SECONDARY)
-          .layoutWeight(1)
-        if (this.questionText.length > 0) {
-          Text(`置信度 ${Math.round(this.ocrConfidence * 100)}%`)
-            .fontSize(12)
-            .fontColor(this.ocrConfidence < CaptureOrchestrator.getConfidenceThreshold() && this.questionText.length > 0
-              ? AppColors.WARNING : AppColors.TEXT_PLACEHOLDER)
+  build() {
+    Scroll() {
+      Column() {
+        // 照片 + AI 状态
+        Column() {
+          Image(toFileUri(this.imagePath))
+            .width('100%')
+            .height(150)
+            .objectFit(ImageFit.Contain)
+            .sourceSize({ width: 720, height: 720 })
+            .draggable(false)
+            .backgroundColor(AppColors.IMAGE_VIEWER_BG)
+            .borderRadius(AppSizes.CORNER_RADIUS_SM)
+            .accessibilityText('错题照片')
+          Row() {
+            Text(this.aiRecognized ? '✨ AI 已识别，请核对' : '✏️ 请补充题目信息')
+              .fontSize(12)
+              .fontColor(AppColors.PRIMARY)
+              .layoutWeight(1)
+            Text('换一张照片')
+              .fontSize(12)
+              .fontColor(AppColors.TEXT_SECONDARY)
+              .padding({ left: 8, right: 8, top: 6, bottom: 6 })
+              .onClick(() => {
+                this.onRepick();
+              })
+          }
+          .width('100%')
+          .margin({ top: 8 })
         }
+        .width('100%')
+        .padding(12)
+        .backgroundColor(AppColors.BG_CARD)
+        .borderRadius(AppSizes.CORNER_RADIUS)
+        .margin({ left: 16, right: 16, top: 12 })
+
+        this.QuestionCard()
+        this.AnswerCard()
+        this.CategoryCard()
+        this.KnowledgeCard()
+
+        Button(this.questionText.length > 0 ? '✔  保存错题' : '请先填写题目内容')
+          .width('100%')
+          .height(50)
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .backgroundColor(this.questionText.length > 0 ? AppColors.SOLID_PRIMARY : AppColors.DISABLED)
+          .fontColor(this.questionText.length > 0 ? Color.White : AppColors.TEXT_PRIMARY)
+          .borderRadius(25)
+          .margin({ left: 16, right: 16, top: 20, bottom: 32 })
+          .enabled(this.questionText.length > 0)
+          .accessibilityText('保存错题')
+          .onClick(() => {
+            this.onSaveClick();
+          })
       }
       .width('100%')
-      .margin({ bottom: 4 })
-
-      TextArea({ text: this.questionText, placeholder: '请核对题目内容' })
-        .fontSize(16)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .backgroundColor(AppColors.BG_PAGE)
-        .border({
-          width: this.ocrConfidence < CaptureOrchestrator.getConfidenceThreshold() && this.questionText.length > 0 ? 1.5 : 0,
-          color: AppColors.WARNING
-        })
-        .onChange((v: string) => {
-          this.questionText = v;
-        })
-
-      Button('🔄 重新选择题目图片')
-        .height(32)
-        .fontSize(12)
-        .backgroundColor(AppColors.CHIP_BG)
-        .fontColor(AppColors.TEXT_REGULAR)
-        .borderRadius(16)
-        .margin({ top: 8 })
-        .onClick(() => {
-          this.onRepickQuestion();
-        })
-
-      if (CaptureOrchestrator.isLowConfidence(new OcrFieldResult(this.questionText, this.ocrConfidence, ContentType.PRINTED_TEXT))) {
-        Text('⚠️ 识别置信度较低，需人工核对')
-          .fontSize(11)
-          .fontColor(AppColors.WARNING)
-          .margin({ top: 4 })
-      }
     }
+    .scrollBar(BarState.Auto)
+    .edgeEffect(EdgeEffect.Spring)
     .width('100%')
-    .padding(16)
-    .backgroundColor(AppColors.BG_CARD)
-    .borderRadius(AppSizes.CORNER_RADIUS_SM)
-    .margin({ left: 16, right: 16, top: 8 })
+    .height('100%')
   }
 
   @Builder
-  AnswerFieldCard(label: string, target: string) {
+  SectionTitle(title: string, hint: string) {
+    Row() {
+      Text(title)
+        .fontSize(14)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(AppColors.TEXT_PRIMARY)
+        .layoutWeight(1)
+      if (hint.length > 0) {
+        Text(hint)
+          .fontSize(11)
+          .fontColor(AppColors.TEXT_PLACEHOLDER)
+      }
+    }
+    .width('100%')
+    .margin({ bottom: 8 })
+  }
+
+  @Builder
+  QuestionCard() {
+    Column() {
+      this.SectionTitle('题目内容', 'AI 已识别，可修改')
+      TextArea({ text: this.questionText, placeholder: 'AI 将自动识别题目内容' })
+        .fontSize(15)
+        .constraintSize({ minHeight: 96 })
+        .borderRadius(AppSizes.CORNER_RADIUS_XS)
+        .backgroundColor(AppColors.BG_PAGE)
+        .onChange((v: string) => {
+          this.questionText = v;
+        })
+    }
+    .alignItems(HorizontalAlign.Start)
+    .width('100%')
+    .padding(14)
+    .backgroundColor(AppColors.BG_CARD)
+    .borderRadius(AppSizes.CORNER_RADIUS)
+    .margin({ left: 16, right: 16, top: 12 })
+  }
+
+  @Builder
+  AnswerCard() {
+    Column() {
+      this.SectionTitle('答案对比', 'AI 从照片提取，可修改')
+
+      this.AnswerField('我的答案', 'mine')
+      this.AnswerField('标准答案', 'standard')
+
+      Button(this.compareBusy ? '🔍 AI 分析中...' : '🔍 AI 智能对比分析')
+        .width('100%')
+        .height(42)
+        .fontSize(14)
+        .backgroundColor(this.compareBusy ? AppColors.DISABLED : AppColors.SECONDARY)
+        .fontColor(this.compareBusy ? AppColors.TEXT_PRIMARY : Color.White)
+        .borderRadius(21)
+        .margin({ top: 12 })
+        .enabled(!this.compareBusy)
+        .onClick(() => {
+          this.runCompare();
+        })
+
+      if (this.compareResult.length > 0) {
+        Text(this.compareResult)
+          .fontSize(13)
+          .fontColor(AppColors.TEXT_REGULAR)
+          .lineHeight(20)
+          .width('100%')
+          .padding(12)
+          .backgroundColor(AppColors.BG_PAGE)
+          .borderRadius(AppSizes.CORNER_RADIUS_XS)
+          .margin({ top: 10 })
+      }
+    }
+    .alignItems(HorizontalAlign.Start)
+    .width('100%')
+    .padding(14)
+    .backgroundColor(AppColors.BG_CARD)
+    .borderRadius(AppSizes.CORNER_RADIUS)
+    .margin({ left: 16, right: 16, top: 12 })
+  }
+
+  @Builder
+  AnswerField(label: string, target: string) {
     Column() {
       Row() {
         Text(label)
-          .fontSize(14)
+          .fontSize(13)
           .fontColor(AppColors.TEXT_SECONDARY)
           .layoutWeight(1)
-        if (this.answerAnalyzing(target)) {
-          Text('AI 分析中...')
-            .fontSize(11)
-            .fontColor(AppColors.WARNING)
+        if (target === 'standard' && this.stdPhotoBusy) {
+          LoadingProgress()
+            .width(16)
+            .height(16)
+            .color(AppColors.PRIMARY)
+            .margin({ right: 6 })
         }
+        if (target === 'mine' && this.myPhotoBusy) {
+          LoadingProgress()
+            .width(16)
+            .height(16)
+            .color(AppColors.PRIMARY)
+            .margin({ right: 6 })
+        }
+        Text('📷 AI识别')
+          .fontSize(12)
+          .fontColor(AppColors.PRIMARY)
+          .padding({ left: 8, right: 8, top: 5, bottom: 5 })
+          .backgroundColor(AppColors.CHIP_BG)
+          .borderRadius(12)
+          .onClick(() => {
+            this.fillAnswerFromPhoto(target, true);
+          })
+        Text('🖼️')
+          .fontSize(12)
+          .fontColor(AppColors.PRIMARY)
+          .padding({ left: 6, right: 6, top: 5, bottom: 5 })
+          .backgroundColor(AppColors.CHIP_BG)
+          .borderRadius(12)
+          .margin({ left: 6 })
+          .onClick(() => {
+            this.fillAnswerFromPhoto(target, false);
+          })
       }
       .width('100%')
-      .margin({ bottom: 4 })
+      .margin({ bottom: 6 })
 
       if (target === 'standard') {
-        TextArea({ text: this.standardAnswer, placeholder: `输入${label}，或选图后智能分析` })
-          .fontSize(16)
-          .borderRadius(AppSizes.CORNER_RADIUS_SM)
+        TextArea({ text: this.standardAnswer, placeholder: '正确的答案（可拍照由AI识别）' })
+          .fontSize(15)
+          .constraintSize({ minHeight: 64 })
+          .borderRadius(AppSizes.CORNER_RADIUS_XS)
           .backgroundColor(AppColors.BG_PAGE)
           .onChange((v: string) => {
             this.standardAnswer = v;
           })
       } else {
-        TextArea({ text: this.studentAnswer, placeholder: `输入${label}，或选图后智能分析` })
-          .fontSize(16)
-          .borderRadius(AppSizes.CORNER_RADIUS_SM)
+        TextArea({ text: this.studentAnswer, placeholder: '我当时的答案（可拍照由AI识别）' })
+          .fontSize(15)
+          .constraintSize({ minHeight: 64 })
+          .borderRadius(AppSizes.CORNER_RADIUS_XS)
           .backgroundColor(AppColors.BG_PAGE)
           .onChange((v: string) => {
             this.studentAnswer = v;
           })
       }
-
-      if (this.answerImageOf(target).length > 0) {
-        Row() {
-          Image(toFileUri(this.answerImageOf(target)))
-            .width(72)
-            .height(72)
-            .borderRadius(AppSizes.CORNER_RADIUS_XS)
-            .objectFit(ImageFit.Cover)
-            .sourceSize({ width: 256, height: 256 })
-            .margin({ right: 8 })
-
-          Column({ space: 8 }) {
-            Button('✂️ 框选区域')
-              .height(32)
-              .fontSize(12)
-              .backgroundColor(AppColors.CHIP_BG)
-              .fontColor(AppColors.TEXT_REGULAR)
-              .borderRadius(16)
-              .onClick(() => {
-                this.onRegionSelect(target);
-              })
-            Button('🔍 智能分析')
-              .height(32)
-              .fontSize(12)
-              .backgroundColor(AppColors.SOLID_PRIMARY)
-              .fontColor(Color.White)
-              .borderRadius(16)
-              .enabled(!this.answerAnalyzing(target))
-              .onClick(() => {
-                this.analyzeAnswer(target);
-              })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-        }
-        .width('100%')
-        .margin({ top: 8 })
-      }
-
-      Row({ space: 8 }) {
-        Button('📷 拍照')
-          .height(32)
-          .fontSize(12)
-          .backgroundColor(AppColors.CHIP_BG)
-          .fontColor(AppColors.TEXT_REGULAR)
-          .borderRadius(16)
-          .onClick(() => {
-            this.pickAnswerImage(target, true);
-          })
-        Button('🖼️ 相册')
-          .height(32)
-          .fontSize(12)
-          .backgroundColor(AppColors.CHIP_BG)
-          .fontColor(AppColors.TEXT_REGULAR)
-          .borderRadius(16)
-          .onClick(() => {
-            this.pickAnswerImage(target, false);
-          })
-      }
-      .width('100%')
-      .margin({ top: 8 })
     }
     .width('100%')
-    .padding(16)
+    .margin({ bottom: 10 })
+  }
+
+  @Builder
+  CategoryCard() {
+    Column() {
+      this.SectionTitle('学科', 'AI 已判断')
+      Row({ space: 6 }) {
+        FilterChip({
+          text: subjectLabel(Subject.MATH), selected: this.selectedSubject === Subject.MATH,
+          onTap: (): void => {
+            this.selectedSubject = Subject.MATH;
+            this.loadTags();
+          }
+        })
+        FilterChip({
+          text: subjectLabel(Subject.CHINESE), selected: this.selectedSubject === Subject.CHINESE,
+          onTap: (): void => {
+            this.selectedSubject = Subject.CHINESE;
+            this.loadTags();
+          }
+        })
+        FilterChip({
+          text: subjectLabel(Subject.ENGLISH), selected: this.selectedSubject === Subject.ENGLISH,
+          onTap: (): void => {
+            this.selectedSubject = Subject.ENGLISH;
+            this.loadTags();
+          }
+        })
+        FilterChip({
+          text: subjectLabel(Subject.SCIENCE), selected: this.selectedSubject === Subject.SCIENCE,
+          onTap: (): void => {
+            this.selectedSubject = Subject.SCIENCE;
+            this.loadTags();
+          }
+        })
+      }
+      .width('100%')
+
+      Column() {
+        this.SectionTitle('题型', '')
+      }
+      .width('100%')
+      .margin({ top: 14 })
+      Flex({ wrap: FlexWrap.Wrap }) {
+        ForEach(this.answerTypeOptions, (item: AnswerTypeOption) => {
+          FilterChip({
+            text: item.label, selected: this.answerType === item.type,
+            onTap: (): void => {
+              this.answerType = item.type;
+            }
+          })
+        }, (item: AnswerTypeOption) => item.type as string)
+      }
+
+      Column() {
+        this.SectionTitle('错误原因', '可选')
+      }
+      .width('100%')
+      .margin({ top: 14 })
+      Flex({ wrap: FlexWrap.Wrap }) {
+        ForEach(this.errorTypeOptions, (item: ErrorTypeOption) => {
+          FilterChip({
+            text: item.label, selected: this.selectedErrorType === item.type,
+            onTap: (): void => {
+              this.selectedErrorType = item.type;
+            }
+          })
+        }, (item: ErrorTypeOption) => item.type as string)
+      }
+    }
+    .alignItems(HorizontalAlign.Start)
+    .width('100%')
+    .padding(14)
     .backgroundColor(AppColors.BG_CARD)
-    .borderRadius(AppSizes.CORNER_RADIUS_SM)
-    .margin({ left: 16, right: 16, top: 8 })
+    .borderRadius(AppSizes.CORNER_RADIUS)
+    .margin({ left: 16, right: 16, top: 12 })
+  }
+
+  @Builder
+  KnowledgeCard() {
+    Column() {
+      this.SectionTitle('知识点', 'AI 已总结')
+      TextInput({ text: this.knowledgeSummary, placeholder: '不超过10字，可修改' })
+        .fontSize(15)
+        .borderRadius(AppSizes.CORNER_RADIUS_XS)
+        .backgroundColor(AppColors.BG_PAGE)
+        .onChange((v: string) => {
+          this.knowledgeSummary = v;
+        })
+
+      if (this.knowledgeTags.length === 0) {
+        Text('暂无匹配标签，可跳过')
+          .fontSize(12)
+          .fontColor(AppColors.TEXT_PLACEHOLDER)
+          .margin({ top: 8 })
+      } else {
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.knowledgeTags, (tag: KnowledgeTag) => {
+            FilterChip({
+              text: tag.name, selected: this.selectedTagIds.indexOf(tag.id) >= 0,
+              onTap: (): void => {
+                this.toggleTag(tag.id);
+              }
+            })
+          }, (tag: KnowledgeTag) => tag.id)
+        }
+        .margin({ top: 8 })
+      }
+    }
+    .alignItems(HorizontalAlign.Start)
+    .width('100%')
+    .padding(14)
+    .backgroundColor(AppColors.BG_CARD)
+    .borderRadius(AppSizes.CORNER_RADIUS)
+    .margin({ left: 16, right: 16, top: 12 })
   }
 }
 
-/** 第四步：保存结果。 */
+/** 第四步：保存成功。 */
 @Component
-export struct ResultStep {
+export struct CaptureResultStep {
+  @Prop pointsEarned: number = 0;
   onContinue: () => void = (): void => {
   };
   onExit: () => void = (): void => {
@@ -981,34 +994,64 @@ export struct ResultStep {
 
   build() {
     Column() {
-      Text('✅')
-        .fontSize(64)
-        .margin({ top: 80 })
-      Text('录入成功！')
+      Text('🎉 ✨ 🎉')
         .fontSize(20)
-        .fontWeight(FontWeight.Medium)
+        .margin({ top: 40 })
+      Column() {
+        Text('✓')
+          .fontSize(44)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+        if (this.pointsEarned > 0) {
+          Text(`+${this.pointsEarned} 积分`)
+            .fontSize(12)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.SECONDARY)
+            .backgroundColor(Color.White)
+            .borderRadius(10)
+            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+            .margin({ top: 8 })
+        }
+      }
+      .width(112)
+      .height(112)
+      .justifyContent(FlexAlign.Center)
+      .alignItems(HorizontalAlign.Center)
+      .backgroundColor(AppColors.MASTERY_MASTERED)
+      .borderRadius(56)
+      .margin({ top: 16 })
+
+      Text('录入成功！')
+        .fontSize(22)
+        .fontWeight(FontWeight.Bold)
         .fontColor(AppColors.TEXT_PRIMARY)
-        .margin({ top: 16 })
-      Text('系统将根据遗忘曲线自动安排复习')
+        .margin({ top: 18 })
+      Text('AI 已根据遗忘曲线安排复习计划\n明天记得来复习这道错题哦')
         .fontSize(14)
         .fontColor(AppColors.TEXT_SECONDARY)
+        .textAlign(TextAlign.Center)
+        .lineHeight(22)
         .margin({ top: 8 })
-      Button('继续录入')
+
+      Button('📷  继续录入')
+        .width('80%')
+        .height(48)
+        .fontSize(16)
         .backgroundColor(AppColors.SOLID_PRIMARY)
         .fontColor(Color.White)
-        .borderRadius(22)
-        .height(44)
-        .width('60%')
-        .margin({ top: 32 })
+        .borderRadius(24)
+        .margin({ top: 40 })
         .onClick(() => {
           this.onContinue();
         })
-      Button('返回首页')
+      Button('完成')
+        .width('80%')
+        .height(44)
+        .fontSize(15)
         .backgroundColor(AppColors.BG_CARD)
         .fontColor(AppColors.PRIMARY)
         .borderRadius(22)
-        .height(44)
-        .width('60%')
+        .border({ width: 1, color: AppColors.PRIMARY })
         .margin({ top: 12 })
         .onClick(() => {
           this.onExit();

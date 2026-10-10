@@ -1,12 +1,11 @@
 import http from '@ohos.net.http';
 import util from '@ohos.util';
 import { Subject, AnswerType, ErrorType } from '../models/Enums';
-import { CropFracs } from '../models/Mistake';
 import { MediaService } from './MediaService';
 import { AiConfig } from '../common/AiConfig';
 
 const CONFIG_GUIDE: string =
-  'AI 功能未配置：请将 entry/src/main/resources/rawfile/ai_config.example.json 复制为同目录 ai_config.json 并填入密钥（该文件不入库）';
+  'AI 未配置：请到「我的 → AI 设置」填写并保存 API Key';
 const BODY_SUMMARY_MAX: number = 160;
 
 interface AiImageUrl {
@@ -36,6 +35,14 @@ interface AiResponse {
   choices: AiResponseChoice[];
 }
 
+interface AiModelRaw {
+  id: string;
+}
+
+interface AiModelsResponse {
+  data: AiModelRaw[];
+}
+
 interface AiAnalysisRaw {
   analysis: string;
   answerType: string;
@@ -45,6 +52,8 @@ interface AiAnalysisRaw {
 
 interface AiQuestionRaw {
   question: string;
+  myAnswer: string;
+  standardAnswer: string;
   knowledgeSummary: string;
   subject: string;
   answerType: string;
@@ -62,6 +71,8 @@ export class AiAnalysis {
 
 export class AiQuestionResult {
   question: string = '';
+  myAnswer: string = '';
+  standardAnswer: string = '';
   knowledgeSummary: string = '';
   subject: Subject = Subject.MATH;
   answerType: AnswerType = AnswerType.TEXT;
@@ -79,8 +90,8 @@ export class AiService {
     }
   }
 
-  static async recognizeImage(imagePath: string, fracs: CropFracs | undefined): Promise<string> {
-    const base64: string | undefined = await MediaService.readRegionBase64(imagePath, fracs, 1280);
+  static async recognizeImage(imagePath: string): Promise<string> {
+    const base64: string | undefined = await MediaService.readImageBase64(imagePath, 1280);
     if (base64 === undefined || base64.length === 0) {
       throw new Error('图片读取失败，请重新选择图片');
     }
@@ -96,26 +107,83 @@ export class AiService {
     return AiService.request([msg]);
   }
 
-  static async summarizeKnowledge(question: string): Promise<string> {
-    const prompt: string =
-      '请把下面的题目内容总结为一个知识点名称，要求：不超过10个汉字；只输出知识点名称本身；不要标点、不要解释。\n题目：' + question;
-    const part: AiContentPart = { type: 'text', text: prompt };
-    const raw: string = await AiService.request([{ role: 'user', content: [part] }]);
-    return AiService.cleanText(raw);
+  /** 连接测试（AI 设置页）：最小请求验证密钥 / 接口 / 模型可用性。 */
+  static async testConnection(): Promise<void> {
+    const part: AiContentPart = { type: 'text', text: '你好' };
+    await AiService.request([{ role: 'user', content: [part] }]);
   }
 
-  static async recognizeQuestion(imagePath: string, fracs: CropFracs | undefined, ocrHint: string): Promise<AiQuestionResult> {
-    const base64: string | undefined = await MediaService.readRegionBase64(imagePath, fracs, 1280);
-    const textPrompt: string =
-      '这是一道错题的图片，附带了OCR初步识别文字作为参考。请结合图片准确识别，并以纯JSON返回（不要markdown代码块、不要解释）。\n' +
-      'OCR参考文字：' + (ocrHint.length > 0 ? ocrHint : '（无）') + '\n' +
-      '返回格式：{"question":"准确的题目内容","knowledgeSummary":"不超过10个汉字的知识点名称","subject":"math或chinese或english或science","answerType":"choice或numeric或text或subjective","errorType":"concept或careless或misread或other","knowledgeTags":["标签1","标签2"]}\n' +
-      'subject 只能是 math/chinese/english/science；answerType 只能是 choice/numeric/text/subjective；errorType 只能是 concept/careless/misread/other。只输出JSON。';
-    const parts: AiContentPart[] = [];
-    if (base64 !== undefined && base64.length > 0) {
-      parts.push({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + base64 } });
+  /**
+   * 拉取模型列表（AI 设置页）：OpenAI 兼容 GET {base}/models。
+   * 接口地址支持完整 chat/completions 地址或 API base 地址，自动推导。
+   */
+  static async fetchModels(baseUrl: string, apiKey: string): Promise<string[]> {
+    const key: string = apiKey.trim();
+    if (key.length === 0) {
+      throw new Error('请先填写 API Key');
     }
-    parts.push({ type: 'text', text: textPrompt });
+    let base: string = baseUrl.trim();
+    while (base.length > 0 && base.charAt(base.length - 1) === '/') {
+      base = base.substring(0, base.length - 1);
+    }
+    if (base.length === 0) {
+      throw new Error('请先填写接口地址');
+    }
+    if (base.endsWith('/chat/completions')) {
+      base = base.substring(0, base.length - '/chat/completions'.length);
+    }
+    const modelsUrl: string = base + '/models';
+    const httpRequest: http.HttpRequest = http.createHttp();
+    try {
+      const response = await httpRequest.request(modelsUrl, {
+        method: http.RequestMethod.GET,
+        header: { 'Authorization': 'Bearer ' + key },
+        connectTimeout: 10000,
+        readTimeout: 15000
+      });
+      const bodyStr: string = AiService.responseBodyText(response.result);
+      if (response.responseCode !== 200) {
+        throw new Error(`获取模型列表失败: HTTP ${response.responseCode} ${AiService.summary(bodyStr)}`);
+      }
+      let resp: AiModelsResponse;
+      try {
+        resp = JSON.parse(bodyStr) as AiModelsResponse;
+      } catch (e) {
+        throw new Error('模型列表返回非JSON: ' + AiService.summary(bodyStr));
+      }
+      if (resp.data === undefined || resp.data.length === 0) {
+        throw new Error('服务器返回的模型列表为空');
+      }
+      const ids: string[] = [];
+      for (const item of resp.data) {
+        if (item.id !== undefined && item.id.length > 0 && ids.indexOf(item.id) < 0) {
+          ids.push(item.id);
+        }
+      }
+      ids.sort();
+      return ids;
+    } finally {
+      httpRequest.destroy();
+    }
+  }
+
+  /**
+   * AI 全图识别（无本地 OCR 环节）：直接把整张错题照片交给多模态模型，
+   * 一次性提取题目、我的答案、标准答案、学科、题型、错误类型与知识点。
+   */
+  static async recognizeQuestion(imagePath: string): Promise<AiQuestionResult> {
+    const base64: string | undefined = await MediaService.readImageBase64(imagePath, 1280);
+    if (base64 === undefined || base64.length === 0) {
+      throw new Error('图片读取失败，请重新选择图片');
+    }
+    const textPrompt: string =
+      '这是一道小学生错题的照片（可能包含题目、学生作答和批改痕迹）。请仔细看图，并以纯JSON返回（不要markdown代码块、不要解释）。\n' +
+      '返回格式：{"question":"图中的完整题目内容，保留原有题号与选项","myAnswer":"图中学生的作答内容，看不清或没有则为空字符串","standardAnswer":"图中可见的正确答案或批改结果，看不出则为空字符串","knowledgeSummary":"不超过10个汉字的知识点名称","subject":"math或chinese或english或science","answerType":"choice或numeric或text或subjective","errorType":"concept或careless或misread或other","knowledgeTags":["标签1","标签2"]}\n' +
+      '要求：subject 只能是 math/chinese/english/science；answerType 只能是 choice/numeric/text/subjective；errorType 只能是 concept/careless/misread/other；knowledgeTags 2-4个简短标签。只输出JSON。';
+    const parts: AiContentPart[] = [
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + base64 } },
+      { type: 'text', text: textPrompt }
+    ];
     const raw: string = await AiService.request([{ role: 'user', content: parts }]);
     return AiService.parseQuestion(raw);
   }
@@ -126,6 +194,8 @@ export class AiService {
       const jsonStr: string = AiService.extractJson(raw);
       const obj: AiQuestionRaw = JSON.parse(jsonStr) as AiQuestionRaw;
       result.question = obj.question !== undefined ? obj.question : '';
+      result.myAnswer = obj.myAnswer !== undefined ? obj.myAnswer : '';
+      result.standardAnswer = obj.standardAnswer !== undefined ? obj.standardAnswer : '';
       result.knowledgeSummary = AiService.cleanText(obj.knowledgeSummary !== undefined ? obj.knowledgeSummary : '');
       result.subject = AiService.mapSubject(obj.subject);
       result.answerType = AiService.mapAnswerType(obj.answerType);

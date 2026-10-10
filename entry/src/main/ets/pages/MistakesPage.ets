@@ -1,12 +1,12 @@
 import { Mistake } from '../models/Mistake';
 import { MistakeStatus, Subject, ErrorType } from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
-import { AppColors, AppSizes, subjectLabel, statusLabel, formatDate, toFileUri, truncateText } from '../common/Constants';
+import { AppColors, AppSizes, truncateText } from '../common/Constants';
 import { TabController } from '../common/TabController';
 import { Toast } from '../common/Toast';
 import { MediaService } from '../services/MediaService';
-import { StatusTag, SubjectTag } from '../components/CommonComponents';
 import { EmptyBlock, FilterChip } from '../components/BasicWidgets';
+import { MistakeCard } from '../components/MistakeCard';
 
 const PAGE_SIZE: number = 20;
 
@@ -127,10 +127,30 @@ export struct MistakesPage {
 
   build() {
     Column() {
+      Row() {
+        Text('错题本')
+          .fontSize(24)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.TEXT_PRIMARY)
+        Text(`${this.dataSource.totalCount()}`)
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.PRIMARY)
+          .backgroundColor(AppColors.BG_CHIP)
+          .borderRadius(10)
+          .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+          .margin({ left: 8 })
+        Column() {
+        }
+        .layoutWeight(1)
+      }
+      .width('100%')
+      .padding({ left: 20, right: 20, top: 14, bottom: 4 })
+
       Scroll() {
         Row({ space: 8 }) {
           FilterChip({
-            text: '全部',
+            text: '🌈 全部',
             selected: this.filterSubject.length === 0 && this.filterStatus.length === 0,
             onTap: (): void => {
               this.filterSubject = '';
@@ -139,7 +159,7 @@ export struct MistakesPage {
             }
           })
           FilterChip({
-            text: '数学',
+            text: '🔢 数学',
             selected: this.filterSubject === Subject.MATH,
             onTap: (): void => {
               this.filterSubject = Subject.MATH;
@@ -148,7 +168,7 @@ export struct MistakesPage {
             }
           })
           FilterChip({
-            text: '语文',
+            text: '📖 语文',
             selected: this.filterSubject === Subject.CHINESE,
             onTap: (): void => {
               this.filterSubject = Subject.CHINESE;
@@ -157,7 +177,7 @@ export struct MistakesPage {
             }
           })
           FilterChip({
-            text: '未掌握',
+            text: '🔴 未掌握',
             selected: this.filterStatus === MistakeStatus.UNMASTERED,
             onTap: (): void => {
               this.filterStatus = MistakeStatus.UNMASTERED;
@@ -166,7 +186,7 @@ export struct MistakesPage {
             }
           })
           FilterChip({
-            text: '复习中',
+            text: '🔵 复习中',
             selected: this.filterStatus === MistakeStatus.REVIEWING,
             onTap: (): void => {
               this.filterStatus = MistakeStatus.REVIEWING;
@@ -175,7 +195,7 @@ export struct MistakesPage {
             }
           })
           FilterChip({
-            text: '已掌握',
+            text: '🟢 已掌握',
             selected: this.filterStatus === MistakeStatus.MASTERED,
             onTap: (): void => {
               this.filterStatus = MistakeStatus.MASTERED;
@@ -191,21 +211,30 @@ export struct MistakesPage {
       .width('100%')
       .padding({ left: 16, right: 16, top: 6, bottom: 4 })
 
-      Row() {
-        TextInput({ text: this.searchKeyword, placeholder: '🔍 搜索错题内容' })
+      Row({ space: 10 }) {
+        TextInput({ text: this.searchKeyword, placeholder: '搜索题目 / 知识点' })
           .fontSize(15)
           .layoutWeight(1)
           .backgroundColor(AppColors.BG_CARD)
-          .borderRadius(AppSizes.CORNER_RADIUS_SM)
+          .borderRadius(22)
+          .padding({ left: 16, right: 16 })
+          .height(44)
           .onChange((value: string) => {
             this.searchKeyword = value;
           })
-        Button('搜索')
-          .height(40)
+          .onSubmit(() => {
+            this.applyFilters();
+          })
+        Stack() {
+          Text('🔍')
+            .fontSize(17)
+        }
+          .width(44)
+          .height(44)
           .backgroundColor(AppColors.SOLID_PRIMARY)
-          .fontColor(Color.White)
-          .borderRadius(AppSizes.CORNER_RADIUS_SM)
-          .margin({ left: 8 })
+          .borderRadius(22)
+          .shadow({ radius: 8, color: AppColors.SHADOW_PRIMARY, offsetY: 2 })
+          .accessibilityText('搜索')
           .onClick(() => {
             this.applyFilters();
           })
@@ -216,7 +245,7 @@ export struct MistakesPage {
       Scroll() {
         Row({ space: 8 }) {
           FilterChip({
-            text: '概念不清',
+            text: '🧩 概念不清',
             selected: this.filterErrorType === ErrorType.CONCEPT,
             onTap: (): void => {
               this.filterErrorType = this.filterErrorType === ErrorType.CONCEPT ? '' : ErrorType.CONCEPT;
@@ -224,7 +253,7 @@ export struct MistakesPage {
             }
           })
           FilterChip({
-            text: '粗心',
+            text: '💨 粗心',
             selected: this.filterErrorType === ErrorType.CARELESS,
             onTap: (): void => {
               this.filterErrorType = this.filterErrorType === ErrorType.CARELESS ? '' : ErrorType.CARELESS;
@@ -232,7 +261,7 @@ export struct MistakesPage {
             }
           })
           FilterChip({
-            text: '审题错误',
+            text: '👀 审题错误',
             selected: this.filterErrorType === ErrorType.MISREAD,
             onTap: (): void => {
               this.filterErrorType = this.filterErrorType === ErrorType.MISREAD ? '' : ErrorType.MISREAD;
@@ -290,63 +319,11 @@ export struct MistakesPage {
         List({ space: 8 }) {
           LazyForEach(this.dataSource, (item: Mistake) => {
             ListItem() {
-              Row() {
-                Column() {
-                  Text(this.displayTitle(item))
-                    .fontSize(15)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(AppColors.TEXT_PRIMARY)
-                    .maxLines(2)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-
-                  if (item.ocrText.length > 0) {
-                    Text(truncateText(item.ocrText, 40))
-                      .fontSize(12)
-                      .fontColor(AppColors.TEXT_SECONDARY)
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                      .margin({ top: 4 })
-                  }
-
-                  Row({ space: 4 }) {
-                    SubjectTag({ subjectText: subjectLabel(item.subject), subjectKey: item.subject })
-                    StatusTag({ statusText: statusLabel(item.status), statusKey: item.status })
-                    Text(formatDate(item.createdAt))
-                      .fontSize(11)
-                      .fontColor(AppColors.TEXT_SECONDARY)
-                  }
-                  .margin({ top: 6 })
+              MistakeCard({
+                mistake: item,
+                onItemClick: (m: Mistake): void => {
+                  this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeDetailPage', params: { mistakeId: m.id } });
                 }
-                .alignItems(HorizontalAlign.Start)
-                .layoutWeight(1)
-
-                if (item.imageUrl.length > 0) {
-                  Image(toFileUri(item.imageUrl))
-                    .width(64).height(64).borderRadius(AppSizes.CORNER_RADIUS_XS)
-                    .objectFit(ImageFit.Cover)
-                    .sourceSize({ width: 200, height: 200 })
-                    .margin({ left: 10 })
-                } else {
-                  Column() {
-                    Text('📷')
-                      .fontSize(28)
-                  }
-                  .width(64)
-                  .height(64)
-                  .borderRadius(AppSizes.CORNER_RADIUS_XS)
-                  .backgroundColor(AppColors.BG_CHIP)
-                  .justifyContent(FlexAlign.Center)
-                  .alignItems(HorizontalAlign.Center)
-                  .margin({ left: 10 })
-                }
-              }
-              .width('100%')
-              .padding(14)
-              .backgroundColor(AppColors.BG_CARD)
-              .borderRadius(AppSizes.CORNER_RADIUS_SM)
-              .shadow({ radius: 6, color: AppColors.SHADOW_SOFT, offsetY: 2 })
-              .onClick(() => {
-                this.getUIContext().getRouter().pushUrl({ url: 'pages/MistakeDetailPage', params: { mistakeId: item.id } });
               })
             }
             .swipeAction({

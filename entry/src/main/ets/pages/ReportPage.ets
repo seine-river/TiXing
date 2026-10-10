@@ -1,7 +1,7 @@
 import { KnowledgeProfile } from '../models/KnowledgeTag';
 import { MistakeStats, SubjectCount } from '../models/AnalyticsEvent';
 import { dbHelper } from '../repository/DatabaseHelper';
-import { AppColors, AppSizes, AppStrings, subjectLabel } from '../common/Constants';
+import { AppColors, AppSizes, AppStrings, subjectLabel, subjectColor } from '../common/Constants';
 import { TabController } from '../common/TabController';
 import { GradientHeader } from '../components/GradientHeader';
 
@@ -57,7 +57,34 @@ export struct ReportPage {
   build() {
     Scroll() {
       Column() {
-        GradientHeader({ title: AppStrings.PAGE_REPORT, subtitle: '错题掌握与薄弱知识点分析' }) {
+        GradientHeader({ title: AppStrings.PAGE_REPORT, subtitle: '看看你的进步与薄弱点' }) {
+          if (this.totalMistakes > 0) {
+            Column() {
+              Row() {
+                Text('总掌握率')
+                  .fontSize(13)
+                  .fontColor(AppColors.HERO_TEXT_DIM)
+                  .layoutWeight(1)
+                Text(`${Math.round(this.masteredCount / this.totalMistakes * 100)}%`)
+                  .fontSize(22)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(Color.White)
+              }
+              .width('100%')
+              Progress({ value: this.masteredCount, total: this.totalMistakes, type: ProgressType.Linear })
+                .width('100%')
+                .height(10)
+                .margin({ top: 8 })
+                .color(Color.White)
+                .backgroundColor('#33FFFFFF')
+                .borderRadius(5)
+            }
+            .width('100%')
+            .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+            .backgroundColor(AppColors.BADGE_BG)
+            .borderRadius(16)
+            .margin({ top: 16 })
+          }
         }
         this.OverviewSection()
         this.SubjectSection()
@@ -77,61 +104,60 @@ export struct ReportPage {
     Column() {
       Text('错题概览')
         .fontSize(16)
-        .fontWeight(FontWeight.Medium)
+        .fontWeight(FontWeight.Bold)
         .fontColor(AppColors.TEXT_PRIMARY)
         .width('100%')
         .margin({ bottom: 12 })
 
       Row() {
-        this.OverviewItem('总错题', `${this.totalMistakes}`, AppColors.PRIMARY)
-        this.OverviewItem('已掌握', `${this.masteredCount}`, AppColors.SECONDARY)
-        this.OverviewItem('复习中', `${this.reviewingCount}`, AppColors.MASTERY_REVIEWING)
-        this.OverviewItem('未掌握', `${this.unmasteredCount}`, AppColors.DANGER)
+        this.OverviewItem('📒', '总错题', `${this.totalMistakes}`, AppColors.SOLID_PRIMARY)
+        this.OverviewItem('✅', '已掌握', `${this.masteredCount}`, AppColors.SOLID_SECONDARY)
       }
       .width('100%')
-      .justifyContent(FlexAlign.SpaceBetween)
-
-      if (this.totalMistakes > 0) {
-        Row() {
-          Text('掌握率')
-            .fontSize(14)
-            .fontColor(AppColors.TEXT_REGULAR)
-          Progress({ value: this.masteredCount, total: this.totalMistakes, type: ProgressType.Linear })
-            .layoutWeight(1)
-            .margin({ left: 8 })
-            .color(AppColors.SECONDARY)
-          Text(`${Math.round(this.masteredCount / this.totalMistakes * 100)}%`)
-            .fontSize(14)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(AppColors.SECONDARY)
-            .margin({ left: 8 })
-        }
-        .width('100%')
-        .margin({ top: 12 })
+      .margin({ bottom: 10 })
+      Row() {
+        this.OverviewItem('🔁', '复习中', `${this.reviewingCount}`, AppColors.SOLID_INFO)
+        this.OverviewItem('⚠️', '未掌握', `${this.unmasteredCount}`, AppColors.SOLID_DANGER)
       }
+      .width('100%')
     }
     .width('100%')
     .padding(16)
     .backgroundColor(AppColors.BG_CARD)
-    .borderRadius(AppSizes.CORNER_RADIUS)
-    .margin({ left: 16, right: 16, top: 8 })
-    .shadow({ radius: 8, color: AppColors.SHADOW_SOFT, offsetY: 2 })
+    .borderRadius(AppSizes.CORNER_RADIUS_LG)
+    .margin({ left: 16, right: 16, top: 16 })
+    .shadow({ radius: 10, color: AppColors.SHADOW_SOFT, offsetY: 3 })
   }
 
   @Builder
-  OverviewItem(label: string, value: string, color: ResourceColor) {
-    Column() {
-      Text(value)
-        .fontSize(24)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(color)
-      Text(label)
-        .fontSize(12)
-        .fontColor(AppColors.TEXT_SECONDARY)
-        .margin({ top: 4 })
+  OverviewItem(icon: string, label: string, value: string, bubble: Resource) {
+    Row() {
+      Text(icon)
+        .fontSize(16)
+        .width(36)
+        .height(36)
+        .textAlign(TextAlign.Center)
+        .backgroundColor(bubble)
+        .borderRadius(12)
+      Column() {
+        Text(value)
+          .fontSize(22)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.TEXT_PRIMARY)
+        Text(label)
+          .fontSize(11)
+          .fontColor(AppColors.TEXT_SECONDARY)
+          .margin({ top: 1 })
+      }
+      .alignItems(HorizontalAlign.Start)
+      .margin({ left: 10 })
     }
-    .alignItems(HorizontalAlign.Center)
     .layoutWeight(1)
+    .padding({ left: 10, right: 10, top: 10, bottom: 10 })
+    .backgroundColor(AppColors.BG_PAGE)
+    .borderRadius(AppSizes.CORNER_RADIUS_SM)
+    .margin(4)
+    .accessibilityText(`${label} ${value}`)
   }
 
   @Builder
@@ -139,7 +165,7 @@ export struct ReportPage {
     Column() {
       Text('学科分布')
         .fontSize(16)
-        .fontWeight(FontWeight.Medium)
+        .fontWeight(FontWeight.Bold)
         .fontColor(AppColors.TEXT_PRIMARY)
         .width('100%')
         .margin({ bottom: 12 })
@@ -152,29 +178,43 @@ export struct ReportPage {
         ForEach(this.subjectDistribution, (item: SubjectDist) => {
           Row() {
             Text(subjectLabel(item.subject))
-              .fontSize(14)
+              .fontSize(13)
               .fontColor(AppColors.TEXT_PRIMARY)
-              .width(60)
-            Progress({ value: item.count, total: this.totalMistakes > 0 ? this.totalMistakes : 1, type: ProgressType.Linear })
-              .layoutWeight(1)
-              .color(AppColors.PRIMARY)
+              .width(48)
+            Stack({ alignContent: Alignment.Start }) {
+              Column() {
+              }
+              .width('100%')
+              .height(10)
+              .backgroundColor(AppColors.BG_PAGE)
+              .borderRadius(5)
+              Progress({ value: item.count, total: this.totalMistakes > 0 ? this.totalMistakes : 1, type: ProgressType.Linear })
+                .width('100%')
+                .height(10)
+                .color(subjectColor(item.subject))
+                .backgroundColor(Color.Transparent)
+                .borderRadius(5)
+            }
+            .layoutWeight(1)
             Text(`${item.count}题`)
-              .fontSize(14)
+              .fontSize(13)
+              .fontWeight(FontWeight.Medium)
               .fontColor(AppColors.TEXT_SECONDARY)
-              .margin({ left: 8 })
+              .margin({ left: 10 })
               .width(40)
+              .textAlign(TextAlign.End)
           }
           .width('100%')
-          .margin({ top: 6 })
+          .margin({ top: 8 })
         }, (item: SubjectDist) => item.subject)
       }
     }
     .width('100%')
     .padding(16)
     .backgroundColor(AppColors.BG_CARD)
-    .borderRadius(AppSizes.CORNER_RADIUS)
+    .borderRadius(AppSizes.CORNER_RADIUS_LG)
     .margin({ left: 16, right: 16, top: 12 })
-    .shadow({ radius: 8, color: AppColors.SHADOW_SOFT, offsetY: 2 })
+    .shadow({ radius: 10, color: AppColors.SHADOW_SOFT, offsetY: 3 })
   }
 
   @Builder
@@ -182,26 +222,39 @@ export struct ReportPage {
     Column() {
       Text('薄弱知识点 Top3')
         .fontSize(16)
-        .fontWeight(FontWeight.Medium)
+        .fontWeight(FontWeight.Bold)
         .fontColor(AppColors.TEXT_PRIMARY)
         .width('100%')
         .margin({ bottom: 12 })
 
       if (this.weakPoints.length === 0) {
-        Text('继续录入错题，系统将为您分析薄弱点')
-          .fontSize(14)
-          .fontColor(AppColors.TEXT_PLACEHOLDER)
+        Column() {
+          Text('🌱')
+            .fontSize(36)
+          Text('继续录入错题，系统将为你分析薄弱点')
+            .fontSize(13)
+            .fontColor(AppColors.TEXT_PLACEHOLDER)
+            .margin({ top: 8 })
+        }
+        .width('100%')
+        .padding({ top: 12, bottom: 12 })
+        .alignItems(HorizontalAlign.Center)
       } else {
         ForEach(this.weakPoints, (item: WeakPoint, idx: number) => {
           Row() {
             Text(`${idx + 1}`)
-              .fontSize(16)
+              .fontSize(14)
               .fontWeight(FontWeight.Bold)
-              .fontColor(AppColors.DANGER)
-              .width(24)
+              .fontColor(Color.White)
+              .width(26)
+              .height(26)
+              .textAlign(TextAlign.Center)
+              .backgroundColor(idx === 0 ? AppColors.SOLID_DANGER : AppColors.SOLID_WARNING)
+              .borderRadius(13)
             Column() {
               Text(item.tagId)
                 .fontSize(14)
+                .fontWeight(FontWeight.Medium)
                 .fontColor(AppColors.TEXT_PRIMARY)
               Text(`错题${item.totalMistakes}题 · 掌握度${Math.round(item.score * 100)}%`)
                 .fontSize(12)
@@ -210,24 +263,27 @@ export struct ReportPage {
             }
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Start)
-            .margin({ left: 8 })
+            .margin({ left: 10 })
           }
           .width('100%')
-          .padding({ top: 8, bottom: 8 })
+          .padding({ top: 10, bottom: 10, left: 8, right: 8 })
+          .backgroundColor(AppColors.BG_PAGE)
+          .borderRadius(AppSizes.CORNER_RADIUS_SM)
+          .margin({ top: 6 })
         }, (item: WeakPoint) => item.tagId)
       }
 
-      Text('深度分析报告需要家长订阅解锁')
-        .fontSize(13)
+      Text('💡 深度分析报告需要家长订阅解锁')
+        .fontSize(12)
         .fontColor(AppColors.TEXT_PLACEHOLDER)
-        .margin({ top: 12 })
+        .margin({ top: 14 })
     }
     .width('100%')
     .padding(16)
     .backgroundColor(AppColors.BG_CARD)
-    .borderRadius(AppSizes.CORNER_RADIUS)
+    .borderRadius(AppSizes.CORNER_RADIUS_LG)
     .margin({ left: 16, right: 16, top: 12, bottom: 24 })
-    .shadow({ radius: 8, color: AppColors.SHADOW_SOFT, offsetY: 2 })
+    .shadow({ radius: 10, color: AppColors.SHADOW_SOFT, offsetY: 3 })
   }
 }
 

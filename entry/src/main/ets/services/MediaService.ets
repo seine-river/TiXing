@@ -7,7 +7,6 @@ import cameraPicker from '@ohos.multimedia.cameraPicker';
 import { AppContextHolder } from '../common/AppContext';
 import { generateId } from '../common/Constants';
 import { PerformanceMonitor } from './PerformanceMonitor';
-import { CropFracs } from '../models/Mistake';
 
 /**
  * 媒体服务（T039/FR-020）：
@@ -245,39 +244,4 @@ export class MediaService {
     }
   }
 
-  static async readRegionBase64(path: string, fracs: CropFracs | undefined, maxDim: number): Promise<string | undefined> {
-    const pm = await MediaService.loadScaledPixelMap(path, maxDim);
-    if (pm === undefined) {
-      return undefined;
-    }
-    const packer: image.ImagePacker = image.createImagePacker();
-    try {
-      if (fracs !== undefined) {
-        const info = await pm.getImageInfo();
-        const w: number = info.size.width;
-        const h: number = info.size.height;
-        const cx: number = Math.round(fracs.leftFrac * w);
-        const cy: number = Math.round(fracs.topFrac * h);
-        const cw: number = Math.round((fracs.rightFrac - fracs.leftFrac) * w);
-        const ch: number = Math.round((fracs.bottomFrac - fracs.topFrac) * h);
-        if (cw > 0 && ch > 0) {
-          await pm.crop({ x: cx, y: cy, size: { width: cw, height: ch } });
-        }
-      }
-      const data: ArrayBuffer = await packer.packing(pm, { format: 'image/jpeg', quality: 80 });
-      const buf: buffer.Buffer = buffer.from(new Uint8Array(data));
-      return buf.toString('base64');
-    } catch (e) {
-      return undefined;
-    } finally {
-      try {
-        packer.release();
-      } catch (e) {
-      }
-      try {
-        await pm.release();
-      } catch (e) {
-      }
-    }
-  }
 }

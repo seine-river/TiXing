@@ -148,30 +148,45 @@ struct ReviewPage {
   ReviewQuestionView() {
     Scroll() {
       Column() {
-        Row() {
-          Text(`第 ${this.currentIndex + 1} / ${this.totalCount} 题`)
-            .fontSize(14)
-            .fontColor(AppColors.TEXT_SECONDARY)
-          Progress({ value: this.currentIndex + 1, total: this.totalCount, type: ProgressType.Linear })
-            .layoutWeight(1)
-            .margin({ left: 12 })
-            .color(AppColors.PRIMARY)
+        Row({ space: 10 }) {
+          Text(`${this.currentIndex + 1}/${this.totalCount}`)
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.PRIMARY)
+          Stack({ alignContent: Alignment.Start }) {
+            Column() {
+            }
+            .width('100%')
+            .height(8)
+            .backgroundColor(AppColors.BG_CHIP)
+            .borderRadius(4)
+            Progress({ value: this.currentIndex + 1, total: this.totalCount, type: ProgressType.Linear })
+              .width('100%')
+              .height(8)
+              .color(AppColors.PRIMARY)
+              .backgroundColor(Color.Transparent)
+              .borderRadius(4)
+          }
+          .layoutWeight(1)
         }
         .width('100%')
-        .padding({ left: 16, right: 16, top: 12 })
+        .padding({ left: 16, right: 16, top: 14, bottom: 6 })
 
         Column() {
           Text(this.reviewList[this.currentIndex].ocrText)
-            .fontSize(18)
+            .fontSize(17)
+            .fontWeight(FontWeight.Medium)
             .fontColor(AppColors.TEXT_PRIMARY)
             .lineHeight(28)
             .width('100%')
+            .textAlign(TextAlign.Start)
         }
         .width('100%')
         .padding(16)
         .backgroundColor(AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
-        .margin({ left: 16, right: 16, top: 12 })
+        .borderRadius(AppSizes.CORNER_RADIUS_LG)
+        .shadow({ radius: 10, color: AppColors.SHADOW_SOFT, offsetY: 3 })
+        .margin({ left: 16, right: 16, top: 10 })
 
         if (!this.showResult) {
           this.AnswerInput(this.reviewList[this.currentIndex])
@@ -219,9 +234,12 @@ struct ReviewPage {
         Button(this.submitBusy ? '提交中...' : AppStrings.REVIEW_SUBMIT)
           .width('90%')
           .height(44)
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
           .backgroundColor(AppColors.SOLID_PRIMARY)
           .fontColor(Color.White)
           .borderRadius(22)
+          .shadow({ radius: 10, color: AppColors.SHADOW_PRIMARY, offsetY: 4 })
           .margin({ top: 24, bottom: 24 })
           .enabled(!this.submitBusy)
           .onClick(() => {
@@ -304,7 +322,8 @@ struct ReviewPage {
         .width('100%')
         .padding(12)
         .backgroundColor(this.selectedAnswer === idx ? AppColors.ROW_SELECTED : AppColors.BG_CARD)
-        .borderRadius(AppSizes.CORNER_RADIUS_SM)
+        .borderRadius(22)
+        .border({ width: this.selectedAnswer === idx ? 1.5 : 0, color: AppColors.PRIMARY })
         .margin({ top: 6 })
       }, (option: string) => option)
     }
@@ -348,13 +367,13 @@ struct ReviewPage {
   AnswerResult(mistake: Mistake) {
     Column() {
       if (this.isCorrect) {
-        Text('✓ ' + AppStrings.CORRECT_ANSWER)
-          .fontSize(20)
+        Text('🎉 ' + AppStrings.CORRECT_ANSWER)
+          .fontSize(21)
           .fontWeight(FontWeight.Bold)
           .fontColor(AppColors.SECONDARY)
       } else {
-        Text('✗ ' + AppStrings.WRONG_ANSWER)
-          .fontSize(20)
+        Text('💪 ' + AppStrings.WRONG_ANSWER)
+          .fontSize(21)
           .fontWeight(FontWeight.Bold)
           .fontColor(AppColors.DANGER)
         Text('正确答案: ' + mistake.standardAnswer)
@@ -381,79 +400,135 @@ struct ReviewPage {
 
   @Builder
   SummaryView() {
-    Column() {
-      Text(AppStrings.REVIEW_SUMMARY)
-        .fontSize(24)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(AppColors.TEXT_PRIMARY)
-        .margin({ top: 40 })
+    Scroll() {
+      Column() {
+        // 彩带庆祝
+        Text('🎉 ✨ 🎈 ✨ 🎉')
+          .fontSize(20)
+          .margin({ top: 48 })
 
-      Text(this.totalCount > 0 ? `${Math.round(this.correctCount / this.totalCount * 100)}%` : '0%')
-        .fontSize(48)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(AppColors.PRIMARY)
-        .margin({ top: 24 })
-
-      Text(AppStrings.ACCURACY)
-        .fontSize(14)
-        .fontColor(AppColors.TEXT_SECONDARY)
-
-      Row() {
+        // 渐变奖杯徽章
         Column() {
-          Text(`${this.correctCount}`)
-            .fontSize(28)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppColors.SECONDARY)
-          Text('正确')
-            .fontSize(13)
-            .fontColor(AppColors.TEXT_SECONDARY)
+          Text('🏆')
+            .fontSize(44)
         }
-        .layoutWeight(1)
+        .width(112)
+        .height(112)
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .linearGradient({
+          angle: 135,
+          colors: [[AppColors.GRADIENT_START, 0], [AppColors.GRADIENT_END, 1]]
+        })
+        .borderRadius(40)
+        .shadow({ radius: 18, color: AppColors.SHADOW_PRIMARY, offsetY: 8 })
+        .margin({ top: 18 })
 
-        Column() {
-          Text(`${this.totalCount - this.correctCount}`)
-            .fontSize(28)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppColors.DANGER)
-          Text('错误')
-            .fontSize(13)
-            .fontColor(AppColors.TEXT_SECONDARY)
-        }
-        .layoutWeight(1)
+        Text(AppStrings.REVIEW_SUMMARY)
+          .fontSize(22)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.TEXT_PRIMARY)
+          .margin({ top: 18 })
 
-        Column() {
-          Text(`+${this.totalPoints}`)
-            .fontSize(28)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(AppColors.WARNING)
-          Text(AppStrings.POINTS_EARNED)
-            .fontSize(13)
-            .fontColor(AppColors.TEXT_SECONDARY)
+        // 星星评价（正确率 80%/50% 对应 3/2 星）
+        Row({ space: 6 }) {
+          Text(this.starAt(0) ? '⭐' : '☆')
+            .fontSize(26)
+          Text(this.starAt(1) ? '⭐' : '☆')
+            .fontSize(26)
+          Text(this.starAt(2) ? '⭐' : '☆')
+            .fontSize(26)
         }
-        .layoutWeight(1)
+        .margin({ top: 10 })
+
+        Text(this.totalCount > 0 ? `${Math.round(this.correctCount / this.totalCount * 100)}%` : '0%')
+          .fontSize(54)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(AppColors.PRIMARY)
+          .margin({ top: 14 })
+          .accessibilityText(`正确率 ${this.totalCount > 0 ? Math.round(this.correctCount / this.totalCount * 100) : 0}%`)
+
+        Text(AppStrings.ACCURACY)
+          .fontSize(13)
+          .fontColor(AppColors.TEXT_SECONDARY)
+
+        // 撞色渐变统计瓦片
+        Row() {
+          this.SummaryTile(`${this.correctCount}`, '答对了', AppColors.MINT_START, AppColors.MINT_END)
+          this.SummaryTile(`${this.totalCount - this.correctCount}`, '再练练', AppColors.SUNSET_START, AppColors.SUNSET_END)
+          this.SummaryTile(`+${this.totalPoints}`, '赢积分', AppColors.PRIMARY_LIGHT, AppColors.GRADIENT_END)
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 28 })
+
+        Text(this.summaryMessage())
+          .fontSize(15)
+          .fontColor(AppColors.TEXT_REGULAR)
+          .margin({ top: 24 })
+
+        Button('返回首页')
+          .width('70%')
+          .height(48)
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .linearGradient({
+            angle: 135,
+            colors: [[AppColors.PRIMARY_LIGHT, 0], [AppColors.SOLID_PRIMARY, 0.55], [AppColors.GRADIENT_END, 1]]
+          })
+          .fontColor(Color.White)
+          .borderRadius(24)
+          .shadow({ radius: 12, color: AppColors.SHADOW_PRIMARY, offsetY: 4 })
+          .margin({ top: 32, bottom: 48 })
+          .onClick(() => {
+            this.getUIContext().getRouter().back();
+          })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 32 })
-
-      Text('继续加油，每天进步一点点！')
-        .fontSize(16)
-        .fontColor(AppColors.TEXT_REGULAR)
-        .margin({ top: 32 })
-
-      Button('返回首页')
-        .width('60%')
-        .height(44)
-        .backgroundColor(AppColors.SOLID_PRIMARY)
-        .fontColor(Color.White)
-        .borderRadius(22)
-        .margin({ top: 32 })
-        .onClick(() => {
-          this.getUIContext().getRouter().back();
-        })
     }
     .width('100%')
     .height('100%')
-    .alignItems(HorizontalAlign.Center)
+    .align(Alignment.Center)
+    .scrollBar(BarState.Off)
+    .edgeEffect(EdgeEffect.Spring)
+  }
+
+  /** 星星评价：第 idx 颗星是否点亮（正确率 80%→3星、50%→2星、其余1星）。 */
+  private starAt(idx: number): boolean {
+    const rate: number = this.totalCount > 0 ? this.correctCount / this.totalCount : 0;
+    const stars: number = rate >= 0.8 ? 3 : (rate >= 0.5 ? 2 : 1);
+    return idx < stars;
+  }
+
+  private summaryMessage(): string {
+    const rate: number = this.totalCount > 0 ? this.correctCount / this.totalCount : 0;
+    if (rate >= 0.8) {
+      return '太棒了！错题正在被你一个个消灭 🦉';
+    }
+    if (rate >= 0.5) {
+      return '有进步！把错的题再看看，明天会更好 💪';
+    }
+    return '别灰心，每道错题都是进步的台阶 🌱';
+  }
+
+  @Builder
+  SummaryTile(value: string, label: string, gradStart: Resource, gradEnd: Resource) {
+    Column() {
+      Text(value)
+        .fontSize(22)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+      Text(label)
+        .fontSize(11)
+        .fontColor('#E6FFFFFF')
+        .margin({ top: 2 })
+    }
+    .layoutWeight(1)
+    .justifyContent(FlexAlign.Center)
+    .padding({ top: 16, bottom: 16 })
+    .linearGradient({ angle: 140, colors: [[gradStart, 0], [gradEnd, 1]] })
+    .borderRadius(AppSizes.CORNER_RADIUS_LG)
+    .margin({ left: 4, right: 4 })
+    .accessibilityText(`${label} ${value}`)
   }
 
   private onSubmitTap(mistake: Mistake): void {
