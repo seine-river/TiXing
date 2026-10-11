@@ -1,4 +1,5 @@
 import { Mistake } from '../models/Mistake';
+import { KnowledgeTag } from '../models/KnowledgeTag';
 import { Subject, AnswerType, ErrorType, PointsActionType } from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { CaptureOrchestrator } from '../usecases/CaptureOrchestrator';
@@ -7,12 +8,12 @@ import { AnalyticsTracker } from '../usecases/AnalyticsTracker';
 import { PointsCalculator } from '../usecases/PointsCalculator';
 import { StreakCalculator } from '../usecases/StreakCalculator';
 import { MediaService } from '../services/MediaService';
-import { AiService } from '../services/AiService';
+import { AiService, AiQuestionResult } from '../services/AiService';
 import { PerformanceMonitor } from '../services/PerformanceMonitor';
 import { AppColors, AppStrings, generateId } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
-import { CaptureSourceStep, AiAnalyzingStep, AiReviewStep, CaptureResultStep, CaptureFormPayload } from '../components/CaptureSteps';
+import { CaptureSourceStep, AiAnalyzingStep, QuestionSelectStep, AiReviewStep, CaptureResultStep, CaptureFormPayload } from '../components/CaptureSteps';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 const LOG_DOMAIN: number = 0xA005;
@@ -32,6 +33,11 @@ struct CapturePage {
   @State aiError: string = '';
   @State aiRecognized: boolean = false;
   @State aiTagNames: string = '';
+  @State questionItems: AiQuestionResult[] = [];
+  @State selectedQuestionIndexes: number[] = [];
+  @State batchSaving: boolean = false;
+  @State savedQuestionCount: number = 1;
+  @State failedQuestionCount: number = 0;
   @State pointsEarned: number = PointsCalculator.getPointsForAction(PointsActionType.CAPTURE);
 
   // 核对步骤表单字段（@Link 双向同步）
@@ -54,9 +60,18 @@ struct CapturePage {
     this.alive = false;
   }
 
+  onBackPress(): boolean {
+    return this.handleBack();
+  }
+
   build() {
     Column() {
-      PageHeader({ title: AppStrings.PAGE_CAPTURE })
+      PageHeader({
+        title: AppStrings.PAGE_CAPTURE,
+        onBack: (): void => {
+          this.handleHeaderBack();
+        }
+      })
 
       if (this.currentStep === 0) {
         CaptureSourceStep({
@@ -72,6 +87,34 @@ struct CapturePage {
           aiError: this.aiError,
           onRetry: (): void => {
             this.startAi();
+          },
+          onManual: (): void => {
+            this.enterManualReview();
+          },
+          onBack: (): void => {
+            this.backToSource();
+          }
+        })
+      } else if (this.currentStep === 4) {
+        QuestionSelectStep({
+          imagePath: this.imagePath,
+          questionItems: this.questionItems,
+          selectedIndexes: this.selectedQuestionIndexes,
+          batchSaving: this.batchSaving,
+          onToggleSelect: (index: number): void => {
+            this.toggleQuestionSelection(index);
+          },
+          onSelect: (item: AiQuestionResult): void => {
+            this.applyQuestionResult(item);
+          },
+          onSaveSelected: (items: AiQuestionResult[]): void => {
+            this.saveQuestionResults(items);
+          },
+          onSelectAll: (): void => {
+            this.selectAllQuestions();
+          },
+          onClearSelect: (): void => {
+            this.clearQuestionSelection();
           },
           onManual: (): void => {
             this.enterManualReview();
@@ -103,6 +146,8 @@ struct CapturePage {
       } else {
         CaptureResultStep({
           pointsEarned: this.pointsEarned,
+          savedCount: this.savedQuestionCount,
+          failedCount: this.failedQuestionCount,
           onContinue: (): void => {
             this.resetFlow();
           },
@@ -114,7 +159,35 @@ struct CapturePage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(AppColors.BG_PAGE)
+      .backgroundColor(AppColors.BG_PAGE)
+  }
+
+  /**
+   * 标题栏返回：优先处理页面内部步骤；未接管的场景沿用路由返回。
+   */
+  private handleHeaderBack(): void {
+    if (!this.handleBack()) {
+      this.getUIContext().getRouter().back();
+    }
+  }
+
+  /**
+   * 系统返回：返回 true 表示已由当前页面接管。
+   * 多题核对页返回时必须回到题目列表，而不是直接退出录入流程。
+   */
+  private handleBack(): boolean {
+    if (this.batchSaving) {
+      return true;
+    }
+    if (this.currentStep === 2 && this.questionItems.length > 1) {
+      this.currentStep = 4;
+      return true;
+    }
+    if (this.currentStep === 1 || this.currentStep === 2) {
+      this.backToSource();
+      return true;
+    }
+    return false;
   }
 
   /** 选图 + 本地轻量质检（解码失败不放行；模糊等仅软提示）。 */
@@ -158,31 +231,30 @@ struct CapturePage {
     this.currentStep = 1;
     const traceStart: number = PerformanceMonitor.startTrace('ai_recognize');
     try {
-      const ai = await AiService.recognizeQuestion(this.imagePath);
+      const batch = await AiService.recognizeQuestions(this.imagePath);
       if (!this.alive) {
         return;
       }
       PerformanceMonitor.endTrace('ai_recognize', traceStart);
-      if (ai.ok) {
-        this.questionText = ai.question;
-        this.aiRecognized = true;
-      }
-      this.studentAnswer = ai.myAnswer;
-      this.standardAnswer = ai.standardAnswer;
-      this.knowledgeSummary = ai.knowledgeSummary;
-      this.selectedSubject = ai.subject;
-      this.answerType = ai.answerType;
-      this.selectedErrorType = ai.errorType;
-      this.aiTagNames = ai.tags.join('\n');
+      this.questionItems = batch.items;
+      this.clearQuestionSelection();
       PerformanceMonitor.writeStatistic('ai_recognize_result', {
-        'ok': ai.ok,
-        'question_length': ai.question.length,
-        'tags': ai.tags.length
+        'ok': batch.ok,
+        'question_count': batch.items.length
       });
-      this.currentStep = 2;
-      if (!ai.ok) {
-        Toast.show('AI 未能识别出题目，请手动核对填写');
+      if (batch.items.length > 1) {
+        this.currentStep = 4;
+        Toast.show(`识别到 ${batch.items.length} 道题，请选择`);
+        return;
       }
+      if (batch.items.length === 1 && batch.items[0].ok) {
+        this.applyQuestionResult(batch.items[0]);
+        return;
+      }
+      this.aiRecognized = false;
+      this.currentStep = 2;
+      this.aiError = batch.error.length > 0 ? batch.error : 'AI 未能识别出题目';
+      Toast.show('AI 未能识别出题目，请手动核对填写');
     } catch (e) {
       PerformanceMonitor.endTrace('ai_recognize', traceStart);
       if (!this.alive) {
@@ -203,6 +275,47 @@ struct CapturePage {
     }
   }
 
+  private applyQuestionResult(ai: AiQuestionResult): void {
+    if (ai.ok) {
+      this.questionText = ai.question;
+      this.aiRecognized = true;
+    }
+    this.studentAnswer = ai.myAnswer;
+    this.standardAnswer = ai.standardAnswer;
+    this.knowledgeSummary = ai.knowledgeSummary;
+    this.selectedSubject = ai.subject;
+    this.answerType = ai.answerType;
+    this.selectedErrorType = ai.errorType;
+    this.aiTagNames = ai.tags.join('\n');
+    this.currentStep = 2;
+  }
+
+  private toggleQuestionSelection(index: number): void {
+    if (index < 0 || index >= this.questionItems.length) {
+      return;
+    }
+    const selected: number[] = this.selectedQuestionIndexes.slice();
+    const pos: number = selected.indexOf(index);
+    if (pos >= 0) {
+      selected.splice(pos, 1);
+    } else {
+      selected.push(index);
+    }
+    this.selectedQuestionIndexes = selected;
+  }
+
+  private selectAllQuestions(): void {
+    const selected: number[] = [];
+    for (let i: number = 0; i < this.questionItems.length; i++) {
+      selected.push(i);
+    }
+    this.selectedQuestionIndexes = selected;
+  }
+
+  private clearQuestionSelection(): void {
+    this.selectedQuestionIndexes = [];
+  }
+
   /** AI 失败后的兜底：跳过识别直接进入手动填写（FR 允许仅保存原图流程不阻塞）。 */
   private enterManualReview(): void {
     this.aiRecognized = false;
@@ -216,6 +329,8 @@ struct CapturePage {
     this.qualityIssue = '';
     this.aiError = '';
     this.aiRecognized = false;
+    this.questionItems = [];
+    this.clearQuestionSelection();
   }
 
   /**
@@ -271,6 +386,116 @@ struct CapturePage {
     }
   }
 
+  /** 多题批量保存：一张照片中的多道题共用原图，分别生成独立错题记录。 */
+  private async saveQuestionResults(items: AiQuestionResult[]): Promise<void> {
+    if (this.batchSaving) {
+      return;
+    }
+    if (items.length === 0) {
+      Toast.show('请先勾选要录入的题目');
+      return;
+    }
+
+    this.batchSaving = true;
+    let successCount: number = 0;
+    let failedCount: number = 0;
+    const studentId: string = 'stu_default';
+
+    try {
+      for (const item of items) {
+        if (!item.ok || item.question.trim().length === 0) {
+          failedCount++;
+          continue;
+        }
+
+        const tagIds: string[] = await this.matchTagIds(item.subject, item.tags);
+        const mistake = Mistake.create(
+          generateId(),
+          studentId,
+          this.imagePath,
+          item.question,
+          item.subject,
+          tagIds,
+          item.answerType,
+          item.standardAnswer
+        );
+        mistake.isConfirmed = true;
+        mistake.errorType = item.errorType;
+        mistake.studentAnswer = item.myAnswer;
+        mistake.knowledgeSummary = item.knowledgeSummary;
+
+        const insertRes = await dbHelper.insertMistake(mistake);
+        if (!insertRes.success) {
+          failedCount++;
+          continue;
+        }
+
+        const pointsLog = PointsCalculator.createPointsLog(
+          generateId(), studentId, PointsActionType.CAPTURE);
+        await dbHelper.insertPointsLog(pointsLog);
+        AnalyticsTracker.trackCapture(studentId);
+        AnalyticsTracker.trackAiConfirm(studentId, true, false);
+        PerformanceMonitor.writeBehavior('capture_mistake', {
+          'subject': mistake.subject,
+          'answer_type': mistake.answerType,
+          'by_ai': true
+        });
+        successCount++;
+      }
+
+      if (successCount > 0) {
+        await this.awardDailyStreakIfNeeded(studentId);
+        await KnowledgeProfileAggregator.recomputeForStudent(studentId);
+        this.pointsEarned = successCount *
+          PointsCalculator.getPointsForAction(PointsActionType.CAPTURE);
+        this.savedQuestionCount = successCount;
+        this.failedQuestionCount = failedCount;
+        this.currentStep = 3;
+        if (failedCount > 0) {
+          Toast.show(`成功录入 ${successCount} 道，${failedCount} 道失败`);
+        } else {
+          Toast.show(`成功录入 ${successCount} 道错题`);
+        }
+      } else {
+        Toast.show('批量录入失败，请重试');
+      }
+    } catch (e) {
+      Toast.show('批量录入失败，请重试');
+      hilog.error(LOG_DOMAIN, LOG_TAG, 'batch save mistakes failed: %{public}s',
+        e instanceof Error ? e.message : `${e}`);
+    }
+    this.batchSaving = false;
+  }
+
+  private async matchTagIds(subject: Subject, names: string[]): Promise<string[]> {
+    if (names.length === 0) {
+      return [];
+    }
+    const tags: KnowledgeTag[] = await dbHelper.queryKnowledgeTags(subject);
+    const ids: string[] = [];
+    for (const tag of tags) {
+      for (const name of names) {
+        if (tag.name === name || tag.name.indexOf(name) >= 0 || name.indexOf(tag.name) >= 0) {
+          if (ids.indexOf(tag.id) < 0) {
+            ids.push(tag.id);
+          }
+        }
+      }
+    }
+    return ids;
+  }
+
+  private async awardDailyStreakIfNeeded(studentId: string): Promise<void> {
+    const activeDays: string[] = await dbHelper.queryActiveDays(studentId);
+    const lastStreakDay: string = await dbHelper.queryLastPointsActionDay(studentId,
+      PointsActionType.STREAK);
+    if (StreakCalculator.shouldAwardToday(activeDays, lastStreakDay)) {
+      const streakLog = PointsCalculator.createPointsLog(
+        `pts_streak_${StreakCalculator.todayIso()}`, studentId, PointsActionType.STREAK);
+      await dbHelper.insertPointsLog(streakLog);
+    }
+  }
+
   private resetFlow(): void {
     this.currentStep = 0;
     this.questionText = '';
@@ -285,5 +510,9 @@ struct CapturePage {
     this.aiError = '';
     this.aiRecognized = false;
     this.aiTagNames = '';
+    this.clearQuestionSelection();
+    this.batchSaving = false;
+    this.savedQuestionCount = 1;
+    this.failedQuestionCount = 0;
   }
 }

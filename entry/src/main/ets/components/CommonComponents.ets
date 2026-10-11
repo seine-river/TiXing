@@ -41,6 +41,9 @@ export struct SubjectTag {
 @Component
 export struct PageHeader {
   @Prop title: string = '';
+  onBack: () => void = (): void => {
+    this.getUIContext().getRouter().back();
+  };
 
   build() {
     Row() {
@@ -53,7 +56,7 @@ export struct PageHeader {
         .textAlign(TextAlign.Center)
         .accessibilityText('返回上一页')
         .onClick(() => {
-          this.getUIContext().getRouter().back();
+          this.onBack();
         })
       Text(this.title)
         .fontSize(19)

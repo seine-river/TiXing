@@ -9,7 +9,8 @@ import { AiConfig } from '../common/AiConfig';
 const CONFIG_GUIDE: string =
   'AI 未配置：请在 entry/src/main/resources/rawfile/apiconfig.json 中配置 apiKey';
 const BODY_SUMMARY_MAX: number = 160;
-const LOG_BODY_MAX: number = 2000;
+const LOG_BODY_MAX: number = 8000;
+const LOG_CHUNK_MAX: number = 800;
 const LOG_DOMAIN: number = 0xA004;
 const LOG_TAG: string = 'TiXingAiService';
 
@@ -29,16 +30,33 @@ interface AiMessage {
 }
 
 interface AiResponseMessage {
-  content: string;
+  content?: string;
+  reasoning_content?: string;
 }
 
 interface AiResponseChoice {
   message: AiResponseMessage;
+  finish_reason?: string;
 }
 
 interface AiResponse {
   choices: AiResponseChoice[];
+  usage?: AiResponseUsage;
 }
+
+interface AiResponseUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+}
+
+interface AiThinking {
+  type: string;
+  clear_thinking?: boolean;
+}
+
+const THINKING_ENABLED: string = 'enabled';
+const REASONING_EFFORT_LOW: string = 'low';
 
 interface AiAnalysisRaw {
   analysis: string;
@@ -61,6 +79,12 @@ interface AiQuestionRaw {
   tags?: string[];
 }
 
+interface AiQuestionListRaw {
+  questionCount?: number;
+  questions?: AiQuestionRaw[];
+  items?: AiQuestionRaw[];
+}
+
 interface AiAnswerRetryRaw {
   myAnswer?: string;
   myAnswerPresent?: boolean;
@@ -74,6 +98,20 @@ interface AiLessonScreenRaw {
   steps?: string[];
   studentAnswer?: string;
   standardAnswer?: string;
+  visual?: AiLessonVisualRaw;
+}
+
+interface AiLessonVisualRaw {
+  type?: string;
+  labels?: string[];
+  numerators?: number[];
+  denominators?: number[];
+  resultNumerator?: number;
+  resultDenominator?: number;
+  nodes?: string[];
+  icons?: string[];
+  captions?: string[];
+  highlightIndex?: number;
 }
 
 interface AiLessonSceneRaw {
@@ -101,6 +139,15 @@ export class AiAnalysis {
   error: string = '';
 }
 
+export class AiServiceError extends Error {
+  readonly diagnostic: string = '';
+
+  constructor(message: string, diagnostic: string) {
+    super(message);
+    this.diagnostic = diagnostic;
+  }
+}
+
 export class AiQuestionResult {
   question: string = '';
   myAnswer: string = '';
@@ -115,6 +162,12 @@ export class AiQuestionResult {
   error: string = '';
 }
 
+export class AiQuestionBatch {
+  items: AiQuestionResult[] = [];
+  ok: boolean = false;
+  error: string = '';
+}
+
 export class AiLessonScreen {
   type: string = 'text';
   title: string = '';
@@ -123,6 +176,20 @@ export class AiLessonScreen {
   steps: string[] = [];
   studentAnswer: string = '';
   standardAnswer: string = '';
+  visual: AiLessonVisual = new AiLessonVisual();
+}
+
+export class AiLessonVisual {
+  type: string = '';
+  labels: string[] = [];
+  numerators: number[] = [];
+  denominators: number[] = [];
+  resultNumerator: number = 0;
+  resultDenominator: number = 0;
+  nodes: string[] = [];
+  icons: string[] = [];
+  captions: string[] = [];
+  highlightIndex: number = 0;
 }
 
 export class AiLessonScene {
@@ -140,6 +207,7 @@ export class AiLesson {
   gradeLevel: string = '';
   tone: string = '亲切、鼓励、适合小学生';
   scenes: AiLessonScene[] = [];
+  error: string = '';
 }
 
 export class AiService {
@@ -153,7 +221,7 @@ export class AiService {
   static async recognizeImage(imagePath: string): Promise<string> {
     let base64: string | undefined;
     try {
-      base64 = await MediaService.readImageBase64(imagePath, 1280);
+      base64 = await MediaService.readImageBase64(imagePath, 1800);
     } catch (e) {
       AiService.logError('read image for recognizeImage', e);
       throw new Error('图片读取异常，请重新选择图片');
@@ -172,17 +240,66 @@ export class AiService {
     };
     const part2: AiContentPart = {
       type: 'text',
-      text: '请识别图片中的文字内容，原样输出，不要添加任何解释、标点或提示语。'
+      text: '请识别图片中所有可见文字，包括多道题目的题号、题干、选项和学生手写作答。按人类阅读顺序原样输出，不要总结、不要解释。'
     };
     const msg: AiMessage = { role: 'user', content: [part1, part2] };
     return AiService.request([msg]);
+  }
+
+  static async recognizeQuestion(imagePath: string): Promise<AiQuestionResult> {
+    const batch: AiQuestionBatch = await AiService.recognizeQuestions(imagePath);
+    if (batch.items.length > 0) {
+      return batch.items[0];
+    }
+    const result: AiQuestionResult = new AiQuestionResult();
+    result.error = batch.error.length > 0 ? batch.error : 'AI 未能识别出题目';
+    return result;
+  }
+
+  /**
+   * 多题识别：一张作业/试卷照片中可能只有一道题，也可能包含多道题。
+   * GLM 按题号拆分题目和对应学生答案，供录入页让用户选择要保存的那一道。
+   */
+  static async recognizeQuestions(imagePath: string): Promise<AiQuestionBatch> {
+    let base64: string | undefined;
+    try {
+      base64 = await MediaService.readImageBase64(imagePath, 1800);
+    } catch (e) {
+      AiService.logError('read image for recognizeQuestions', e);
+      throw new Error('图片读取异常，请重新选择图片');
+    }
+    if (base64 === undefined || base64.length === 0) {
+      hilog.error(LOG_DOMAIN, LOG_TAG,
+        'read image for recognizeQuestions failed: path=%{public}s, base64Length=%{public}d',
+        imagePath, base64 === undefined ? -1 : base64.length);
+      throw new Error('图片读取失败，请重新选择图片');
+    }
+    const textPrompt: string =
+      '这是一张小学生作业或试卷照片，可能只有一道题，也可能包含多道题，还包含学生手写作答和批改痕迹。请仔细看图，按题号把每道题拆开识别，并以纯JSON返回，不要markdown代码块和解释。\n' +
+      '返回格式：{"questionCount":题目数量,"questions":[{"question":"这一道题的完整题干，保留题号、共用材料和选项","myAnswer":"这一道题对应的学生作答，没有则为空字符串","myAnswerPresent":true或false,"standardAnswer":"这一道题可见的正确答案或批改结果，看不出则为空字符串","knowledgeSummary":"不超过10个汉字的知识点名称","subject":"math或chinese或english或science","answerType":"choice或numeric或text或subjective","errorType":"concept或careless或misread或other","knowledgeTags":["标签1","标签2"]}]}\n' +
+      '多题拆分要求：必须按可见题号、题目间距或版式把图片拆成多道题；每道题只归属自己下方或旁边的学生答案；如果多道小题共享阅读材料或题干，每道题的question都要带上必要的共用材料；不要把多道题合并成一个长字符串；只有确实看不出任何题目时questions才返回空数组。\n' +
+      '学生答案识别要求：小学生答案通常写在题目下方、横线上、括号内或题目留白处，笔迹常与印刷题干不同，可能是铅笔、圆珠笔或歪斜手写体。myAnswer必须原样转写学生写的算式、字母、汉字、选项和结果，不要混入题干、教师批注或标准答案。只有确认该题没有学生作答痕迹时，myAnswer才为空并把myAnswerPresent设为false；只要看得到作答痕迹，即使不完整也要转写并把myAnswerPresent设为true。\n' +
+      '其他要求：questionCount必须等于questions长度；JSON字段名必须完全使用英文；subject只能是math/chinese/english/science；answerType只能是choice/numeric/text/subjective；errorType只能是concept/careless/misread/other；knowledgeTags每题2-4个简短标签。只输出JSON。';
+    const parts: AiContentPart[] = [
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + base64 } },
+      { type: 'text', text: textPrompt }
+    ];
+    const raw: string = await AiService.request([{ role: 'user', content: parts }]);
+    const batch: AiQuestionBatch = AiService.parseQuestions(raw);
+    if (!batch.ok) {
+      hilog.error(LOG_DOMAIN, LOG_TAG,
+        'recognizeQuestions parse failed: error=%{public}s, raw=%{public}s',
+        batch.error, AiService.logBody(raw));
+      return AiService.fallbackRecognizeQuestions(imagePath, batch);
+    }
+    return batch;
   }
 
   /**
    * AI 全图识别（无本地 OCR 环节）：直接把整张错题照片交给多模态模型，
    * 一次性提取题目、我的答案、标准答案、学科、题型、错误类型与知识点。
    */
-  static async recognizeQuestion(imagePath: string): Promise<AiQuestionResult> {
+  private static async recognizeQuestionLegacy(imagePath: string): Promise<AiQuestionResult> {
     let base64: string | undefined;
     try {
       base64 = await MediaService.readImageBase64(imagePath, 1280);
@@ -243,6 +360,25 @@ export class AiService {
       return AiService.fillStudentAnswer(imagePath, structured);
     }
     return structured;
+  }
+
+  private static async fallbackRecognizeQuestions(imagePath: string,
+    batch: AiQuestionBatch): Promise<AiQuestionBatch> {
+    try {
+      const text: string = await AiService.recognizeImage(imagePath);
+      const cleaned: string = AiService.plainQuestionText(text);
+      if (cleaned.length > 0) {
+        batch.items = AiService.parsePlainQuestions(cleaned);
+        batch.ok = true;
+        batch.error = '';
+        hilog.info(LOG_DOMAIN, LOG_TAG,
+          'recognizeQuestions fallback succeeded: textLength=%{public}d, questionCount=%{public}d',
+          cleaned.length, batch.items.length);
+      }
+    } catch (e) {
+      AiService.logError('recognizeQuestions fallback', e);
+    }
+    return batch;
   }
 
   /**
@@ -325,6 +461,73 @@ export class AiService {
     return result;
   }
 
+  private static parseQuestions(raw: string): AiQuestionBatch {
+    const batch: AiQuestionBatch = new AiQuestionBatch();
+    try {
+      const jsonStr: string = AiService.extractJson(raw);
+      const parsed: Object = JSON.parse(jsonStr) as Object;
+      let rawItems: AiQuestionRaw[] = [];
+      if (parsed instanceof Array) {
+        rawItems = parsed as AiQuestionRaw[];
+      } else {
+        const obj: AiQuestionListRaw = parsed as AiQuestionListRaw;
+        if (obj.questions !== undefined) {
+          rawItems = obj.questions;
+        } else if (obj.items !== undefined) {
+          rawItems = obj.items;
+        } else {
+          rawItems = [obj as AiQuestionRaw];
+        }
+      }
+      for (const item of rawItems) {
+        const result: AiQuestionResult = AiService.parseQuestion(JSON.stringify(item));
+        if (result.ok) {
+          batch.items.push(result);
+        }
+      }
+      batch.ok = batch.items.length > 0;
+      if (!batch.ok) {
+        batch.error = 'AI 返回内容中没有可用题目';
+      }
+    } catch (e) {
+      batch.error = '多题 JSON 解析失败: ' + AiService.errText(e);
+    }
+    return batch;
+  }
+
+  private static parsePlainQuestions(text: string): AiQuestionResult[] {
+    const lines: string[] = text.split(/[\r\n]+/);
+    const items: AiQuestionResult[] = [];
+    let current: string[] = [];
+    for (const line of lines) {
+      const trimmed: string = line.trim();
+      if (trimmed.length === 0) {
+        continue;
+      }
+      if (AiService.isQuestionNumberLine(trimmed) && current.length > 0) {
+        AiService.pushPlainQuestion(items, current);
+        current = [];
+      }
+      current.push(trimmed);
+    }
+    AiService.pushPlainQuestion(items, current);
+    return items;
+  }
+
+  private static isQuestionNumberLine(line: string): boolean {
+    return /^(\d{1,2}[.、．)]|[一二三四五六七八九十]{1,3}[、.．)])/.test(line);
+  }
+
+  private static pushPlainQuestion(items: AiQuestionResult[], lines: string[]): void {
+    if (lines.length === 0) {
+      return;
+    }
+    const item: AiQuestionResult = new AiQuestionResult();
+    item.question = lines.join('\n');
+    item.ok = item.question.length > 0;
+    items.push(item);
+  }
+
   private static normalizeQuestionJson(json: string): string {
     return json
       .replace(/"题目"/g, '"question"')
@@ -403,35 +606,65 @@ export class AiService {
    */
   static async generateLesson(question: string, studentAnswer: string, standardAnswer: string,
     grade: string, subject: string, knowledgeSummary: string, errorType: string): Promise<AiLesson> {
+    hilog.info(LOG_DOMAIN, LOG_TAG,
+      'generateLesson start: questionLength=%{public}d, studentAnswerLength=%{public}d, ' +
+        'standardAnswerLength=%{public}d, grade=%{public}s, subject=%{public}s, ' +
+        'knowledgeSummaryLength=%{public}d, errorType=%{public}s, model=%{public}s',
+      question.length, studentAnswer.length, standardAnswer.length, grade, subject,
+      knowledgeSummary.length, errorType, AiConfig.model);
     const prompt: string =
       '请为一个小学生错题生成App内动画讲解视频脚本。脚本必须根据学生年级调整语言难度，语气亲切、鼓励，不批评孩子。\n' +
       `学生年级：${grade}年级\n学科：${subject}\n知识点：${knowledgeSummary}\n错误类型：${errorType}\n` +
       `题目：${question}\n学生答案：${studentAnswer.length > 0 ? studentAnswer : '未提供'}\n标准答案：${standardAnswer.length > 0 ? standardAnswer : '未提供'}\n\n` +
       '生成要求：\n' +
-      '1. 6-8个scenes，总时长50-80秒。\n' +
+      '1. 4-6个scenes，总时长35-55秒，优先精炼，不追求长视频。\n' +
       '2. 结构包含：亲切开场、读题、理解学生答案、定位错误原因、正确解法分步讲解、检查答案、鼓励总结。\n' +
-      '3. narration每句不超过55个中文字，适合朗读；subtitle不超过18个中文字。\n' +
+      '3. narration每句不超过38个中文字，适合朗读；subtitle不超过12个中文字。\n' +
       '4. 数学步骤要拆小，每步只讲一个动作；语文/英语/科学用适合年级的方式解释。\n' +
       '5. screen.type只能是cover/question/compare/steps/tip之一。\n' +
-      '6. steps场景的screen.steps放2-4条短步骤，每条不超过24个字。\n' +
-      '7. 不得编造题目没有的信息；标准答案未提供时要提醒家长核对。\n' +
-      '8. 只输出纯JSON，不要markdown代码块和解释。\n' +
-      '返回格式：{"title":"不超过12字","totalDuration":70,"gradeLevel":"三年级","tone":"亲切鼓励","scenes":[{"id":"intro","duration":6,"narration":"...","subtitle":"...","screen":{"type":"cover","title":"...","text":"...","highlight":"...","steps":["..."],"studentAnswer":"...","standardAnswer":"..."},"animation":"mascot_wave"}]}\n' +
+      '6. steps场景的screen.steps放2-3条短步骤，每条不超过18个字。\n' +
+      '7. 每个screen必须带visual字段，用图形表达思考过程，不能只给文字。visual.type只能是fraction_bars/number_line/counters/arrow_flow/shape_combo/icon_story之一。\n' +
+      '8. visual字段要求：fraction_bars用于分数、倍数、比例，输出labels/numerators/denominators/resultNumerator/resultDenominator；number_line输出labels/nodes/highlightIndex；counters输出icons/captions；arrow_flow输出nodes，每步一个节点；shape_combo输出labels/nodes/icons；icon_story输出icons/captions。小学题目优先选能讲清因果的图形，不要每次都用arrow_flow。\n' +
+      '9. 不得编造题目没有的信息；标准答案未提供时要提醒家长核对。\n' +
+      '10. 只输出纯JSON，不要markdown代码块和解释。\n' +
+      'screen只输出该type需要的字段：cover输出title/text；question输出title/text/highlight；compare输出title/studentAnswer/standardAnswer；steps输出title/steps；tip输出title/text。不要输出空字段。\n' +
+      '返回格式：{"title":"不超过10字","totalDuration":45,"gradeLevel":"三年级","tone":"亲切鼓励","scenes":[{"id":"intro","duration":5,"narration":"...","subtitle":"...","screen":{"type":"steps","title":"...","steps":["..."],"visual":{"type":"fraction_bars","labels":["3/8","1/4","5/8"],"numerators":[3,1,5],"denominators":[8,4,8],"resultNumerator":5,"resultDenominator":8,"nodes":[],"icons":[],"captions":[],"highlightIndex":2}},"animation":"bar_grow"}]}\n' +
       'JSON字段名必须使用英文。';
     const part: AiContentPart = { type: 'text', text: prompt };
-    const raw: string = await AiService.request([{ role: 'user', content: [part] }]);
+    hilog.info(LOG_DOMAIN, LOG_TAG,
+      'generateLesson request ready: promptLength=%{public}d, inputQuestionEmpty=%{public}b',
+      prompt.length, question.trim().length === 0);
+    const raw: string = await AiService.request(
+      [{ role: 'user', content: [part] }], 4096, REASONING_EFFORT_LOW);
+    AiService.logLongInfo('generateLesson raw content',
+      `rawLength=${raw.length}\npreview=${AiService.logBody(raw)}`);
     const lesson: AiLesson = AiService.parseLesson(raw);
     if (lesson.scenes.length === 0) {
-      hilog.error(LOG_DOMAIN, LOG_TAG, 'generateLesson parse failed: raw=%{public}s', AiService.logBody(raw));
-      throw new Error('讲解视频脚本生成失败，请重试');
+      const parseError: string = lesson.error.length > 0 ? lesson.error : '未解析到可用 scenes';
+      AiService.logLongError('generateLesson parse failed',
+        `error=${parseError}\nrawLength=${raw.length}\nraw=${AiService.logBody(raw)}`);
+      throw new AiServiceError('讲解视频脚本生成失败，请重试',
+        '讲解视频脚本解析失败\n' +
+        `model=${AiConfig.model}\n` +
+        `error=${parseError}\n` +
+        `rawLength=${raw.length}\n` +
+        `raw=${AiService.logBody(raw)}`);
     }
+    hilog.info(LOG_DOMAIN, LOG_TAG,
+      'generateLesson success: sceneCount=%{public}d, totalDuration=%{public}d, title=%{public}s',
+      lesson.scenes.length, lesson.totalDuration, lesson.title);
     return lesson;
   }
 
   private static parseLesson(raw: string): AiLesson {
     const lesson: AiLesson = new AiLesson();
+    hilog.info(LOG_DOMAIN, LOG_TAG,
+      'parseLesson start: rawLength=%{public}d', raw.length);
     try {
       const jsonStr: string = AiService.extractJson(raw);
+      hilog.info(LOG_DOMAIN, LOG_TAG,
+        'parseLesson json extracted: jsonLength=%{public}d, objectStart=%{public}d, objectEnd=%{public}d',
+        jsonStr.length, raw.indexOf('{'), raw.lastIndexOf('}'));
       const obj: AiLessonRaw = JSON.parse(jsonStr) as AiLessonRaw;
       lesson.title = obj.title !== undefined && obj.title.length > 0 ? obj.title : '错题讲解';
       lesson.gradeLevel = obj.gradeLevel !== undefined ? obj.gradeLevel : '';
@@ -453,17 +686,39 @@ export class AiService {
             scene.screen.highlight = rawScreen.highlight !== undefined ? rawScreen.highlight : '';
             scene.screen.studentAnswer = rawScreen.studentAnswer !== undefined ? rawScreen.studentAnswer : '';
             scene.screen.standardAnswer = rawScreen.standardAnswer !== undefined ? rawScreen.standardAnswer : '';
-            if (rawScreen.steps !== undefined) {
-              scene.screen.steps = rawScreen.steps;
-            }
+          if (rawScreen.steps !== undefined) {
+            scene.screen.steps = rawScreen.steps;
           }
-          if (scene.narration.length > 0) {
-            lesson.scenes.push(scene);
+          if (rawScreen.visual !== undefined) {
+            scene.screen.visual = AiService.parseLessonVisual(rawScreen.visual);
           }
+          if (rawScreen.type !== undefined && AiService.normalizeLessonScreenType(rawScreen.type) === 'text') {
+            hilog.warn(LOG_DOMAIN, LOG_TAG,
+              'parseLesson unknown screen type: sceneId=%{public}s, type=%{public}s',
+              scene.id, rawScreen.type);
+          }
+        } else {
+          hilog.warn(LOG_DOMAIN, LOG_TAG,
+            'parseLesson scene missing screen: sceneId=%{public}s, subtitle=%{public}s',
+            scene.id, scene.subtitle);
+        }
+        if (scene.narration.length > 0) {
+          lesson.scenes.push(scene);
+        } else {
+          hilog.warn(LOG_DOMAIN, LOG_TAG,
+            'parseLesson scene missing narration and skipped: sceneId=%{public}s, rawScene=%{public}s',
+            scene.id, JSON.stringify(rawScene));
         }
       }
+    } else {
+      hilog.warn(LOG_DOMAIN, LOG_TAG, 'parseLesson response has no scenes array');
+    }
       lesson.totalDuration = AiService.lessonDuration(lesson, obj.totalDuration);
+      hilog.info(LOG_DOMAIN, LOG_TAG,
+        'parseLesson success: parsedSceneCount=%{public}d, totalDuration=%{public}d',
+        lesson.scenes.length, lesson.totalDuration);
     } catch (e) {
+      lesson.error = AiService.errText(e);
       AiService.logError('parse lesson', e);
     }
     return lesson;
@@ -503,58 +758,135 @@ export class AiService {
     return 'text';
   }
 
-  private static async request(messages: AiMessage[]): Promise<string> {
+  private static parseLessonVisual(raw: AiLessonVisualRaw): AiLessonVisual {
+    const visual: AiLessonVisual = new AiLessonVisual();
+    visual.type = raw.type !== undefined ? raw.type : '';
+    if (raw.labels !== undefined) {
+      visual.labels = raw.labels;
+    }
+    if (raw.numerators !== undefined) {
+      visual.numerators = raw.numerators;
+    }
+    if (raw.denominators !== undefined) {
+      visual.denominators = raw.denominators;
+    }
+    visual.resultNumerator = raw.resultNumerator !== undefined ? raw.resultNumerator : 0;
+    visual.resultDenominator = raw.resultDenominator !== undefined ? raw.resultDenominator : 0;
+    if (raw.nodes !== undefined) {
+      visual.nodes = raw.nodes;
+    }
+    if (raw.icons !== undefined) {
+      visual.icons = raw.icons;
+    }
+    if (raw.captions !== undefined) {
+      visual.captions = raw.captions;
+    }
+    visual.highlightIndex = raw.highlightIndex !== undefined ? raw.highlightIndex : 0;
+    return visual;
+  }
+
+  private static async request(messages: AiMessage[], maxTokens: number = 8192,
+    reasoningEffort: string = REASONING_EFFORT_LOW): Promise<string> {
     const httpRequest: http.HttpRequest = http.createHttp();
+    const requestStart: number = Date.now();
     try {
       await AiService.ensureConfig();
       hilog.info(LOG_DOMAIN, LOG_TAG,
-        'AI request start: model=%{public}s, url=%{public}s, messages=%{public}d, apiKeyLength=%{public}d',
-        AiConfig.model, AiConfig.baseUrl, messages.length, AiConfig.apiKey.length);
+        'AI request start: model=%{public}s, url=%{public}s, messages=%{public}d, apiKeyLength=%{public}d, thinkingType=%{public}s, reasoningEffort=%{public}s',
+        AiConfig.model, AiConfig.baseUrl, messages.length, AiConfig.apiKey.length,
+        THINKING_ENABLED, reasoningEffort);
       const bodyObj: Record<string, Object> = {
         'model': AiConfig.model,
         'messages': messages as Object,
         'temperature': 0.1 as Object,
-        'max_tokens': 3072 as Object
       };
+      bodyObj['max_tokens'] = maxTokens as Object;
+      const thinking: AiThinking = { type: THINKING_ENABLED, clear_thinking: false };
+      bodyObj['thinking'] = thinking as Object;
+      bodyObj['reasoning_effort'] = reasoningEffort as Object;
       const response = await httpRequest.request(AiConfig.baseUrl, {
         method: http.RequestMethod.POST,
         header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AiConfig.apiKey },
         extraData: JSON.stringify(bodyObj),
-        connectTimeout: 15000,
-        readTimeout: 60000
+        connectTimeout: 30000,
+        readTimeout: 90000
       });
       const bodyStr: string = AiService.responseBodyText(response.result);
+      const elapsedMs: number = Date.now() - requestStart;
       hilog.info(LOG_DOMAIN, LOG_TAG,
-        'AI response received: httpCode=%{public}d, bodyLength=%{public}d',
-        response.responseCode, bodyStr.length);
+        'AI response received: httpCode=%{public}d, bodyLength=%{public}d, elapsedMs=%{public}d',
+        response.responseCode, bodyStr.length, elapsedMs);
       if (response.responseCode !== 200) {
-        hilog.error(LOG_DOMAIN, LOG_TAG,
-          'AI HTTP error body: httpCode=%{public}d, body=%{public}s',
-          response.responseCode, AiService.logBody(bodyStr));
-        AiService.logError('AI HTTP request failed with HTTP ' + response.responseCode,
-          new Error(AiService.logBody(bodyStr)));
-        throw new Error(`AI请求失败: HTTP ${response.responseCode} ${AiService.summary(bodyStr)}`);
+        const diagnostic: string = AiService.responseDiagnostic(bodyStr, response.responseCode, undefined);
+        AiService.logLongError('AI HTTP error', diagnostic);
+        throw new AiServiceError(`AI请求失败: HTTP ${response.responseCode} ${AiService.summary(bodyStr)}`, diagnostic);
       }
       let respObj: AiResponse;
       try {
         respObj = JSON.parse(bodyStr) as AiResponse;
       } catch (e) {
-        throw new Error('AI返回非JSON: ' + AiService.summary(bodyStr));
+        AiService.logLongError('AI response non-JSON',
+          AiService.responseDiagnostic(bodyStr, response.responseCode, undefined));
+        throw new AiServiceError('AI返回非JSON: ' + AiService.summary(bodyStr),
+          AiService.responseDiagnostic(bodyStr, response.responseCode, undefined));
       }
       if (respObj.choices === undefined || respObj.choices.length === 0) {
-        throw new Error('AI返回为空: ' + AiService.summary(bodyStr));
+        AiService.logLongError('AI response choices empty',
+          AiService.responseDiagnostic(bodyStr, response.responseCode, respObj.usage));
+        throw new AiServiceError('AI返回为空: ' + AiService.summary(bodyStr),
+          AiService.responseDiagnostic(bodyStr, response.responseCode, respObj.usage));
       }
-      const content: string = respObj.choices[0].message.content;
-      if (content === undefined || content.length === 0) {
-        throw new Error('AI返回内容为空: ' + AiService.summary(bodyStr));
+      const rawContent: string | undefined = respObj.choices[0].message.content;
+      const reasoningContent: string | undefined = respObj.choices[0].message.reasoning_content;
+      const content: string = rawContent === undefined ? '' : rawContent;
+      const finishReasonLog: string = respObj.choices[0].finish_reason !== undefined
+        ? respObj.choices[0].finish_reason : 'unknown';
+      hilog.info(LOG_DOMAIN, LOG_TAG,
+        'AI choice parsed: choices=%{public}d, finishReason=%{public}s, contentLength=%{public}d, ' +
+          'reasoningContentLength=%{public}d, promptTokens=%{public}s, completionTokens=%{public}s, totalTokens=%{public}s',
+        respObj.choices.length,
+        finishReasonLog,
+        content.length,
+        reasoningContent === undefined ? -1 : reasoningContent.length,
+        respObj.usage !== undefined && respObj.usage.prompt_tokens !== undefined
+          ? `${respObj.usage.prompt_tokens}` : 'unknown',
+        respObj.usage !== undefined && respObj.usage.completion_tokens !== undefined
+          ? `${respObj.usage.completion_tokens}` : 'unknown',
+        respObj.usage !== undefined && respObj.usage.total_tokens !== undefined
+          ? `${respObj.usage.total_tokens}` : 'unknown');
+      if (content.trim().length === 0) {
+        const finishReason: string = respObj.choices[0].finish_reason !== undefined
+          ? respObj.choices[0].finish_reason : 'unknown';
+        const emptyDiagnostic: string =
+          `AI message content empty\nfinishReason=${finishReason}\n` +
+          `contentLength=${content.length}\n` +
+          `reasoningContentLength=${reasoningContent === undefined ? -1 : reasoningContent.length}\n` +
+          AiService.responseDiagnostic(bodyStr, response.responseCode, respObj.usage);
+        AiService.logLongError('AI content empty', emptyDiagnostic);
+        throw new AiServiceError(`AI返回内容为空（finish_reason=${finishReason}）`,
+          emptyDiagnostic);
       }
+      hilog.info(LOG_DOMAIN, LOG_TAG,
+        'AI content return: contentLength=%{public}d, elapsedMs=%{public}d',
+        content.length, Date.now() - requestStart);
       return content;
     } catch (e) {
       AiService.logError('AI request', e);
-      if (e instanceof Error) {
+      if (e instanceof AiServiceError) {
         throw e;
       }
-      throw new Error('AI请求异常: ' + AiService.errorDetail(e));
+      const elapsedMs: number = Date.now() - requestStart;
+      const diagnostic: string = 'AI请求异常完整诊断\n' +
+        `model=${AiConfig.model}\n` +
+        `url=${AiConfig.baseUrl}\n` +
+        `elapsedMs=${elapsedMs}\n` +
+        `connectTimeoutMs=30000\n` +
+        `readTimeoutMs=180000\n` +
+        `error=${AiService.errorDetail(e)}`;
+      const requestError: AiServiceError =
+        new AiServiceError('AI请求异常: ' + AiService.errText(e), diagnostic);
+      AiService.logLongError('AI request exception diagnostic', diagnostic);
+      throw requestError;
     } finally {
       httpRequest.destroy();
     }
@@ -562,6 +894,9 @@ export class AiService {
 
   private static responseBodyText(result: string | Object | ArrayBuffer): string {
     try {
+      hilog.info(LOG_DOMAIN, LOG_TAG,
+        'AI response body decode: resultType=%{public}s, isArrayBuffer=%{public}b',
+        typeof result, result instanceof ArrayBuffer);
       if (typeof result === 'string') {
         return result as string;
       }
@@ -571,8 +906,27 @@ export class AiService {
       }
       return `${result}`;
     } catch (e) {
+      AiService.logLongError('AI response body decode failed', AiService.errorDetail(e));
       return '';
     }
+  }
+
+  private static responseDiagnostic(body: string, httpCode: number, usage: AiResponseUsage | undefined): string {
+    const promptTokens: string = usage !== undefined && usage.prompt_tokens !== undefined
+      ? `${usage.prompt_tokens}` : 'unknown';
+    const completionTokens: string = usage !== undefined && usage.completion_tokens !== undefined
+      ? `${usage.completion_tokens}` : 'unknown';
+    const totalTokens: string = usage !== undefined && usage.total_tokens !== undefined
+      ? `${usage.total_tokens}` : 'unknown';
+    return 'AI服务完整诊断\n' +
+      `model=${AiConfig.model}\n` +
+      `url=${AiConfig.baseUrl}\n` +
+      `httpCode=${httpCode}\n` +
+      `bodyLength=${body.length}\n` +
+      `usage.promptTokens=${promptTokens}\n` +
+      `usage.completionTokens=${completionTokens}\n` +
+      `usage.totalTokens=${totalTokens}\n` +
+      `response=${AiService.logBody(body)}`;
   }
 
   private static summary(body: string): string {
@@ -592,6 +946,37 @@ export class AiService {
   private static logError(stage: string, e: Object): void {
     hilog.error(LOG_DOMAIN, LOG_TAG, '%{public}s failed: %{public}s',
       stage, AiService.errorDetail(e));
+    if (e instanceof AiServiceError && e.diagnostic.length > 0) {
+      AiService.logLongError(stage + ' diagnostic', e.diagnostic);
+    }
+  }
+
+  /**
+   * HiLog 单条输出可能被系统截断；错误诊断按固定长度分段输出，
+   * 确保 HTTP 超时、响应体、finish_reason、usage 等关键信息都能进入日志。
+   */
+  private static logLongError(stage: string, content: string): void {
+    const text: string = content.length > 0 ? content : '(empty diagnostic)';
+    const totalChunks: number = Math.ceil(text.length / LOG_CHUNK_MAX);
+    for (let i: number = 0; i < totalChunks; i++) {
+      const start: number = i * LOG_CHUNK_MAX;
+      const end: number = Math.min(start + LOG_CHUNK_MAX, text.length);
+      hilog.error(LOG_DOMAIN, LOG_TAG,
+        '%{public}s [%{public}d/%{public}d]: %{public}s',
+        stage, i + 1, totalChunks, text.substring(start, end));
+    }
+  }
+
+  private static logLongInfo(stage: string, content: string): void {
+    const text: string = content.length > 0 ? content : '(empty content)';
+    const totalChunks: number = Math.ceil(text.length / LOG_CHUNK_MAX);
+    for (let i: number = 0; i < totalChunks; i++) {
+      const start: number = i * LOG_CHUNK_MAX;
+      const end: number = Math.min(start + LOG_CHUNK_MAX, text.length);
+      hilog.info(LOG_DOMAIN, LOG_TAG,
+        '%{public}s [%{public}d/%{public}d]: %{public}s',
+        stage, i + 1, totalChunks, text.substring(start, end));
+    }
   }
 
   private static errorDetail(e: Object): string {
@@ -644,8 +1029,18 @@ export class AiService {
   }
 
   private static extractJson(raw: string): string {
-    const start: number = raw.indexOf('{');
-    const end: number = raw.lastIndexOf('}');
+    const objectStart: number = raw.indexOf('{');
+    const arrayStart: number = raw.indexOf('[');
+    let start: number = -1;
+    let endChar: string = '';
+    if (arrayStart >= 0 && (objectStart < 0 || arrayStart < objectStart)) {
+      start = arrayStart;
+      endChar = ']';
+    } else {
+      start = objectStart;
+      endChar = '}';
+    }
+    const end: number = raw.lastIndexOf(endChar);
     if (start >= 0 && end > start) {
       return raw.substring(start, end + 1);
     }

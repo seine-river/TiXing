@@ -1,11 +1,11 @@
 import { Subject, AnswerType, ErrorType, ImageQualityIssue } from '../models/Enums';
 import { KnowledgeTag } from '../models/KnowledgeTag';
 import { dbHelper } from '../repository/DatabaseHelper';
-import { AiService } from '../services/AiService';
+import { AiService, AiQuestionResult } from '../services/AiService';
 import { MediaService } from '../services/MediaService';
-import { AppColors, AppSizes, subjectLabel, toFileUri } from '../common/Constants';
+import { AppColors, AppSizes, subjectLabel, toFileUri, truncateText } from '../common/Constants';
 import { Toast } from '../common/Toast';
-import { FilterChip } from './BasicWidgets';
+import { FilterChip, PrimaryButton } from './BasicWidgets';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 const LOG_DOMAIN: number = 0xA007;
@@ -477,6 +477,264 @@ export struct AiAnalyzingStep {
     .backgroundColor(AppColors.BG_CARD)
     .borderRadius(AppSizes.CORNER_RADIUS)
     .margin({ left: 16, right: 16, top: 16 })
+  }
+}
+
+/** 多题识别结果选择：一张照片里识别出多道题时，先让用户选择要录入哪一道。 */
+@Component
+export struct QuestionSelectStep {
+  @Prop imagePath: string = '';
+  @Prop questionItems: AiQuestionResult[] = [];
+  @Prop selectedIndexes: number[] = [];
+  @Prop batchSaving: boolean = false;
+  onToggleSelect: (index: number) => void = (_index: number): void => {
+  };
+  onSelect: (item: AiQuestionResult) => void = (_item: AiQuestionResult): void => {
+  };
+  onSaveSelected: (items: AiQuestionResult[]) => void = (_items: AiQuestionResult[]): void => {
+  };
+  onSelectAll: () => void = (): void => {
+  };
+  onClearSelect: () => void = (): void => {
+  };
+  onManual: () => void = (): void => {
+  };
+  onBack: () => void = (): void => {
+  };
+
+  private isSelected(index: number): boolean {
+    return this.selectedIndexes.indexOf(index) >= 0;
+  }
+
+  private selectedItems(): AiQuestionResult[] {
+    const items: AiQuestionResult[] = [];
+    for (const index of this.selectedIndexes) {
+      if (index >= 0 && index < this.questionItems.length) {
+        items.push(this.questionItems[index]);
+      }
+    }
+    return items;
+  }
+
+  build() {
+    Scroll() {
+      Column() {
+        Image(toFileUri(this.imagePath))
+          .width('100%')
+          .height(168)
+          .objectFit(ImageFit.Contain)
+          .sourceSize({ width: 1080, height: 1080 })
+          .backgroundColor(AppColors.IMAGE_VIEWER_BG)
+          .borderRadius(AppSizes.CORNER_RADIUS)
+          .clip(true)
+          .draggable(false)
+          .accessibilityText('包含多道题目的原始照片')
+
+        Column() {
+          Row({ space: 8 }) {
+            Text('🧩')
+              .fontSize(22)
+            Column() {
+              Text(`识别到 ${this.questionItems.length} 道题`)
+                .fontSize(17)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppColors.TEXT_PRIMARY)
+              Text('可勾选多道题，一次批量录入错题本')
+                .fontSize(12)
+                .fontColor(AppColors.TEXT_SECONDARY)
+                .margin({ top: 3 })
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+          }
+          .width('100%')
+
+          Row({ space: 8 }) {
+            Text(`已选 ${this.selectedIndexes.length} 道`)
+              .fontSize(13)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(AppColors.PRIMARY)
+              .layoutWeight(1)
+            Text('全选')
+              .fontSize(12)
+              .fontColor(AppColors.PRIMARY)
+              .padding({ top: 6, bottom: 6 })
+              .enabled(!this.batchSaving)
+              .onClick(() => {
+                this.onSelectAll();
+              })
+            Text('清空')
+              .fontSize(12)
+              .fontColor(AppColors.TEXT_SECONDARY)
+              .padding({ top: 6, bottom: 6 })
+              .enabled(!this.batchSaving)
+              .onClick(() => {
+                this.onClearSelect();
+              })
+          }
+          .width('100%')
+          .margin({ top: 12 })
+
+          ForEach(this.questionItems, (item: AiQuestionResult, index: number) => {
+            Column({ space: 8 }) {
+              Row({ space: 12 }) {
+                Text(`${index + 1}`)
+                  .fontSize(14)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(Color.White)
+                  .width(32)
+                  .height(32)
+                  .textAlign(TextAlign.Center)
+                  .linearGradient({
+                    angle: 135,
+                    colors: [[AppColors.PRIMARY_LIGHT, 0], [AppColors.GRADIENT_END, 1]]
+                  })
+                  .borderRadius(16)
+                Column() {
+                  Text(subjectLabel(item.subject))
+                    .fontSize(13)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(AppColors.TEXT_PRIMARY)
+                  Text(item.myAnswerPresent ? '已识别学生作答' : '未看到学生作答')
+                    .fontSize(11)
+                    .fontColor(item.myAnswerPresent ? AppColors.SECONDARY : AppColors.TEXT_PLACEHOLDER)
+                    .margin({ top: 2 })
+                }
+                .layoutWeight(1)
+
+                Text(this.isSelected(index) ? '✓ 已选' : '选择')
+                  .fontSize(13)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(this.isSelected(index) ? Color.White : AppColors.PRIMARY)
+                  .height(38)
+                  .textAlign(TextAlign.Center)
+                  .padding({ left: 15, right: 15 })
+                  .backgroundColor(this.isSelected(index)
+                    ? AppColors.SOLID_PRIMARY
+                    : AppColors.SOFT_PRIMARY)
+                  .borderRadius(20)
+                  .border({
+                    width: this.isSelected(index) ? 0 : 1.5,
+                    color: AppColors.PRIMARY
+                  })
+                  .accessibilityText(this.isSelected(index)
+                    ? `第${index + 1}题已选择`
+                    : `选择第${index + 1}题`)
+                  .onClick(() => {
+                    if (!this.batchSaving) {
+                      this.onToggleSelect(index);
+                    }
+                  })
+              }
+              .width('100%')
+
+              Text(item.question)
+                .fontSize(15)
+                .fontColor(AppColors.TEXT_PRIMARY)
+                .lineHeight(22)
+                .maxLines(5)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+                .width('100%')
+
+              if (item.myAnswer.length > 0 || item.standardAnswer.length > 0) {
+                Row({ space: 8 }) {
+                  if (item.myAnswer.length > 0) {
+                    Text('我的：' + truncateText(item.myAnswer, 36))
+                      .fontSize(12)
+                      .fontColor(AppColors.DANGER)
+                      .layoutWeight(1)
+                      .maxLines(2)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  }
+                  if (item.standardAnswer.length > 0) {
+                    Text('正确：' + truncateText(item.standardAnswer, 36))
+                      .fontSize(12)
+                      .fontColor(AppColors.SECONDARY)
+                      .layoutWeight(1)
+                      .maxLines(2)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  }
+                }
+                .width('100%')
+              }
+
+              Button('核对这道题')
+                .width('100%')
+                .height(40)
+                .fontSize(14)
+                .fontWeight(FontWeight.Bold)
+                .backgroundColor(AppColors.SOLID_PRIMARY)
+                .fontColor(Color.White)
+                .borderRadius(20)
+                .margin({ top: 2 })
+                .onClick(() => {
+                  this.onSelect(item);
+                })
+            }
+            .alignItems(HorizontalAlign.Start)
+            .width('100%')
+            .padding(13)
+            .backgroundColor(this.isSelected(index) ? AppColors.SOFT_PRIMARY : AppColors.BG_PAGE)
+            .borderRadius(AppSizes.CORNER_RADIUS)
+            .border({
+              width: this.isSelected(index) ? 1.5 : 1,
+              color: this.isSelected(index) ? AppColors.PRIMARY : AppColors.BORDER
+            })
+            .margin({ top: 10 })
+          }, (item: AiQuestionResult, index: number) =>
+            `${index}_${this.isSelected(index)}_${item.question}`)
+
+          PrimaryButton({
+            text: this.batchSaving
+              ? '⏳ 正在批量保存...'
+              : `💾 保存选中的 ${this.selectedIndexes.length} 道错题`,
+            isEnabled: !this.batchSaving && this.selectedIndexes.length > 0,
+            onTap: (): void => {
+              this.onSaveSelected(this.selectedItems());
+            }
+          })
+            .margin({ top: 16 })
+
+          Button('✏️ 都不是，手动填写')
+            .width('100%')
+            .height(44)
+            .fontSize(14)
+            .backgroundColor(AppColors.BG_CARD)
+            .fontColor(AppColors.PRIMARY)
+            .borderRadius(22)
+            .border({ width: 1.2, color: AppColors.PRIMARY })
+            .margin({ top: 10 })
+            .enabled(!this.batchSaving)
+            .onClick(() => {
+              this.onManual();
+            })
+
+          Button('重新选图')
+            .height(38)
+            .fontSize(13)
+            .backgroundColor(Color.Transparent)
+            .fontColor(AppColors.TEXT_SECONDARY)
+            .borderRadius(19)
+            .margin({ top: 6, bottom: 20 })
+            .enabled(!this.batchSaving)
+            .onClick(() => {
+              this.onBack();
+            })
+        }
+        .width('100%')
+        .padding(14)
+        .backgroundColor(AppColors.BG_CARD)
+        .borderRadius(AppSizes.CORNER_RADIUS_LG)
+        .shadow({ radius: 10, color: AppColors.SHADOW_SOFT, offsetY: 3 })
+        .margin({ left: 16, right: 16, top: 12 })
+      }
+      .width('100%')
+      .padding({ bottom: 10 })
+    }
+    .width('100%')
+    .height('100%')
+    .scrollBar(BarState.Auto)
+    .edgeEffect(EdgeEffect.Spring)
   }
 }
 
@@ -1003,6 +1261,8 @@ export struct AiReviewStep {
 @Component
 export struct CaptureResultStep {
   @Prop pointsEarned: number = 0;
+  @Prop savedCount: number = 1;
+  @Prop failedCount: number = 0;
   onContinue: () => void = (): void => {
   };
   onExit: () => void = (): void => {
@@ -1037,17 +1297,28 @@ export struct CaptureResultStep {
       .borderRadius(56)
       .margin({ top: 16 })
 
-      Text('录入成功！')
+      Text(this.savedCount > 1 ? `成功录入 ${this.savedCount} 道错题！` : '录入成功！')
         .fontSize(22)
         .fontWeight(FontWeight.Bold)
         .fontColor(AppColors.TEXT_PRIMARY)
         .margin({ top: 18 })
-      Text('AI 已根据遗忘曲线安排复习计划\n明天记得来复习这道错题哦')
+      Text(this.savedCount > 1
+        ? 'AI 已根据遗忘曲线安排复习计划\n明天记得来复习这些错题哦'
+        : 'AI 已根据遗忘曲线安排复习计划\n明天记得来复习这道错题哦')
         .fontSize(14)
         .fontColor(AppColors.TEXT_SECONDARY)
         .textAlign(TextAlign.Center)
         .lineHeight(22)
         .margin({ top: 8 })
+
+      if (this.failedCount > 0) {
+        Text(`有 ${this.failedCount} 道保存失败，可在错题本中核对后重新录入`)
+          .fontSize(12)
+          .fontColor(AppColors.WARNING)
+          .lineHeight(18)
+          .textAlign(TextAlign.Center)
+          .margin({ top: 8 })
+      }
 
       Button('📷  继续录入')
         .width('80%')
