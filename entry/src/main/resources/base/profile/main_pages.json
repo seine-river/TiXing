@@ -9,6 +9,7 @@
     "pages/PointsCenterPage",
     "pages/DataManagementPage",
     "pages/OpsOverviewPage",
+    "pages/AboutPage",
     "pages/LessonVideoPage"
   ]
 }

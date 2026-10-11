@@ -109,10 +109,12 @@ export class AppStrings {
   static readonly LEARNING_PROFILE: string = '学习档案';
   static readonly PARENT_CENTER: string = '家长中心';
   static readonly POINTS_CENTER: string = '积分中心';
+  static readonly ABOUT: string = '关于题醒';
   static readonly PAGE_CAPTURE: string = '录入错题';
   static readonly PAGE_REVIEW: string = '复习错题';
   static readonly PAGE_DETAIL: string = '错题详情';
   static readonly PAGE_DATA: string = '导出与导入';
+  static readonly PAGE_ABOUT: string = '关于题醒';
   static readonly PAGE_REMINDER: string = '复习提醒设置';
   static readonly PAGE_REPORT: string = '学习报告';
   static readonly DELETE: string = '删除';

@@ -72,7 +72,13 @@ export struct ProfilePage {
     m5.url = 'pages/OpsOverviewPage';
     m5.bubble = AppColors.SOLID_INFO;
 
-    return [m1, m2, m3, m4, m5];
+    const m6 = new MenuEntry();
+    m6.icon = 'ℹ️';
+    m6.label = AppStrings.ABOUT;
+    m6.url = 'pages/AboutPage';
+    m6.bubble = AppColors.SOLID_PRIMARY;
+
+    return [m1, m2, m3, m4, m5, m6];
   }
 
   build() {
