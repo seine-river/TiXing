@@ -6,6 +6,10 @@ import { MediaService } from '../services/MediaService';
 import { AppColors, AppSizes, subjectLabel, toFileUri } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { FilterChip } from './BasicWidgets';
+import { hilog } from '@kit.PerformanceAnalysisKit';
+
+const LOG_DOMAIN: number = 0xA007;
+const LOG_TAG: string = 'TiXingCaptureSteps';
 
 /**
  * 录入流程步骤组件（AI 全图识别版）：
@@ -602,6 +606,12 @@ export struct AiReviewStep {
         this.studentAnswer = cleaned;
       }
     } catch (e) {
+      const detail: string = e instanceof Error
+        ? `name=${e.name}, message=${e.message}, stack=${e.stack === undefined ? '' : e.stack}`
+        : `${e}`;
+      hilog.error(LOG_DOMAIN, LOG_TAG,
+        'fill answer from photo failed: target=%{public}s, imagePath=%{public}s, error=%{public}s',
+        target, path, detail);
       Toast.show(e instanceof Error ? e.message : 'AI 识别失败，请检查网络');
     }
     if (this.alive) {
@@ -633,6 +643,12 @@ export struct AiReviewStep {
       }
       this.compareResult = msg;
     } catch (e) {
+      const detail: string = e instanceof Error
+        ? `name=${e.name}, message=${e.message}, stack=${e.stack === undefined ? '' : e.stack}`
+        : `${e}`;
+      hilog.error(LOG_DOMAIN, LOG_TAG,
+        'AI compare failed: questionLength=%{public}d, standardAnswerLength=%{public}d, myAnswerLength=%{public}d, error=%{public}s',
+        this.questionText.length, s.length, m.length, detail);
       this.compareResult = diffAnswers(s, m);
       Toast.show('AI 分析失败，已使用本地对比');
     }

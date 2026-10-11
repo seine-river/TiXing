@@ -380,6 +380,22 @@ struct ReviewPage {
           .fontSize(16)
           .fontColor(AppColors.TEXT_REGULAR)
           .margin({ top: 8 })
+        Button('🎬 AI 视频讲解')
+          .width('90%')
+          .height(42)
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .backgroundColor(AppColors.BG_CARD)
+          .fontColor(AppColors.PRIMARY)
+          .borderRadius(21)
+          .border({ width: 1.5, color: AppColors.PRIMARY })
+          .margin({ top: 14 })
+          .onClick(() => {
+            this.getUIContext().getRouter().pushUrl({
+              url: 'pages/LessonVideoPage',
+              params: { mistakeId: mistake.id }
+            });
+          })
       }
 
       Button(this.currentIndex + 1 < this.totalCount ? AppStrings.REVIEW_NEXT : AppStrings.REVIEW_FINISH)

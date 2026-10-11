@@ -6,8 +6,12 @@ import { AiService } from '../services/AiService';
 import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, formatDate, toFileUri } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { StatusTag, SubjectTag, PageHeader } from '../components/CommonComponents';
-import { EmptyBlock } from '../components/BasicWidgets';
+import { EmptyBlock, PrimaryButton } from '../components/BasicWidgets';
 import { MistakeDetailParams } from '../common/RouteParams';
+import { hilog } from '@kit.PerformanceAnalysisKit';
+
+const LOG_DOMAIN: number = 0xA006;
+const LOG_TAG: string = 'TiXingMistakeDetail';
 
 @Entry
 @Component
@@ -152,7 +156,13 @@ struct MistakeDetailPage {
         this.editMyAnswer = cleaned;
       }
     } catch (e) {
-      Toast.show('识别失败，请检查网络或 AI 配置');
+      const detail: string = e instanceof Error
+        ? `name=${e.name}, message=${e.message}, stack=${e.stack === undefined ? '' : e.stack}`
+        : `${e}`;
+      hilog.error(LOG_DOMAIN, LOG_TAG,
+        're-recognize field failed: target=%{public}s, imagePath=%{public}s, error=%{public}s',
+        target, path, detail);
+      Toast.show(e instanceof Error ? e.message : '识别失败，请检查网络或 AI 配置');
     }
     this.fieldBusy = '';
   }
@@ -188,6 +198,49 @@ struct MistakeDetailPage {
                 .fontColor(AppColors.TEXT_SECONDARY)
             }
             .padding({ left: 16, right: 16, top: 4 })
+
+            // AI 动画讲解入口：根据学生年级、题目和学生答案生成个性化讲解
+            Column({ space: 10 }) {
+              Row({ space: 12 }) {
+                Text('🎬')
+                  .fontSize(24)
+                  .width(50)
+                  .height(50)
+                  .textAlign(TextAlign.Center)
+                  .backgroundColor(AppColors.SOFT_PRIMARY)
+                  .borderRadius(18)
+                Column() {
+                  Text('AI 视频讲解')
+                    .fontSize(16)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(AppColors.TEXT_PRIMARY)
+                  Text('按年级定制 · 分析我的答案 · 分步讲懂')
+                    .fontSize(12)
+                    .fontColor(AppColors.TEXT_SECONDARY)
+                    .margin({ top: 3 })
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start)
+              }
+              .width('100%')
+
+              PrimaryButton({
+                text: '生成并播放讲解',
+                onTap: (): void => {
+                  this.getUIContext().getRouter().pushUrl({
+                    url: 'pages/LessonVideoPage',
+                    params: { mistakeId: this.mistake.id }
+                  });
+                }
+              })
+            }
+            .alignItems(HorizontalAlign.Start)
+            .width('100%')
+            .padding(14)
+            .backgroundColor(AppColors.BG_CARD)
+            .borderRadius(AppSizes.CORNER_RADIUS_LG)
+            .shadow({ radius: 10, color: AppColors.SHADOW_SOFT, offsetY: 3 })
+            .margin({ left: 16, right: 16, top: 10 })
 
             // 原始照片（录入时拍摄的错题原图）
             if (this.mistake.imageUrl.length > 0) {

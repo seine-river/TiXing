@@ -43,42 +43,36 @@ export struct ProfilePage {
 
   private menuItems(): MenuEntry[] {
     const m1 = new MenuEntry();
-    m1.icon = '🤖';
-    m1.label = 'AI 设置';
-    m1.url = 'pages/AiSettingPage';
-    m1.bubble = AppColors.SOLID_PRIMARY;
+    m1.icon = '📚';
+    m1.label = AppStrings.LEARNING_PROFILE;
+    m1.url = 'pages/ProfileSettingPage';
+    m1.bubble = AppColors.SOLID_INFO;
 
     const m2 = new MenuEntry();
-    m2.icon = '📚';
-    m2.label = AppStrings.LEARNING_PROFILE;
-    m2.url = 'pages/ProfileSettingPage';
-    m2.bubble = AppColors.SOLID_INFO;
+    m2.icon = '⏰';
+    m2.label = '复习提醒设置';
+    m2.url = 'pages/ReminderSettingPage';
+    m2.bubble = AppColors.SOLID_WARNING;
 
     const m3 = new MenuEntry();
-    m3.icon = '⏰';
-    m3.label = '复习提醒设置';
-    m3.url = 'pages/ReminderSettingPage';
-    m3.bubble = AppColors.SOLID_WARNING;
+    m3.icon = '🎁';
+    m3.label = AppStrings.POINTS_CENTER;
+    m3.url = 'pages/PointsCenterPage';
+    m3.bubble = AppColors.SOLID_SECONDARY;
 
     const m4 = new MenuEntry();
-    m4.icon = '🎁';
-    m4.label = AppStrings.POINTS_CENTER;
-    m4.url = 'pages/PointsCenterPage';
-    m4.bubble = AppColors.SOLID_SECONDARY;
+    m4.icon = '🔄';
+    m4.label = '导出与导入';
+    m4.url = 'pages/DataManagementPage';
+    m4.bubble = AppColors.SOLID_DANGER;
 
     const m5 = new MenuEntry();
-    m5.icon = '🔄';
-    m5.label = '导出与导入';
-    m5.url = 'pages/DataManagementPage';
-    m5.bubble = AppColors.SOLID_DANGER;
+    m5.icon = '👨‍👩‍👧';
+    m5.label = AppStrings.PARENT_CENTER;
+    m5.url = 'pages/OpsOverviewPage';
+    m5.bubble = AppColors.SOLID_INFO;
 
-    const m6 = new MenuEntry();
-    m6.icon = '👨‍👩‍👧';
-    m6.label = AppStrings.PARENT_CENTER;
-    m6.url = 'pages/OpsOverviewPage';
-    m6.bubble = AppColors.SOLID_INFO;
-
-    return [m1, m2, m3, m4, m5, m6];
+    return [m1, m2, m3, m4, m5];
   }
 
   build() {

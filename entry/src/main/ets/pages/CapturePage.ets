@@ -13,6 +13,10 @@ import { AppColors, AppStrings, generateId } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
 import { CaptureSourceStep, AiAnalyzingStep, AiReviewStep, CaptureResultStep, CaptureFormPayload } from '../components/CaptureSteps';
+import { hilog } from '@kit.PerformanceAnalysisKit';
+
+const LOG_DOMAIN: number = 0xA005;
+const LOG_TAG: string = 'TiXingCapture';
 
 /**
  * 录入页（AI 全图识别版）：
@@ -184,7 +188,16 @@ struct CapturePage {
       if (!this.alive) {
         return;
       }
-      PerformanceMonitor.writeFault('ai_recognize_error', { 'reason': 'request_failed' });
+      const detail: string = e instanceof Error
+        ? `name=${e.name}, message=${e.message}, stack=${e.stack === undefined ? '' : e.stack}`
+        : `${e}`;
+      hilog.error(LOG_DOMAIN, LOG_TAG,
+        'AI recognize question failed: imagePath=%{public}s, error=%{public}s',
+        this.imagePath, detail);
+      PerformanceMonitor.writeFault('ai_recognize_error', {
+        'reason': 'request_failed',
+        'error': e instanceof Error ? e.message : 'non_error_exception'
+      });
       this.aiRecognized = false;
       this.aiError = e instanceof Error ? e.message : 'AI 识别失败，请检查网络后重试';
     }
