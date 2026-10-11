@@ -25,11 +25,11 @@ struct DataManagementPage {
               .fontColor(AppColors.TEXT_PRIMARY)
               .width('100%')
               .margin({ bottom: 8 })
-            Text('将错题、复习记录与错题图片打包为 zip 备份文件，可用于换机备份或分享。')
+            Text('打包错题、复习记录与图片后，会弹出系统保存窗口，由你选择备份文件的存储位置和文件名。')
               .fontSize(13)
               .fontColor(AppColors.TEXT_SECONDARY)
               .margin({ bottom: 12 })
-            Button(this.busy && this.busyMsg.length > 0 ? this.busyMsg : '导出备份（zip）')
+            Button(this.busy && this.busyMsg.length > 0 ? this.busyMsg : '导出到指定位置（zip）')
               .width('100%')
               .height(44)
               .backgroundColor(this.busy ? AppColors.DISABLED : AppColors.SOLID_PRIMARY)
@@ -145,10 +145,16 @@ struct DataManagementPage {
     }
     this.setBusy('导出中...');
     try {
-      const path: string = await DataPortabilityService.exportBundle('stu_default');
-      this.statusOk = true;
-      this.statusMsg = `✅ 已导出到：${path}`;
-      Toast.show('导出成功');
+      const path: string | undefined =
+        await DataPortabilityService.exportBundleToUserSelectedPath('stu_default');
+      if (path === undefined) {
+        this.statusOk = false;
+        this.statusMsg = '已取消保存，备份文件未导出';
+      } else {
+        this.statusOk = true;
+        this.statusMsg = `✅ 已导出到：${path}`;
+        Toast.show('导出成功');
+      }
     } catch (e) {
       const reason: string = e instanceof Error ? e.message : '未知错误';
       this.statusOk = false;

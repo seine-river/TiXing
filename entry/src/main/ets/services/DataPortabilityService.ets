@@ -244,6 +244,45 @@ export class DataPortabilityService {
    * 失败 throw；成功返回 zip 路径。
    */
   static async exportBundle(studentId: string): Promise<string> {
+    const ctx = AppContextHolder.require();
+    const exportsDir: string = ctx.filesDir + '/exports';
+    if (!fs.accessSync(exportsDir)) {
+      fs.mkdirSync(exportsDir, true);
+    }
+    const zipPath: string =
+      `${exportsDir}/tixing_backup_${DataPortabilityService.dateStamp()}_${Date.now() % 100000}.zip`;
+    await DataPortabilityService.buildBundle(studentId, zipPath);
+    DataPortabilityService.rotateExports(exportsDir);
+    return zipPath;
+  }
+
+  /**
+   * 先在应用缓存中生成备份包，再拉起系统保存窗口。
+   * 用户选择目录/文件名后写入用户可见位置；取消保存时返回 undefined。
+   */
+  static async exportBundleToUserSelectedPath(studentId: string): Promise<string | undefined> {
+    const ctx = AppContextHolder.require();
+    const exportDir: string = ctx.cacheDir + '/export_to_user';
+    if (!fs.accessSync(exportDir)) {
+      fs.mkdirSync(exportDir, true);
+    }
+    const fileName: string =
+      `tixing_backup_${DataPortabilityService.dateStamp()}_${Date.now() % 100000}.zip`;
+    const zipPath: string = `${exportDir}/${fileName}`;
+    try {
+      await DataPortabilityService.buildBundle(studentId, zipPath);
+      const targetUri: string | undefined = await DataPortabilityService.pickExportDestination(fileName);
+      if (targetUri === undefined) {
+        return undefined;
+      }
+      await DataPortabilityService.copyFileToUri(zipPath, targetUri);
+      return targetUri;
+    } finally {
+      removeDirRecursive(exportDir);
+    }
+  }
+
+  private static async buildBundle(studentId: string, zipPath: string): Promise<void> {
     const mistakes: Mistake[] = await dbHelper.queryMistakesByStudent(studentId);
     const logs: ReviewLog[] = await dbHelper.queryReviewLogsByStudent(studentId);
     const settings: ReminderSettings = await dbHelper.queryReminderSettings(studentId);
@@ -317,20 +356,40 @@ export class DataPortabilityService {
       };
       DataPortabilityService.writeText(`${stagingDir}/data.json`, JSON.stringify(dataRoot));
 
-      const exportsDir: string = ctx.filesDir + '/exports';
-      if (!fs.accessSync(exportsDir)) {
-        fs.mkdirSync(exportsDir, true);
-      }
-      const zipPath: string = `${exportsDir}/tixing_backup_${DataPortabilityService.dateStamp()}_${Date.now() % 100000}.zip`;
       const zlibOpts: zlib.Options = {};
       await zlib.compressFile(stagingDir, zipPath, zlibOpts);
       if (!fs.accessSync(zipPath)) {
         throw new Error('压缩产物写入失败');
       }
-      DataPortabilityService.rotateExports(exportsDir);
-      return zipPath;
     } finally {
       removeDirRecursive(stagingDir);
+    }
+  }
+
+  /** 拉起系统保存文件窗口，让用户选择备份文件的保存位置与文件名。 */
+  private static async pickExportDestination(fileName: string): Promise<string | undefined> {
+    const docPicker = new picker.DocumentViewPicker(AppContextHolder.require());
+    const options = new picker.DocumentSaveOptions();
+    options.newFileNames = [fileName];
+    options.fileSuffixChoices = ['.zip'];
+    const uris: string[] = await docPicker.save(options);
+    return uris.length > 0 ? uris[0] : undefined;
+  }
+
+  private static async copyFileToUri(sourcePath: string, targetUri: string): Promise<void> {
+    const srcFile = fs.openSync(sourcePath, fs.OpenMode.READ_ONLY);
+    let destFile: fs.File | undefined = undefined;
+    try {
+      destFile = fs.openSync(targetUri, fs.OpenMode.READ_WRITE | fs.OpenMode.TRUNC);
+      await fs.copyFile(srcFile.fd, destFile.fd);
+    } catch (e) {
+      PerformanceMonitor.warn('copy export bundle to user path failed');
+      throw new Error('备份文件写入所选位置失败，请重试');
+    } finally {
+      if (destFile !== undefined) {
+        fs.closeSync(destFile);
+      }
+      fs.closeSync(srcFile);
     }
   }
 
