@@ -16,7 +16,6 @@ struct ReminderSettingPage {
   @State chineseEnabled: boolean = true;
   @State englishEnabled: boolean = false;
   @State scienceEnabled: boolean = false;
-  @State doNotDisturb: boolean = false;
   @State notificationEnabled: boolean = true;
   @State saving: boolean = false;
   @State statusMsg: string = '';
@@ -36,7 +35,6 @@ struct ReminderSettingPage {
     this.chineseEnabled = s.chineseEnabled;
     this.englishEnabled = s.englishEnabled;
     this.scienceEnabled = s.scienceEnabled;
-    this.doNotDisturb = s.doNotDisturb;
     this.notificationEnabled = s.notificationEnabled;
   }
 
@@ -58,6 +56,10 @@ struct ReminderSettingPage {
             }
             .width('100%')
             .padding({ top: 8, bottom: 8 })
+            Text('若设备限制应用代理提醒，将自动改为写入系统日历，仍按开始时间提醒')
+              .fontSize(12)
+              .fontColor(AppColors.TEXT_SECONDARY)
+              .margin({ top: 4 })
           }
           .width('100%')
           .padding(16)
@@ -68,17 +70,17 @@ struct ReminderSettingPage {
           Column() {
             Text('复习时间段')
               .fontSize(14)
-              .fontColor(AppColors.TEXT_SECONDARY)
+              .fontColor(this.settingLabelColor())
               .margin({ bottom: 8 })
             Row() {
               Text('开始时间')
                 .fontSize(15)
-                .fontColor(AppColors.TEXT_PRIMARY)
+                .fontColor(this.settingTextColor())
                 .layoutWeight(1)
               Text(this.reviewTimeStart)
                 .fontSize(15)
                 .fontWeight(FontWeight.Medium)
-                .fontColor(AppColors.PRIMARY)
+                .fontColor(this.settingValueColor())
             }
             .width('100%')
             .height(AppSizes.TOUCH_TARGET)
@@ -89,12 +91,12 @@ struct ReminderSettingPage {
             Row() {
               Text('结束时间')
                 .fontSize(15)
-                .fontColor(AppColors.TEXT_PRIMARY)
+                .fontColor(this.settingTextColor())
                 .layoutWeight(1)
               Text(this.reviewTimeEnd)
                 .fontSize(15)
                 .fontWeight(FontWeight.Medium)
-                .fontColor(AppColors.PRIMARY)
+                .fontColor(this.settingValueColor())
             }
             .width('100%')
             .height(AppSizes.TOUCH_TARGET)
@@ -104,23 +106,25 @@ struct ReminderSettingPage {
             })
             Text('每日提醒将在开始时间推送（点击时间可修改）')
               .fontSize(12)
-              .fontColor(AppColors.TEXT_PLACEHOLDER)
+              .fontColor(this.settingNoteColor())
           }
           .width('100%')
           .padding(16)
           .backgroundColor(AppColors.BG_CARD)
           .borderRadius(AppSizes.CORNER_RADIUS_SM)
           .margin({ left: 16, right: 16, top: 8 })
+          .enabled(this.notificationEnabled)
+          .opacity(this.notificationEnabled ? 1 : 0.55)
 
           Column() {
             Text('每日复习题量上限')
               .fontSize(14)
-              .fontColor(AppColors.TEXT_SECONDARY)
+              .fontColor(this.settingLabelColor())
               .margin({ bottom: 8 })
             Row() {
               Button('-')
-                .width(40).height(40).fontSize(20).borderRadius(20)
-                .backgroundColor(AppColors.CHIP_BG).fontColor(AppColors.TEXT_PRIMARY)
+                .width(44).height(44).fontSize(24).borderRadius(22).padding(0)
+                .backgroundColor(this.settingChipColor()).fontColor(this.settingTextColor())
                 .onClick(() => {
                   if (this.dailyLimit > 3) {
                     this.dailyLimit -= 1;
@@ -128,10 +132,10 @@ struct ReminderSettingPage {
                 })
               Text(`${this.dailyLimit}`)
                 .fontSize(24).fontWeight(FontWeight.Bold)
-                .fontColor(AppColors.PRIMARY).width(60).textAlign(TextAlign.Center)
+                .fontColor(this.settingValueColor()).width(60).textAlign(TextAlign.Center)
               Button('+')
-                .width(40).height(40).fontSize(20).borderRadius(20)
-                .backgroundColor(AppColors.CHIP_BG).fontColor(AppColors.TEXT_PRIMARY)
+                .width(44).height(44).fontSize(24).borderRadius(22).padding(0)
+                .backgroundColor(this.settingChipColor()).fontColor(this.settingTextColor())
                 .onClick(() => {
                   if (this.dailyLimit < 20) {
                     this.dailyLimit += 1;
@@ -145,11 +149,13 @@ struct ReminderSettingPage {
           .backgroundColor(AppColors.BG_CARD)
           .borderRadius(AppSizes.CORNER_RADIUS_SM)
           .margin({ left: 16, right: 16, top: 8 })
+          .enabled(this.notificationEnabled)
+          .opacity(this.notificationEnabled ? 1 : 0.55)
 
           Column() {
             Text('学科开关')
               .fontSize(14)
-              .fontColor(AppColors.TEXT_SECONDARY)
+              .fontColor(this.settingLabelColor())
               .margin({ bottom: 8 })
             this.SubjectToggle('数学', this.mathEnabled, (v: boolean) => {
               this.mathEnabled = v;
@@ -169,26 +175,8 @@ struct ReminderSettingPage {
           .backgroundColor(AppColors.BG_CARD)
           .borderRadius(AppSizes.CORNER_RADIUS_SM)
           .margin({ left: 16, right: 16, top: 8 })
-
-          Column() {
-            Row() {
-              Text('免打扰模式')
-                .fontSize(15)
-                .fontColor(AppColors.TEXT_PRIMARY)
-                .layoutWeight(1)
-              Toggle({ type: ToggleType.Switch, isOn: this.doNotDisturb })
-                .onChange((isOn: boolean) => {
-                  this.doNotDisturb = isOn;
-                })
-            }
-            .width('100%')
-            .padding({ top: 8, bottom: 8 })
-          }
-          .width('100%')
-          .padding(16)
-          .backgroundColor(AppColors.BG_CARD)
-          .borderRadius(AppSizes.CORNER_RADIUS_SM)
-          .margin({ left: 16, right: 16, top: 8 })
+          .enabled(this.notificationEnabled)
+          .opacity(this.notificationEnabled ? 1 : 0.55)
 
           if (this.statusMsg.length > 0) {
             Text(this.statusMsg)
@@ -224,6 +212,9 @@ struct ReminderSettingPage {
    * 时间段编辑（T023/FR-011）：点击弹 TimePicker，修改后保存生效。
    */
   private editTime(isStart: boolean): void {
+    if (!this.notificationEnabled) {
+      return;
+    }
     const current: string = isStart ? this.reviewTimeStart : this.reviewTimeEnd;
     this.getUIContext().showTimePickerDialog({
       selected: this.timeToDate(current),
@@ -254,24 +245,48 @@ struct ReminderSettingPage {
     return v;
   }
 
+  private settingLabelColor(): Resource {
+    return this.notificationEnabled ? AppColors.TEXT_SECONDARY : AppColors.DISABLED;
+  }
+
+  private settingTextColor(): Resource {
+    return this.notificationEnabled ? AppColors.TEXT_PRIMARY : AppColors.DISABLED;
+  }
+
+  private settingValueColor(): Resource {
+    return this.notificationEnabled ? AppColors.PRIMARY : AppColors.DISABLED;
+  }
+
+  private settingNoteColor(): Resource {
+    return this.notificationEnabled ? AppColors.TEXT_PLACEHOLDER : AppColors.DISABLED;
+  }
+
+  private settingChipColor(): Resource {
+    return this.notificationEnabled ? AppColors.CHIP_BG : AppColors.DISABLED;
+  }
+
   @Builder
   SubjectToggle(label: string, isOn: boolean, onChange: (v: boolean) => void) {
     Row() {
       Text(label)
         .fontSize(15)
-        .fontColor(AppColors.TEXT_PRIMARY)
+        .fontColor(this.settingTextColor())
         .layoutWeight(1)
       Toggle({ type: ToggleType.Switch, isOn: isOn })
+        .enabled(this.notificationEnabled)
         .onChange((v: boolean) => {
-          onChange(v);
+          if (this.notificationEnabled) {
+            onChange(v);
+          }
         })
     }
     .width('100%')
     .padding({ top: 8, bottom: 8 })
+    .enabled(this.notificationEnabled)
   }
 
   /**
-   * 保存（T023/FR-009）：先运行时权限申请，再按真实发布结果提示。
+   * 保存（T023/FR-009）：代理提醒权限由安装声明授予，这里只申请通知开关。
    */
   private async saveSettings(): Promise<void> {
     if (this.saving) {
@@ -286,7 +301,6 @@ struct ReminderSettingPage {
     s.chineseEnabled = this.chineseEnabled;
     s.englishEnabled = this.englishEnabled;
     s.scienceEnabled = this.scienceEnabled;
-    s.doNotDisturb = this.doNotDisturb;
     s.notificationEnabled = this.notificationEnabled;
 
     const saveRes: DbResult = await dbHelper.saveReminderSettings(s);
@@ -298,7 +312,7 @@ struct ReminderSettingPage {
       return;
     }
 
-    if (!this.notificationEnabled || this.doNotDisturb) {
+    if (!this.notificationEnabled) {
       const cancelRes: DbResult = await ReminderService.syncAndApply(s);
       this.saving = false;
       if (cancelRes.success) {
@@ -314,20 +328,23 @@ struct ReminderSettingPage {
     }
 
     const ctx = this.getUIContext().getHostContext() as Context;
-    const granted: boolean = await ReminderService.ensurePermission(ctx);
-    if (!granted) {
-      this.saving = false;
+    const notificationReady: boolean = await ReminderService.ensureNotificationEnabled(ctx);
+    if (!notificationReady) {
       this.statusOk = false;
-      this.statusMsg = '⚠️ 未获得通知权限，提醒不会生效；请在系统设置中开启后重试';
-      Toast.show('未获得通知权限，提醒不会生效');
-      return;
+      this.statusMsg = '⚠️ 应用通知未开启，将尝试使用系统日历提醒';
     }
-    const applyRes: DbResult = await ReminderService.syncAndApply(s);
+    const applyRes: DbResult = await ReminderService.syncAndApply(s, ctx);
     this.saving = false;
     if (applyRes.success) {
-      this.statusOk = true;
-      this.statusMsg = '✅ 设置已保存，提醒已生效';
-      Toast.show('提醒设置已保存并生效');
+      if (applyRes.mode === 'calendar') {
+        this.statusOk = true;
+        this.statusMsg = '✅ 成功设置日历';
+        Toast.show('成功设置日历');
+      } else {
+        this.statusOk = true;
+        this.statusMsg = '✅ 设置已保存，提醒已生效';
+        Toast.show('提醒设置已保存并生效');
+      }
     } else {
       this.statusOk = false;
       this.statusMsg = '❌ ' + applyRes.reason;

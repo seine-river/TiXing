@@ -56,6 +56,22 @@
         }
       },
       {
+        "name": "ohos.permission.READ_CALENDAR",
+        "reason": "$string:reason_read_calendar",
+        "usedScene": {
+          "abilities": ["EntryAbility"],
+          "when": "inuse"
+        }
+      },
+      {
+        "name": "ohos.permission.WRITE_CALENDAR",
+        "reason": "$string:reason_write_calendar",
+        "usedScene": {
+          "abilities": ["EntryAbility"],
+          "when": "inuse"
+        }
+      },
+      {
         "name": "ohos.permission.INTERNET",
         "reason": "$string:reason_internet",
         "usedScene": {
