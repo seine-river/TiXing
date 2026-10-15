@@ -1,0 +1,19 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/CapturePage",
+    "pages/MistakeDetailPage",
+    "pages/ReviewPage",
+    "pages/ProfileSettingPage",
+    "pages/ReminderSettingPage",
+    "pages/PointsCenterPage",
+    "pages/DataManagementPage",
+    "pages/OpsOverviewPage",
+    "pages/AboutPage",
+    "pages/LessonVideoPage",
+    "pages/VoiceAskPage",
+    "pages/VoiceAskListPage",
+    "pages/VoiceAskDetailPage",
+    "pages/CuriosityPlanetPage"
+  ]
+}

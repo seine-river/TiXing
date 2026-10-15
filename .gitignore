@@ -1,19 +1,22 @@
-/node_modules
-/oh_modules
-/local.properties
-/.idea
-**/build
-/.hvigor
-.cxx
-/.clangd
-/.clang-format
-/.clang-tidy
-**/.test
-/.appanalyzer
-/Key/
-/.cache/
 .DS_Store
-/App截图/
-/build-profile.signing.json5
-entry/src/main/resources/rawfile/ai_config.json
-entry/src/main/resources/rawfile/apiconfig.json
+**/.DS_Store
+/.idea/
+/.hvigor/
+/.deveco/
+/.cache/
+
+# 构建产物与本地缓存按平台自身规则继续忽略。
+**/build/
+**/.test/
+
+# Android 常见本地产物
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# iOS 常见本地产物
+ios/Pods/
+ios/build/
+ios/DerivedData/
+ios/*.xcuserstate
