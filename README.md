@@ -16,7 +16,7 @@ TiXing/
 
 - `harmonyos/` 保存当前已实现的 HarmonyOS 版本。
 - `android/` 与 `ios/` 为后续原生应用工程预留。
-- iOS UX 设计参考截图见 `docs/ux_screenshots/ios_reference/`。
+- iOS UX 设计参考截图见 `docs/ux_screenshots/reference/`。
 
 ## IDE 打开方式
 

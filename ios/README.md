@@ -7,7 +7,7 @@
 iOS UX 参考：
 
 ```text
-../docs/ux_screenshots/ios_reference/
+../docs/ux_screenshots/reference/
 ```
 
 建议后续落地时采用 SwiftUI 为主、必要模块 UIKit 兼容的实现，并按数据、领域、界面和平台能力分层。
