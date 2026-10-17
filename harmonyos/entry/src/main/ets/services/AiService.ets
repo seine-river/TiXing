@@ -746,6 +746,7 @@ export class AiService {
       '8. visual字段要求：fraction_bars用于分数、倍数、比例，输出labels/numerators/denominators/resultNumerator/resultDenominator；number_line输出labels/nodes/highlightIndex；counters输出icons/captions；arrow_flow输出nodes，每步一个节点；shape_combo输出labels/nodes/icons；icon_story输出icons/captions。小学题目优先选能讲清因果的图形，不要每次都用arrow_flow。\n' +
       '9. 不得编造题目没有的信息；标准答案未提供时要提醒家长核对。\n' +
       '10. 只输出纯JSON，不要markdown代码块和解释。\n' +
+      '11. visual.nodes、visual.labels、visual.icons、visual.captions 必须全部是字符串数组；number_line的节点数值也必须写成字符串，例如"nodes":["0","120","240"]，不要输出数字。\n' +
       'screen只输出该type需要的字段：cover输出title/text；question输出title/text/highlight；compare输出title/studentAnswer/standardAnswer；steps输出title/steps；tip输出title/text。不要输出空字段。\n' +
       '返回格式：{"title":"不超过10字","totalDuration":45,"gradeLevel":"三年级","tone":"亲切鼓励","scenes":[{"id":"intro","duration":5,"narration":"...","subtitle":"...","screen":{"type":"steps","title":"...","steps":["..."],"visual":{"type":"fraction_bars","labels":["3/8","1/4","5/8"],"numerators":[3,1,5],"denominators":[8,4,8],"resultNumerator":5,"resultDenominator":8,"nodes":[],"icons":[],"captions":[],"highlightIndex":2}},"animation":"bar_grow"}]}\n' +
       'JSON字段名必须使用英文。';
@@ -784,7 +785,22 @@ export class AiService {
       hilog.info(LOG_DOMAIN, LOG_TAG,
         'parseLesson json extracted: jsonLength=%{public}d, objectStart=%{public}d, objectEnd=%{public}d',
         jsonStr.length, raw.indexOf('{'), raw.lastIndexOf('}'));
-      const obj: AiLessonRaw = JSON.parse(jsonStr) as AiLessonRaw;
+      const parseCandidates: string[] = [jsonStr, AiService.quoteNumericVisualNodes(jsonStr)];
+      let obj: AiLessonRaw | undefined = undefined;
+      let parseError: Object | undefined = undefined;
+      for (const candidate of parseCandidates) {
+        try {
+          obj = JSON.parse(candidate) as AiLessonRaw;
+          break;
+        } catch (e) {
+          parseError = e;
+        }
+      }
+      if (obj === undefined) {
+        throw new Error(parseError === undefined
+          ? '讲解视频 JSON 解析失败'
+          : AiService.errText(parseError));
+      }
       lesson.title = obj.title !== undefined && obj.title.length > 0 ? obj.title : '错题讲解';
       lesson.gradeLevel = obj.gradeLevel !== undefined ? obj.gradeLevel : '';
       lesson.tone = obj.tone !== undefined && obj.tone.length > 0 ? obj.tone : lesson.tone;
@@ -864,10 +880,47 @@ export class AiService {
     for (const scene of lesson.scenes) {
       total += scene.duration;
     }
-    if (modelValue !== undefined && modelValue > 0 && Math.abs(modelValue - total) <= 10) {
-      return Math.round(modelValue);
-    }
     return total;
+  }
+
+  /**
+   * 真机偶发 JSON.parse 报 “Unexpected Object Prop in JSON”：
+   * GLM 有时把 number_line.nodes 输出成数字数组。这里只把 nodes 中裸数字
+   * 转成字符串后重试，不改变 numerators/denominators 等真实数值字段。
+   */
+  private static quoteNumericVisualNodes(json: string): string {
+    const marker: string = '"nodes"';
+    let output: string = '';
+    let cursor: number = 0;
+    while (cursor < json.length) {
+      const markerAt: number = json.indexOf(marker, cursor);
+      if (markerAt < 0) {
+        output += json.substring(cursor);
+        break;
+      }
+      const arrayStart: number = json.indexOf('[', markerAt + marker.length);
+      const arrayEnd: number = arrayStart >= 0 ? json.indexOf(']', arrayStart + 1) : -1;
+      if (arrayStart < 0 || arrayEnd < 0) {
+        output += json.substring(cursor, markerAt + marker.length);
+        cursor = markerAt + marker.length;
+        continue;
+      }
+      output += json.substring(cursor, arrayStart + 1);
+      const body: string = json.substring(arrayStart + 1, arrayEnd).trim();
+      if (body.length > 0) {
+        const values: string[] = body.split(',');
+        for (let i: number = 0; i < values.length; i++) {
+          const value: string = values[i].trim();
+          output += value.startsWith('"') ? value : `"${value}"`;
+          if (i < values.length - 1) {
+            output += ',';
+          }
+        }
+      }
+      output += ']';
+      cursor = arrayEnd;
+    }
+    return output;
   }
 
   private static normalizeLessonScreenType(value: string | undefined): string {

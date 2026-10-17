@@ -111,26 +111,62 @@ export struct HomePage {
               .textAlign(TextAlign.Center)
               .backgroundColor(AppColors.BADGE_BG)
               .borderRadius(18)
-              .margin({ right: 10 })
               .accessibilityText('吉祥物醒醒')
-
-            Button(this.todayReviewCount > 0 ? '开始复习' : '休息一下')
-              .height(AppSizes.TOUCH_TARGET + 2)
-              .backgroundColor(Color.White)
-              .fontColor(AppColors.HERO_BTN_TEXT)
-              .fontSize(16)
-              .fontWeight(FontWeight.Bold)
-              .borderRadius(23)
-              .padding({ left: 24, right: 24 })
-              .shadow({ radius: 10, color: AppColors.SHADOW_CARD, offsetY: 4 })
-              .enabled(this.todayReviewCount > 0)
-              .accessibilityText('开始复习今日错题')
-              .onClick(() => {
-                this.getUIContext().getRouter().pushUrl({ url: 'pages/ReviewPage' });
-              })
           }
           .width('100%')
           .margin({ top: 22 })
+
+          if (this.todayReviewCount > 0) {
+            Button() {
+              Row({ space: 10 }) {
+                Text('▶')
+                  .fontSize(14)
+                  .fontColor(Color.White)
+                  .width(34)
+                  .height(34)
+                  .textAlign(TextAlign.Center)
+                  .backgroundColor('#38FFFFFF')
+                  .borderRadius(17)
+
+                Column({ space: 2 }) {
+                  Text('开始复习')
+                    .fontSize(17)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(Color.White)
+                  Text(`${this.todayReviewCount} 道题已经准备好`)
+                    .fontSize(11)
+                    .fontColor('#E6FFFFFF')
+                }
+                .alignItems(HorizontalAlign.Start)
+                .layoutWeight(1)
+
+                Text('›')
+                  .fontSize(18)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(Color.White)
+                  .width(30)
+                  .height(30)
+                  .textAlign(TextAlign.Center)
+                  .backgroundColor('#2EFFFFFF')
+                  .borderRadius(15)
+              }
+              .width('100%')
+              .height(64)
+              .padding({ left: 14, right: 14 })
+              .borderRadius(22)
+            }
+            .linearGradient({
+              angle: 140,
+              colors: [['#FFD166', 0], ['#FF7836', 0.55], ['#EE4526', 1]]
+            })
+            .border({ width: 1, color: '#47FFFFFF' })
+            .shadow({ radius: 12, color: '#47EE4526', offsetY: 5 })
+            .margin({ top: 16 })
+            .accessibilityText('开始复习今日错题')
+            .onClick(() => {
+              this.getUIContext().getRouter().pushUrl({ url: 'pages/ReviewPage' });
+            })
+          }
         }
 
         Row() {

@@ -1,0 +1,688 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	objectVersion = 56;
+	classes = {
+	};
+	objects = {
+		00000000000000000000001D /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000001C /* App/RootView.swift */;
+		};
+
+		00000000000000000000001F /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000001E /* App/TiXingApp.swift */;
+		};
+
+		000000000000000000000021 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000020 /* Features/About/AboutView.swift */;
+		};
+
+		000000000000000000000023 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000022 /* Features/Curiosity/CuriosityPlanetView.swift */;
+		};
+
+		000000000000000000000025 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000024 /* Features/Data/DataManagementView.swift */;
+		};
+
+		000000000000000000000027 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000026 /* Features/Home/HomeView.swift */;
+		};
+
+		000000000000000000000029 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000028 /* Features/Lesson/LessonVideoView.swift */;
+		};
+
+		00000000000000000000002B /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000002A /* Features/Mistakes/CaptureFlowView.swift */;
+		};
+
+		00000000000000000000002D /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000002C /* Features/Mistakes/MistakeDetailView.swift */;
+		};
+
+		00000000000000000000002F /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000002E /* Features/Mistakes/MistakeRow.swift */;
+		};
+
+		000000000000000000000031 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000030 /* Features/Mistakes/MistakesView.swift */;
+		};
+
+		000000000000000000000033 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000032 /* Features/Points/PointsCenterView.swift */;
+		};
+
+		000000000000000000000035 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000034 /* Features/Profile/OpsOverviewView.swift */;
+		};
+
+		000000000000000000000037 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000036 /* Features/Profile/ProfileSettingView.swift */;
+		};
+
+		000000000000000000000039 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000038 /* Features/Profile/ProfileView.swift */;
+		};
+
+		00000000000000000000003B /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000003A /* Features/Profile/ReminderSettingView.swift */;
+		};
+
+		00000000000000000000003D /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000003C /* Features/Report/ReportView.swift */;
+		};
+
+		00000000000000000000003F /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000003E /* Features/Review/ReviewView.swift */;
+		};
+
+		000000000000000000000041 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000040 /* Features/VoiceAsk/VoiceAskDetailView.swift */;
+		};
+
+		000000000000000000000043 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000042 /* Features/VoiceAsk/VoiceAskListView.swift */;
+		};
+
+		000000000000000000000045 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000044 /* Features/VoiceAsk/VoiceAskView.swift */;
+		};
+
+		000000000000000000000047 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000046 /* Models/AIModels.swift */;
+		};
+
+		000000000000000000000049 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000048 /* Models/DomainModels.swift */;
+		};
+
+		00000000000000000000004B /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000004A /* Services/AIService.swift */;
+		};
+
+		00000000000000000000004D /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000004C /* Services/AudioAndSpeechService.swift */;
+		};
+
+		00000000000000000000004F /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000004E /* Services/AudioSessionService.swift */;
+		};
+
+		000000000000000000000051 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000050 /* Services/BackupCompatibility.swift */;
+		};
+
+		000000000000000000000053 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000052 /* Services/BackupService.swift */;
+		};
+
+		000000000000000000000055 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000054 /* Services/HashService.swift */;
+		};
+
+		000000000000000000000057 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000056 /* Services/ImageQualityService.swift */;
+		};
+
+		000000000000000000000059 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000058 /* Services/ReminderService.swift */;
+		};
+
+		00000000000000000000005B /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000005A /* Services/ZipService.swift */;
+		};
+
+		00000000000000000000005D /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000005C /* Store/AppStore.swift */;
+		};
+
+		00000000000000000000005F /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000005E /* Store/SQLiteStoreService.swift */;
+		};
+
+		000000000000000000000061 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000060 /* Theme/Theme.swift */;
+		};
+
+		000000000000000000000063 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000062 /* AlignmentTests.swift */;
+		};
+
+		000000000000000000000065 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000064 /* HarmonyParityTests.swift */;
+		};
+
+		000000000000000000000067 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000066 /* JSONExtractorTests.swift */;
+		};
+
+		000000000000000000000069 /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 000000000000000000000068 /* TiXingTests.swift */;
+		};
+
+		00000000000000000000006B /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000006A /* Resources/Assets.xcassets */;
+		};
+
+		00000000000000000000001C /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "App/RootView.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000001E /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "App/TiXingApp.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000020 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/About/AboutView.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000022 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Curiosity/CuriosityPlanetView.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000024 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Data/DataManagementView.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000026 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Home/HomeView.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000028 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Lesson/LessonVideoView.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000002A /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Mistakes/CaptureFlowView.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000002C /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Mistakes/MistakeDetailView.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000002E /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Mistakes/MistakeRow.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000030 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Mistakes/MistakesView.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000032 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Points/PointsCenterView.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000034 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Profile/OpsOverviewView.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000036 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Profile/ProfileSettingView.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000038 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Profile/ProfileView.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000003A /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Profile/ReminderSettingView.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000003C /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Report/ReportView.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000003E /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/Review/ReviewView.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000040 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/VoiceAsk/VoiceAskDetailView.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000042 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/VoiceAsk/VoiceAskListView.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000044 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Features/VoiceAsk/VoiceAskView.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000046 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Models/AIModels.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000048 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Models/DomainModels.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000004A /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Services/AIService.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000004C /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Services/AudioAndSpeechService.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000004E /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Services/AudioSessionService.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000050 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Services/BackupCompatibility.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000052 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Services/BackupService.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000054 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Services/HashService.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000056 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Services/ImageQualityService.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000058 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Services/ReminderService.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000005A /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Services/ZipService.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000005C /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Store/AppStore.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000005E /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Store/SQLiteStoreService.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000060 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "Theme/Theme.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000062 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "AlignmentTests.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000064 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "HarmonyParityTests.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000066 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "JSONExtractorTests.swift";
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000068 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "TiXingTests.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000006A /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.assetcatalog;
+			path = "Resources/Assets.xcassets";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000000F /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			path = TiXing.app;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+
+		000000000000000000000010 /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.cfbundle;
+			includeInIndex = 0;
+			path = TiXingTests.xctest;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+
+		00000000000000000000001A /* PBXGroup */ = {
+			isa = PBXGroup;
+			children = (00000000000000000000001C /* App/RootView.swift */, 00000000000000000000001E /* App/TiXingApp.swift */, 000000000000000000000020 /* Features/About/AboutView.swift */, 000000000000000000000022 /* Features/Curiosity/CuriosityPlanetView.swift */, 000000000000000000000024 /* Features/Data/DataManagementView.swift */, 000000000000000000000026 /* Features/Home/HomeView.swift */, 000000000000000000000028 /* Features/Lesson/LessonVideoView.swift */, 00000000000000000000002A /* Features/Mistakes/CaptureFlowView.swift */, 00000000000000000000002C /* Features/Mistakes/MistakeDetailView.swift */, 00000000000000000000002E /* Features/Mistakes/MistakeRow.swift */, 000000000000000000000030 /* Features/Mistakes/MistakesView.swift */, 000000000000000000000032 /* Features/Points/PointsCenterView.swift */, 000000000000000000000034 /* Features/Profile/OpsOverviewView.swift */, 000000000000000000000036 /* Features/Profile/ProfileSettingView.swift */, 000000000000000000000038 /* Features/Profile/ProfileView.swift */, 00000000000000000000003A /* Features/Profile/ReminderSettingView.swift */, 00000000000000000000003C /* Features/Report/ReportView.swift */, 00000000000000000000003E /* Features/Review/ReviewView.swift */, 000000000000000000000040 /* Features/VoiceAsk/VoiceAskDetailView.swift */, 000000000000000000000042 /* Features/VoiceAsk/VoiceAskListView.swift */, 000000000000000000000044 /* Features/VoiceAsk/VoiceAskView.swift */, 000000000000000000000046 /* Models/AIModels.swift */, 000000000000000000000048 /* Models/DomainModels.swift */, 00000000000000000000004A /* Services/AIService.swift */, 00000000000000000000004C /* Services/AudioAndSpeechService.swift */, 00000000000000000000004E /* Services/AudioSessionService.swift */, 000000000000000000000050 /* Services/BackupCompatibility.swift */, 000000000000000000000052 /* Services/BackupService.swift */, 000000000000000000000054 /* Services/HashService.swift */, 000000000000000000000056 /* Services/ImageQualityService.swift */, 000000000000000000000058 /* Services/ReminderService.swift */, 00000000000000000000005A /* Services/ZipService.swift */, 00000000000000000000005C /* Store/AppStore.swift */, 00000000000000000000005E /* Store/SQLiteStoreService.swift */, 000000000000000000000060 /* Theme/Theme.swift */, 00000000000000000000006A /* Resources/Assets.xcassets */,);
+			path = TiXing;
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000001B /* PBXGroup */ = {
+			isa = PBXGroup;
+			children = (000000000000000000000062 /* AlignmentTests.swift */, 000000000000000000000064 /* HarmonyParityTests.swift */, 000000000000000000000066 /* JSONExtractorTests.swift */, 000000000000000000000068 /* TiXingTests.swift */,);
+			path = TiXingTests;
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000003 /* PBXGroup */ = {
+			isa = PBXGroup;
+			children = (00000000000000000000000F /* TiXing.app */, 000000000000000000000010 /* TiXingTests.xctest */,);
+			name = Products;
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000002 /* PBXGroup */ = {
+			isa = PBXGroup;
+			children = (00000000000000000000001A /* TiXing */, 00000000000000000000001B /* TiXingTests */, 000000000000000000000003 /* Products */,);
+			sourceTree = "<group>";
+		};
+
+		000000000000000000000007 /* PBXNativeTarget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000000000009 /* Build configuration list for PBXNativeTarget "TiXing" */;
+			buildPhases = (000000000000000000000011 /* Sources */, 000000000000000000000012 /* Frameworks */, 000000000000000000000013 /* Resources */, 000000000000000000000017 /* ShellScript */,);
+			buildRules = ();
+			dependencies = ();
+			name = TiXing;
+			productName = TiXing;
+			productReference = 00000000000000000000000F /* TiXing.app */;
+			productType = "com.apple.product-type.application";
+		};
+
+		000000000000000000000008 /* PBXNativeTarget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 00000000000000000000000A /* Build configuration list for PBXNativeTarget "TiXingTests" */;
+			buildPhases = (000000000000000000000014 /* Sources */, 000000000000000000000015 /* Frameworks */, 000000000000000000000016 /* Resources */,);
+			buildRules = ();
+			dependencies = (000000000000000000000018 /* PBXTargetDependency */,);
+			name = TiXingTests;
+			productName = TiXingTests;
+			productReference = 000000000000000000000010 /* TiXingTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+
+		000000000000000000000001 /* PBXProject */ = {
+			isa = PBXProject;
+			attributes = { BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 2700; LastUpgradeCheck = 2700; TargetAttributes = { 000000000000000000000007 = { CreatedOnToolsVersion = 27.0; }; 000000000000000000000008 = { CreatedOnToolsVersion = 27.0; TestTargetID = 000000000000000000000007; }; }; };
+			buildConfigurationList = 000000000000000000000004 /* Build configuration list for PBXProject "TiXing" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = "zh-CN";
+			hasScannedForEncodings = 0;
+			knownRegions = ("zh-CN", en, Base,);
+			mainGroup = 000000000000000000000002 /* Main group */;
+			productRefGroup = 000000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (000000000000000000000007 /* TiXing */, 000000000000000000000008 /* TiXingTests */,);
+		};
+
+		000000000000000000000011 /* PBXSourcesBuildPhase */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (00000000000000000000001D /* App/RootView.swift */, 00000000000000000000001F /* App/TiXingApp.swift */, 000000000000000000000021 /* Features/About/AboutView.swift */, 000000000000000000000023 /* Features/Curiosity/CuriosityPlanetView.swift */, 000000000000000000000025 /* Features/Data/DataManagementView.swift */, 000000000000000000000027 /* Features/Home/HomeView.swift */, 000000000000000000000029 /* Features/Lesson/LessonVideoView.swift */, 00000000000000000000002B /* Features/Mistakes/CaptureFlowView.swift */, 00000000000000000000002D /* Features/Mistakes/MistakeDetailView.swift */, 00000000000000000000002F /* Features/Mistakes/MistakeRow.swift */, 000000000000000000000031 /* Features/Mistakes/MistakesView.swift */, 000000000000000000000033 /* Features/Points/PointsCenterView.swift */, 000000000000000000000035 /* Features/Profile/OpsOverviewView.swift */, 000000000000000000000037 /* Features/Profile/ProfileSettingView.swift */, 000000000000000000000039 /* Features/Profile/ProfileView.swift */, 00000000000000000000003B /* Features/Profile/ReminderSettingView.swift */, 00000000000000000000003D /* Features/Report/ReportView.swift */, 00000000000000000000003F /* Features/Review/ReviewView.swift */, 000000000000000000000041 /* Features/VoiceAsk/VoiceAskDetailView.swift */, 000000000000000000000043 /* Features/VoiceAsk/VoiceAskListView.swift */, 000000000000000000000045 /* Features/VoiceAsk/VoiceAskView.swift */, 000000000000000000000047 /* Models/AIModels.swift */, 000000000000000000000049 /* Models/DomainModels.swift */, 00000000000000000000004B /* Services/AIService.swift */, 00000000000000000000004D /* Services/AudioAndSpeechService.swift */, 00000000000000000000004F /* Services/AudioSessionService.swift */, 000000000000000000000051 /* Services/BackupCompatibility.swift */, 000000000000000000000053 /* Services/BackupService.swift */, 000000000000000000000055 /* Services/HashService.swift */, 000000000000000000000057 /* Services/ImageQualityService.swift */, 000000000000000000000059 /* Services/ReminderService.swift */, 00000000000000000000005B /* Services/ZipService.swift */, 00000000000000000000005D /* Store/AppStore.swift */, 00000000000000000000005F /* Store/SQLiteStoreService.swift */, 000000000000000000000061 /* Theme/Theme.swift */,);
+		};
+
+		000000000000000000000014 /* PBXSourcesBuildPhase */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (000000000000000000000063 /* AlignmentTests.swift */, 000000000000000000000065 /* HarmonyParityTests.swift */, 000000000000000000000067 /* JSONExtractorTests.swift */, 000000000000000000000069 /* TiXingTests.swift */,);
+		};
+
+		000000000000000000000012 /* PBXFrameworksBuildPhase */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+		000000000000000000000015 /* PBXFrameworksBuildPhase */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+		000000000000000000000013 /* PBXResourcesBuildPhase */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (00000000000000000000006B /* Resources/Assets.xcassets */,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+		000000000000000000000016 /* PBXResourcesBuildPhase */ = {
+			isa = PBXResourcesBuildPhase;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+		000000000000000000000017 /* PBXShellScriptBuildPhase */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ();
+			outputPaths = ();
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ -f \"${SRCROOT}/TiXing/Resources/apiconfig.json\" ]; then\n\tcp \"${SRCROOT}/TiXing/Resources/apiconfig.json\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/apiconfig.json\"\nelse\n\techo \"warning: TiXing/Resources/apiconfig.json is not present; AI features will report not configured.\"\nfi";
+		};
+
+		000000000000000000000019 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000000000007;
+			remoteInfo = TiXing;
+		};
+
+		000000000000000000000018 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000000000007 /* TiXing */;
+			targetProxy = 000000000000000000000019 /* PBXContainerItemProxy */;
+		};
+
+		000000000000000000000005 /* XCBuildConfiguration */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; COPY_PHASE_STRIP = NO; DEAD_CODE_STRIPPING = YES; ENABLE_STRICT_OBJC_MSGSEND = YES; GCC_C_LANGUAGE_STANDARD = "gnu17"; GCC_NO_COMMON_BLOCKS = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; SWIFT_OPTIMIZATION_LEVEL = -Onone;};
+			name = Debug;
+		};
+
+		000000000000000000000006 /* XCBuildConfiguration */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; COPY_PHASE_STRIP = NO; DEAD_CODE_STRIPPING = YES; ENABLE_STRICT_OBJC_MSGSEND = YES; GCC_C_LANGUAGE_STANDARD = "gnu17"; GCC_NO_COMMON_BLOCKS = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SWIFT_VERSION = 5.0; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = -O; VALIDATE_PRODUCT = YES;};
+			name = Release;
+		};
+
+		00000000000000000000000B /* XCBuildConfiguration */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1000003; DEVELOPMENT_ASSET_PATHS = ""; ENABLE_PREVIEWS = YES; ENABLE_USER_SCRIPT_SANDBOXING = NO; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = TiXing/Resources/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; MARKETING_VERSION = 1.0.3; PRODUCT_BUNDLE_IDENTIFIER = com.tixing.me.ios; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTS_MACCATALYST = NO; TARGETED_DEVICE_FAMILY = 1; ENABLE_TESTABILITY = YES;};
+			name = Debug;
+		};
+
+		00000000000000000000000C /* XCBuildConfiguration */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1000003; DEVELOPMENT_ASSET_PATHS = ""; ENABLE_PREVIEWS = YES; ENABLE_USER_SCRIPT_SANDBOXING = NO; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = TiXing/Resources/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; MARKETING_VERSION = 1.0.3; PRODUCT_BUNDLE_IDENTIFIER = com.tixing.me.ios; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTS_MACCATALYST = NO; TARGETED_DEVICE_FAMILY = 1;};
+			name = Release;
+		};
+
+		00000000000000000000000D /* XCBuildConfiguration */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.tixing.me.ios.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = NO; TARGETED_DEVICE_FAMILY = 1; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TiXing.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TiXing"; BUNDLE_LOADER = "$(TEST_HOST)";};
+			name = Debug;
+		};
+
+		00000000000000000000000E /* XCBuildConfiguration */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; GENERATE_INFOPLIST_FILE = YES; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.tixing.me.ios.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = NO; TARGETED_DEVICE_FAMILY = 1; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TiXing.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TiXing"; BUNDLE_LOADER = "$(TEST_HOST)";};
+			name = Release;
+		};
+
+		000000000000000000000004 /* XCConfigurationList */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (000000000000000000000005 /* Debug */, 000000000000000000000006 /* Release */,);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+
+		000000000000000000000009 /* XCConfigurationList */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (00000000000000000000000B /* Debug */, 00000000000000000000000C /* Release */,);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+
+		00000000000000000000000A /* XCConfigurationList */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (00000000000000000000000D /* Debug */, 00000000000000000000000E /* Release */,);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+	};
+	rootObject = 000000000000000000000001 /* Project object */;
+}

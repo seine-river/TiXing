@@ -15,7 +15,8 @@ TiXing/
 ## 当前状态
 
 - `harmonyos/` 保存当前已实现的 HarmonyOS 版本。
-- `android/` 与 `ios/` 为后续原生应用工程预留。
+- `ios/` 保存当前已实现的 iOS / SwiftUI 版本。
+- `android/` 为后续原生应用工程预留。
 - iOS UX 设计参考截图见 `docs/ux_screenshots/reference/`。
 
 ## IDE 打开方式
@@ -24,4 +25,4 @@ TiXing/
 
 - **DevEco Studio**：打开 `/Users/dfx/TiXing/harmonyos`
 - **Android Studio**：后续工程落地后打开 `/Users/dfx/TiXing/android`
-- **Xcode**：后续工程落地后打开 `/Users/dfx/TiXing/ios`
+- **Xcode**：打开 `/Users/dfx/TiXing/ios/TiXing.xcodeproj`

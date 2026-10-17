@@ -348,16 +348,25 @@ struct LessonVideoPage {
     }
   }
 
-  private speakScene(scene: AiLessonScene): void {
+  private speakScene(scene: AiLessonScene, resumeElapsed: number = -1): void {
     if (!this.audioEnabled || !this.audioAvailable || this.ttsEngine === undefined) {
       hilog.info(LOG_DOMAIN, LOG_TAG,
         'lesson TTS speak skipped: audioEnabled=%{public}b, audioAvailable=%{public}b, engineReady=%{public}b, sceneId=%{public}s',
         this.audioEnabled, this.audioAvailable, this.ttsEngine !== undefined, scene.id);
       return;
     }
+    const narration: string = resumeElapsed >= 0
+      ? this.remainingNarration(scene, resumeElapsed)
+      : scene.narration;
+    if (narration.length === 0) {
+      hilog.info(LOG_DOMAIN, LOG_TAG,
+        'lesson TTS resume skipped because narration is finished: sceneId=%{public}s, elapsed=%{public}d',
+        scene.id, resumeElapsed);
+      return;
+    }
     hilog.info(LOG_DOMAIN, LOG_TAG,
-      'lesson TTS speak start: sceneId=%{public}s, narrationLength=%{public}d',
-      scene.id, scene.narration.length);
+      'lesson TTS speak start: sceneId=%{public}s, narrationLength=%{public}d, resumed=%{public}b',
+      scene.id, narration.length, resumeElapsed >= 0);
     try {
       if (this.ttsEngine.isBusy()) {
         this.ttsEngine.stop();
@@ -365,7 +374,7 @@ struct LessonVideoPage {
       const speakParams: textToSpeech.SpeakParams = {
         requestId: generateId()
       };
-      this.ttsEngine.speak(scene.narration, speakParams);
+      this.ttsEngine.speak(narration, speakParams);
       hilog.info(LOG_DOMAIN, LOG_TAG, 'lesson TTS speak submitted');
     } catch (e) {
       const detail: string = e instanceof Error
@@ -408,6 +417,11 @@ struct LessonVideoPage {
       'lesson playback start: index=%{public}d, sceneId=%{public}s, duration=%{public}d, sceneCount=%{public}d',
       this.currentIndex, scene.id, scene.duration, this.lesson.scenes.length);
     this.speakScene(scene);
+    this.startSceneTimer();
+  }
+
+  private startSceneTimer(): void {
+    this.stopTimer();
     this.timerId = setInterval((): void => {
       try {
         if (this.currentIndex < 0 || this.currentIndex >= this.lesson.scenes.length) {
@@ -462,11 +476,92 @@ struct LessonVideoPage {
       finished, this.currentIndex, this.sceneElapsed);
   }
 
+  private pausePlayback(): void {
+    if (!this.isPlaying) {
+      return;
+    }
+    this.stopTimer();
+    this.isPlaying = false;
+    this.isFinished = false;
+    if (this.ttsEngine !== undefined) {
+      try {
+        this.ttsEngine.stop();
+      } catch (e) {
+        const detail: string = e instanceof Error
+          ? `name=${e.name}, message=${e.message}`
+          : this.exceptionDetail(e);
+        this.logLongError('lesson TTS pause stop failed', detail);
+      }
+    }
+    hilog.info(LOG_DOMAIN, LOG_TAG,
+      'lesson playback paused: index=%{public}d, elapsed=%{public}d',
+      this.currentIndex, this.sceneElapsed);
+  }
+
+  private resumePlayback(): void {
+    if (this.isPlaying || this.lesson.scenes.length === 0) {
+      return;
+    }
+    if (this.currentIndex < 0 || this.currentIndex >= this.lesson.scenes.length) {
+      this.currentIndex = 0;
+    }
+    const scene: AiLessonScene = this.lesson.scenes[this.currentIndex];
+    this.isFinished = false;
+    this.isPlaying = true;
+    this.speakScene(scene, this.sceneElapsed);
+    this.startSceneTimer();
+    hilog.info(LOG_DOMAIN, LOG_TAG,
+      'lesson playback resumed: index=%{public}d, elapsed=%{public}d',
+      this.currentIndex, this.sceneElapsed);
+  }
+
   private stopTimer(): void {
     if (this.timerId >= 0) {
       clearInterval(this.timerId);
       this.timerId = -1;
     }
+  }
+
+  private remainingNarration(scene: AiLessonScene, elapsed: number): string {
+    if (elapsed <= 0 || scene.narration.length === 0) {
+      return scene.narration;
+    }
+    const duration: number = Math.max(1, scene.duration);
+    if (elapsed >= duration) {
+      return '';
+    }
+
+    const sentences: string[] = this.splitNarration(scene.narration);
+    const consumedTarget: number = scene.narration.length * elapsed / duration;
+    let consumed: number = 0;
+    for (let i: number = 0; i < sentences.length; i++) {
+      const previousConsumed: number = consumed;
+      consumed += sentences[i].length;
+      if (consumed > consumedTarget && previousConsumed <= consumedTarget) {
+        return sentences.slice(i).join('');
+      }
+    }
+    return '';
+  }
+
+  private splitNarration(text: string): string[] {
+    const sentences: string[] = [];
+    let start: number = 0;
+    for (let i: number = 0; i < text.length; i++) {
+      const ch: string = text.charAt(i);
+      if (ch === '。' || ch === '！' || ch === '？' || ch === '；' || ch === '.') {
+        const sentence: string = text.substring(start, i + 1).trim();
+        if (sentence.length > 0) {
+          sentences.push(sentence);
+        }
+        start = i + 1;
+      }
+    }
+    const tail: string = text.substring(start).trim();
+    if (tail.length > 0) {
+      sentences.push(tail);
+    }
+    return sentences;
   }
 
   private exceptionDetail(e: Object): string {
@@ -485,6 +580,11 @@ struct LessonVideoPage {
       seconds += Math.min(this.sceneElapsed, this.lesson.scenes[this.currentIndex].duration);
     }
     return seconds;
+  }
+
+  private completedFraction(): number {
+    const total: number = Math.max(1, this.lesson.totalDuration);
+    return Math.min(1, Math.max(0, this.completedSeconds() / total));
   }
 
   private fractionPercent(visual: AiLessonVisual, index: number): number {
@@ -1170,16 +1270,20 @@ struct LessonVideoPage {
   @Builder
   ControlBar() {
     Column({ space: 10 }) {
-      Progress({
-        value: this.completedSeconds(),
-        total: this.lesson.totalDuration,
-        type: ProgressType.Linear
-      })
+      Stack({ alignContent: Alignment.Start }) {
+        Column()
+          .width('100%')
+          .height(8)
+          .backgroundColor(AppColors.BG_CHIP)
+        Column()
+          .width(`${(this.completedFraction() * 100).toFixed(2)}%`)
+          .height(8)
+          .backgroundColor(AppColors.PRIMARY)
+      }
         .width('100%')
         .height(8)
-        .color(AppColors.PRIMARY)
-        .backgroundColor(AppColors.BG_CHIP)
         .borderRadius(4)
+        .clip(true)
 
       Row({ space: 10 }) {
         Button('⏮')
@@ -1207,9 +1311,9 @@ struct LessonVideoPage {
             if (this.isFinished) {
               this.startPlayback(0);
             } else if (this.isPlaying) {
-              this.stopPlayback(false);
+              this.pausePlayback();
             } else if (this.currentIndex < this.lesson.scenes.length) {
-              this.startPlayback(this.currentIndex);
+              this.resumePlayback();
             }
           })
 
