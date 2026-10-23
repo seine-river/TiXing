@@ -1,11 +1,29 @@
 import Foundation
 
 struct HarmonyBackupData: Codable {
-    var mistakes: [HarmonyBackupMistake]?
-    var reviewLogs: [HarmonyBackupReviewLog]?
-    var settings: HarmonyBackupSettings?
-    var voiceAsks: [HarmonyBackupVoiceAsk]?
-    var interestInsights: [HarmonyBackupInsight]?
+    var student: HarmonyBackupStudent? = nil
+    var mistakes: [HarmonyBackupMistake]? = nil
+    var reviewLogs: [HarmonyBackupReviewLog]? = nil
+    var settings: HarmonyBackupSettings? = nil
+    var voiceAsks: [HarmonyBackupVoiceAsk]? = nil
+    var interestInsights: [HarmonyBackupInsight]? = nil
+    var pointsLogs: [HarmonyBackupPointsLog]? = nil
+    var redemptions: [HarmonyBackupRedemption]? = nil
+    var knowledgeProfiles: [HarmonyBackupKnowledgeProfile]? = nil
+    var analyticsEvents: [HarmonyBackupAnalyticsEvent]? = nil
+}
+
+struct HarmonyBackupStudent: Codable {
+    var id: String?
+    var parentId: String?
+    var nickname: String?
+    var grade: String?
+    var textbookVersion: String?
+    var region: String?
+    var school: String?
+    var communityBrowseEnabled: Bool?
+    var communityShareEnabled: Bool?
+    var createdAt: Double?
 }
 
 struct HarmonyBackupMistake: Codable {
@@ -91,6 +109,42 @@ struct HarmonyBackupInsight: Codable {
     var generatedAt: Double?
 }
 
+struct HarmonyBackupPointsLog: Codable {
+    var id: String
+    var studentId: String?
+    var actionType: String?
+    var points: Int?
+    var createdAt: Double?
+}
+
+struct HarmonyBackupRedemption: Codable {
+    var id: String
+    var studentId: String?
+    var itemId: String?
+    var cost: Int?
+    var redeemedAt: Double?
+}
+
+struct HarmonyBackupKnowledgeProfile: Codable {
+    var id: String
+    var studentId: String?
+    var knowledgeTagId: String?
+    var totalMistakes: Int?
+    var masteredCount: Int?
+    var currentMasteryScore: Double?
+    var trend: String?
+    var updatedAt: Double?
+}
+
+struct HarmonyBackupAnalyticsEvent: Codable {
+    var id: String
+    var eventType: String?
+    var studentIdHash: String?
+    var platform: String?
+    var properties: String?
+    var occurredAt: Double?
+}
+
 enum BackupCompatibility {
     static func encode(storage: PersistentStore, exportedAt: Date, studentID: String) throws -> Data {
         let encoder = JSONEncoder()
@@ -100,7 +154,7 @@ enum BackupCompatibility {
     }
 
     static func data(from storage: PersistentStore) -> HarmonyBackupData {
-        HarmonyBackupData(
+        var backup = HarmonyBackupData(
             mistakes: storage.mistakes.map { mistake in
                 HarmonyBackupMistake(
                     id: mistake.id,
@@ -172,11 +226,68 @@ enum BackupCompatibility {
                     recommendedActivities: insight.recommendedActivities,
                     generatedAt: insight.generatedAt.timeIntervalSince1970 * 1000)
             })
+        backup.student = HarmonyBackupStudent(
+            id: storage.student.id,
+            parentId: "",
+            nickname: storage.student.nickname,
+            grade: storage.student.grade.rawValue,
+            textbookVersion: storage.student.textbookVersion.rawValue,
+            region: "",
+            school: "",
+            communityBrowseEnabled: false,
+            communityShareEnabled: false,
+            createdAt: storage.student.createdAt.timeIntervalSince1970 * 1000)
+        backup.pointsLogs = storage.pointsLogs.map { log in
+            HarmonyBackupPointsLog(
+                id: log.id,
+                studentId: storage.student.id,
+                actionType: log.action.rawValue,
+                points: log.points,
+                createdAt: log.createdAt.timeIntervalSince1970 * 1000)
+        }
+        backup.redemptions = (storage.redemptionRecords ?? []).map { record in
+            HarmonyBackupRedemption(
+                id: record.id,
+                studentId: storage.student.id,
+                itemId: record.itemID,
+                cost: record.cost,
+                redeemedAt: record.redeemedAt.timeIntervalSince1970 * 1000)
+        }
+        backup.knowledgeProfiles = (storage.knowledgeProfiles ?? []).map { profile in
+            HarmonyBackupKnowledgeProfile(
+                id: profile.id,
+                studentId: profile.studentID,
+                knowledgeTagId: profile.tag,
+                totalMistakes: profile.totalMistakes,
+                masteredCount: profile.masteredCount,
+                currentMasteryScore: profile.masteryScore,
+                trend: profile.trend,
+                updatedAt: profile.updatedAt.timeIntervalSince1970 * 1000)
+        }
+        backup.analyticsEvents = storage.analytics.map { event in
+            HarmonyBackupAnalyticsEvent(
+                id: event.id,
+                eventType: event.type,
+                studentIdHash: event.studentHash,
+                platform: "ios",
+                properties: "{}",
+                occurredAt: event.createdAt.timeIntervalSince1970 * 1000)
+        }
+        return backup
     }
 
     static func storage(from data: HarmonyBackupData, student: Student) -> PersistentStore {
         var storage = PersistentStore()
-        storage.student = student
+        if let rawStudent = data.student {
+            storage.student = Student(
+                id: rawStudent.id ?? student.id,
+                nickname: rawStudent.nickname ?? student.nickname,
+                grade: Grade(rawValue: rawStudent.grade ?? "") ?? student.grade,
+                textbookVersion: TextbookVersion(rawValue: rawStudent.textbookVersion ?? "") ?? student.textbookVersion,
+                createdAt: date(rawStudent.createdAt, fallback: student.createdAt))
+        } else {
+            storage.student = student
+        }
         storage.mistakes = (data.mistakes ?? []).map { raw in
             var mistake = Mistake.new(
                 question: raw.ocrText ?? "",
@@ -244,6 +355,40 @@ enum BackupCompatibility {
                 parentSummary: raw.parentSummary ?? "",
                 recommendedActivities: raw.recommendedActivities ?? [],
                 generatedAt: date(raw.generatedAt, fallback: Date()))
+        }
+        storage.pointsLogs = (data.pointsLogs ?? []).map { raw in
+            PointsLog(
+                id: raw.id,
+                action: PointsAction(rawValue: raw.actionType ?? "") ?? .capture,
+                points: raw.points ?? 0,
+                createdAt: date(raw.createdAt, fallback: Date()))
+        }
+        let backupRedemptions = (data.redemptions ?? []).map { raw in
+            RedemptionRecord(
+                id: raw.id,
+                itemID: raw.itemId ?? "",
+                cost: raw.cost ?? 0,
+                redeemedAt: date(raw.redeemedAt, fallback: Date()))
+        }
+        storage.redemptionRecords = backupRedemptions
+        storage.redeemedItemIds = Set(backupRedemptions.map(\.itemID))
+        storage.knowledgeProfiles = (data.knowledgeProfiles ?? []).map { raw in
+            KnowledgeProfile(
+                id: raw.id,
+                studentID: raw.studentId ?? storage.student.id,
+                tag: raw.knowledgeTagId ?? "",
+                totalMistakes: raw.totalMistakes ?? 0,
+                masteredCount: raw.masteredCount ?? 0,
+                masteryScore: raw.currentMasteryScore ?? 0,
+                trend: raw.trend ?? "stable",
+                updatedAt: date(raw.updatedAt, fallback: Date()))
+        }
+        storage.analytics = (data.analyticsEvents ?? []).map { raw in
+            AnalyticsEvent(
+                id: raw.id,
+                type: raw.eventType ?? "",
+                studentHash: raw.studentIdHash ?? "",
+                createdAt: date(raw.occurredAt, fallback: Date()))
         }
         return storage
     }

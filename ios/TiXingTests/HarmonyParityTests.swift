@@ -307,6 +307,99 @@ final class HarmonyParityTests: XCTestCase {
         XCTAssertFalse(restored.settings.enabled)
     }
 
+    func testBackupIncludesConfigAndDynamicUserData() throws {
+        var store = PersistentStore()
+        store.student = Student(
+            id: "stu_backup",
+            nickname: "小题",
+            grade: .five,
+            textbookVersion: .bj,
+            createdAt: Date(timeIntervalSince1970: 1_760_000_000))
+        store.settings.dailyLimit = 18
+        store.pointsLogs = [
+            PointsLog(id: "point-backup", action: .streak, points: 15,
+                      createdAt: Date(timeIntervalSince1970: 1_760_000_100))
+        ]
+        store.redemptionRecords = [
+            RedemptionRecord(id: "redeem-backup", itemID: "story_time",
+                             cost: 30, redeemedAt: Date(timeIntervalSince1970: 1_760_000_200))
+        ]
+        store.knowledgeProfiles = [
+            KnowledgeProfile(id: "profile-backup", studentID: "stu_backup", tag: "分数",
+                             totalMistakes: 6, masteredCount: 3, masteryScore: 0.5,
+                             trend: "improving", updatedAt: Date(timeIntervalSince1970: 1_760_000_300))
+        ]
+        store.analytics = [
+            AnalyticsEvent(id: "event-backup", type: "review_submit",
+                           studentHash: "h_backup", createdAt: Date(timeIntervalSince1970: 1_760_000_400))
+        ]
+
+        let data = try BackupCompatibility.encode(storage: store, exportedAt: Date(), studentID: store.student.id)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .millisecondsSince1970
+        let raw = try decoder.decode(HarmonyBackupData.self, from: data)
+        let restored = BackupCompatibility.storage(from: raw, student: Student())
+
+        XCTAssertEqual(restored.student.id, "stu_backup")
+        XCTAssertEqual(restored.student.nickname, "小题")
+        XCTAssertEqual(restored.student.grade, .five)
+        XCTAssertEqual(restored.student.textbookVersion, .bj)
+        XCTAssertEqual(restored.settings.dailyLimit, 18)
+        XCTAssertEqual(restored.pointsLogs.first?.id, "point-backup")
+        XCTAssertEqual(restored.pointsLogs.first?.action, .streak)
+        XCTAssertEqual(restored.pointsLogs.first?.points, 15)
+        XCTAssertEqual(restored.redemptionRecords?.first?.id, "redeem-backup")
+        XCTAssertEqual(restored.redemptionRecords?.first?.itemID, "story_time")
+        XCTAssertEqual(restored.redeemedItemIds, ["story_time"])
+        XCTAssertEqual(restored.knowledgeProfiles?.first?.tag, "分数")
+        XCTAssertEqual(restored.knowledgeProfiles?.first?.masteryScore ?? 0, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(restored.analytics.first?.id, "event-backup")
+        XCTAssertEqual(restored.analytics.first?.type, "review_submit")
+    }
+
+    @MainActor
+    func testImportBackupMergesConfigAndDynamicUserData() throws {
+        let directory = makeDirectory()
+        let store = AppStore(directory: directory)
+        var incoming = PersistentStore()
+        incoming.student = Student(id: "stu_import", nickname: "小醒",
+                                   grade: .six, textbookVersion: .su,
+                                   createdAt: Date(timeIntervalSince1970: 1_760_001_000))
+        incoming.settings.dailyLimit = 20
+        incoming.pointsLogs = [
+            PointsLog(id: "point-import", action: .onTimeReview, points: 10,
+                      createdAt: Date(timeIntervalSince1970: 1_760_001_100))
+        ]
+        incoming.redemptionRecords = [
+            RedemptionRecord(id: "redeem-import", itemID: "museum",
+                             cost: 40, redeemedAt: Date(timeIntervalSince1970: 1_760_001_200))
+        ]
+        incoming.analytics = [
+            AnalyticsEvent(id: "event-import", type: "capture",
+                           studentHash: "h_import", createdAt: Date(timeIntervalSince1970: 1_760_001_300))
+        ]
+        let preview = BackupPreview(
+            manifest: BackupManifest(app: "tixing", version: BackupService.bundleVersion,
+                                     exportedAt: Date(), studentId: incoming.student.id),
+            sourceURL: URL(fileURLWithPath: "/tmp/backup.zip"),
+            storage: incoming,
+            imageData: [:],
+            notesImageData: [:],
+            audioData: [:])
+
+        store.importBackup(preview)
+
+        XCTAssertEqual(store.student.id, "stu_import")
+        XCTAssertEqual(store.student.nickname, "小醒")
+        XCTAssertEqual(store.settings.dailyLimit, 20)
+        XCTAssertTrue(store.pointsLogs.contains { $0.id == "point-import" })
+        XCTAssertTrue((store.storage.redemptionRecords ?? []).contains { $0.id == "redeem-import" })
+        XCTAssertTrue(store.storage.redeemedItemIds.contains("museum"))
+        XCTAssertTrue(store.storage.analytics.contains { $0.id == "event-import" })
+
+        try? FileManager.default.removeItem(at: directory)
+    }
+
     func testBackupVoiceAskRoundTrip() throws {
         var store = PersistentStore()
         var record = VoiceAskRecord()
@@ -328,6 +421,62 @@ final class HarmonyParityTests: XCTestCase {
         XCTAssertEqual(restored.voiceAsks.first?.question, record.question)
         XCTAssertEqual(restored.voiceAsks.first?.interestTags, ["光学", "自然"])
         XCTAssertEqual(restored.voiceAsks.first?.grade, .five)
+    }
+
+    func testBackupPreviewReadsLegacyPersistentStoreData() async throws {
+        let directory = makeDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var storage = PersistentStore()
+        storage.hasSeededExamples = true
+        var mistake = makeMistake()
+        mistake.id = "legacy-native-backup"
+        storage.mistakes = [mistake]
+
+        let manifestEncoder = JSONEncoder()
+        manifestEncoder.dateEncodingStrategy = .millisecondsSince1970
+        let manifest = BackupManifest(app: "tixing", version: BackupService.bundleVersion,
+                                      exportedAt: Date(), studentId: storage.student.id)
+        let dataEncoder = JSONEncoder()
+        dataEncoder.dateEncodingStrategy = .iso8601
+        let archive = directory.appendingPathComponent("legacy-backup.zip")
+        try ZipService.write(entries: [
+            ("manifest.json", try manifestEncoder.encode(manifest)),
+            ("data.json", try dataEncoder.encode(storage))
+        ], to: archive)
+
+        let preview = try await BackupService.preview(at: archive, currentStudent: storage.student)
+        XCTAssertEqual(preview.mistakeCount, 1)
+        XCTAssertEqual(preview.storage.mistakes.first?.id, "legacy-native-backup")
+
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @objc func testLessonCacheUsesFingerprintAndOverwrites() throws {
+        let id = "lesson-cache-\(UUID().uuidString)"
+        let scene = AILessonScene(
+            id: "intro", duration: 5, narration: "我们一起看这道题。",
+            subtitle: "开场", screen: AILessonScreen(type: "cover", title: "开场", steps: []),
+            visual: nil, animation: nil)
+        let first = AILesson(
+            title: "第一次讲解", totalDuration: 5, gradeLevel: "三年级",
+            tone: "亲切", scenes: [scene])
+        var second = first
+        second.title = "重新生成后的讲解"
+        let fingerprint = "grade=3;question=3/8+1/4"
+
+        XCTAssertNil(LessonCacheService.load(mistakeID: id, sourceFingerprint: fingerprint))
+        LessonCacheService.save(mistakeID: id, sourceFingerprint: fingerprint, lesson: first)
+        XCTAssertEqual(
+            LessonCacheService.load(mistakeID: id, sourceFingerprint: fingerprint)?.title,
+            "第一次讲解")
+        XCTAssertNil(LessonCacheService.load(mistakeID: id, sourceFingerprint: "changed"))
+
+        LessonCacheService.save(mistakeID: id, sourceFingerprint: fingerprint, lesson: second)
+        XCTAssertEqual(
+            LessonCacheService.load(mistakeID: id, sourceFingerprint: fingerprint)?.title,
+            "重新生成后的讲解")
+        LessonCacheService.remove(mistakeID: id)
+        XCTAssertNil(LessonCacheService.load(mistakeID: id, sourceFingerprint: fingerprint))
     }
 
     func testZipSupportsUnicodeNames() throws {

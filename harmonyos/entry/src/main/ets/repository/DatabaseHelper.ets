@@ -5,7 +5,7 @@ import { Mistake } from '../models/Mistake';
 import { ReviewLog } from '../models/ReviewLog';
 import { KnowledgeTag, KnowledgeProfile } from '../models/KnowledgeTag';
 import { Student } from '../models/Student';
-import { PointsLog, PointsSummary } from '../models/PointsLog';
+import { PointsLog, PointsSummary, RedemptionRecord } from '../models/PointsLog';
 import { ReminderSettings } from '../models/ReminderSettings';
 import { AnalyticsEvent, MetricSummary, ReviewStats, MistakeStats, SubjectCount } from '../models/AnalyticsEvent';
 import { VoiceAskRecord, InterestInsight } from '../models/VoiceAsk';
@@ -1281,6 +1281,31 @@ export class DatabaseHelper {
     });
   }
 
+  /** 备份导入使用：恢复学生配置字段，存在则更新，不存在则插入。 */
+  async upsertStudent(s: Student): Promise<DbResult> {
+    const op: string = 'upsertStudent';
+    const store = await this.awaitStore(op);
+    if (store === undefined) {
+      return this.notReady(op);
+    }
+    const value: Record<string, relationalStore.ValueType> = {
+      'id': s.id, 'parentId': s.parentId, 'nickname': s.nickname,
+      'grade': s.grade, 'textbookVersion': s.textbookVersion,
+      'region': s.region, 'school': s.school,
+      'communityBrowseEnabled': s.communityBrowseEnabled ? 1 : 0,
+      'communityShareEnabled': s.communityShareEnabled ? 1 : 0,
+      'createdAt': s.createdAt
+    };
+    return this.runWrite(op, async (): Promise<void> => {
+      const predicates = new relationalStore.RdbPredicates('student');
+      predicates.equalTo('id', s.id);
+      const updated: number = await store.update(value, predicates);
+      if (updated === 0) {
+        await store.insert('student', value);
+      }
+    });
+  }
+
   // ---------------------- points ----------------------
 
   async insertPointsLog(log: PointsLog): Promise<DbResult> {
@@ -1380,6 +1405,53 @@ export class DatabaseHelper {
     return list;
   }
 
+  async queryRedemptions(studentId: string): Promise<RedemptionRecord[]> {
+    const op: string = 'queryRedemptions';
+    const list: RedemptionRecord[] = [];
+    const store = await this.awaitStore(op);
+    if (store === undefined) {
+      return list;
+    }
+    try {
+      const predicates = new relationalStore.RdbPredicates('redemption');
+      predicates.equalTo('studentId', studentId);
+      predicates.orderByDesc('redeemedAt');
+      const resultSet = await store.query(predicates);
+      try {
+        while (resultSet.goToNextRow()) {
+          const record = new RedemptionRecord();
+          record.id = rs_col(resultSet, 'id');
+          record.studentId = rs_col(resultSet, 'studentId');
+          record.itemId = rs_col(resultSet, 'itemId');
+          record.cost = rs_col_long(resultSet, 'cost');
+          record.redeemedAt = rs_col_long(resultSet, 'redeemedAt');
+          list.push(record);
+        }
+      } finally {
+        resultSet.close();
+      }
+    } catch (e) {
+      DbLog.error(op, errText(e));
+    }
+    return list;
+  }
+
+  async importRedemption(record: RedemptionRecord): Promise<DbResult> {
+    const op: string = 'importRedemption';
+    const store = await this.awaitStore(op);
+    if (store === undefined) {
+      return this.notReady(op);
+    }
+    const value: Record<string, relationalStore.ValueType> = {
+      'id': record.id, 'studentId': record.studentId,
+      'itemId': record.itemId, 'cost': record.cost,
+      'redeemedAt': record.redeemedAt
+    };
+    return this.runWrite(op, async (): Promise<void> => {
+      await store.insert('redemption', value);
+    });
+  }
+
   /** 最近一次指定行为积分的本地日期（YYYY-MM-DD），用于 streak 按天幂等发放。 */
   async queryLastPointsActionDay(studentId: string, actionType: PointsActionType): Promise<string> {
     const op: string = 'queryLastPointsActionDay';
@@ -1416,6 +1488,7 @@ export class DatabaseHelper {
     try {
       const predicates = new relationalStore.RdbPredicates('reminder_settings');
       predicates.equalTo('studentId', studentId);
+      predicates.orderByDesc('updatedAt');
       const resultSet = await store.query(predicates);
       try {
         if (resultSet.goToFirstRow()) {
@@ -1451,11 +1524,11 @@ export class DatabaseHelper {
       return this.notReady(op);
     }
     r.updatedAt = Date.now();
-    return this.runInTransaction(op, async (): Promise<DbResult> => {
+    const result: DbResult = await this.runInTransaction(op, async (): Promise<DbResult> => {
       const predicates = new relationalStore.RdbPredicates('reminder_settings');
       predicates.equalTo('studentId', r.studentId);
       const value: Record<string, relationalStore.ValueType> = {
-        'id': r.id + '_' + r.studentId, 'studentId': r.studentId,
+        'studentId': r.studentId,
         'reviewTimeStart': r.reviewTimeStart, 'reviewTimeEnd': r.reviewTimeEnd,
         'dailyLimit': r.dailyLimit, 'mathEnabled': r.mathEnabled ? 1 : 0,
         'chineseEnabled': r.chineseEnabled ? 1 : 0,
@@ -1467,10 +1540,41 @@ export class DatabaseHelper {
       };
       const updated: number = await store.update(value, predicates);
       if (updated === 0) {
+        value['id'] = r.id + '_' + r.studentId;
         await store.insert('reminder_settings', value);
       }
       return DbResult.ok();
     });
+    if (!result.success) {
+      return result;
+    }
+
+    // 读库校验用于暴露“更新返回成功但查询仍读到旧值”的持久化问题，
+    // 避免页面提示成功而用户返回后看到旧配置。
+    const saved: ReminderSettings = await this.queryReminderSettings(r.studentId);
+    if (!this.reminderSettingsEqual(saved, r)) {
+      const reason: string = 'readback mismatch: ' + JSON.stringify({
+        start: saved.reviewTimeStart,
+        end: saved.reviewTimeEnd,
+        dailyLimit: saved.dailyLimit,
+        notificationEnabled: saved.notificationEnabled
+      });
+      DbLog.error(op, reason);
+      return DbResult.fail(op, '设置保存后读取校验失败');
+    }
+    return DbResult.ok();
+  }
+
+  private reminderSettingsEqual(a: ReminderSettings, b: ReminderSettings): boolean {
+    return a.studentId === b.studentId &&
+      a.reviewTimeStart === b.reviewTimeStart &&
+      a.reviewTimeEnd === b.reviewTimeEnd &&
+      a.dailyLimit === b.dailyLimit &&
+      a.mathEnabled === b.mathEnabled &&
+      a.chineseEnabled === b.chineseEnabled &&
+      a.englishEnabled === b.englishEnabled &&
+      a.scienceEnabled === b.scienceEnabled &&
+      a.notificationEnabled === b.notificationEnabled;
   }
 
   // ---------------------- analytics ----------------------
@@ -1488,6 +1592,59 @@ export class DatabaseHelper {
     return this.runWrite(op, async (): Promise<void> => {
       await store.insert('analytics_event', value);
     });
+  }
+
+  async queryAnalyticsEvents(limit: number = 10000): Promise<AnalyticsEvent[]> {
+    const op: string = 'queryAnalyticsEvents';
+    const list: AnalyticsEvent[] = [];
+    const store = await this.awaitStore(op);
+    if (store === undefined) {
+      return list;
+    }
+    try {
+      const resultSet = await store.querySql(
+        'SELECT id, eventType, studentIdHash, platform, properties, occurredAt ' +
+        'FROM analytics_event ORDER BY occurredAt DESC LIMIT ?', [limit]);
+      try {
+        while (resultSet.goToNextRow()) {
+          const event = new AnalyticsEvent();
+          event.id = rs_col(resultSet, 'id');
+          event.eventType = rs_col(resultSet, 'eventType');
+          event.studentIdHash = rs_col(resultSet, 'studentIdHash');
+          event.platform = rs_col(resultSet, 'platform');
+          event.properties = rs_col(resultSet, 'properties');
+          event.occurredAt = rs_col_long(resultSet, 'occurredAt');
+          list.push(event);
+        }
+      } finally {
+        resultSet.close();
+      }
+    } catch (e) {
+      DbLog.error(op, errText(e));
+    }
+    return list;
+  }
+
+  async hasAnalyticsEvent(id: string): Promise<boolean> {
+    const op: string = 'hasAnalyticsEvent';
+    const store = await this.awaitStore(op);
+    if (store === undefined) {
+      return false;
+    }
+    try {
+      const resultSet = await store.querySql(
+        'SELECT COUNT(*) AS cnt FROM analytics_event WHERE id = ?', [id]);
+      try {
+        if (resultSet.goToFirstRow()) {
+          return rs_col_long(resultSet, 'cnt') > 0;
+        }
+      } finally {
+        resultSet.close();
+      }
+    } catch (e) {
+      DbLog.error(op, errText(e));
+    }
+    return false;
   }
 
   /** 指标汇总（T036）：基础计数走 GROUP BY，置信度/正确率仅拉取相关行。 */

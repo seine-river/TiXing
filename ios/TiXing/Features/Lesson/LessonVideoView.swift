@@ -272,6 +272,8 @@ struct LessonVideoView: View {
     @State private var errorText: String?
     @State private var detailText: String?
     @State private var timer: Timer?
+    @State private var generating = false
+    @State private var usingCachedLesson = false
     private let mistakeID: String
 
     init(mistakeID: String) {
@@ -293,7 +295,7 @@ struct LessonVideoView: View {
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("AI 讲解视频")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { generate() }
+        .onAppear { generate(force: false) }
         .onDisappear {
             timer?.invalidate()
             player?.stop()
@@ -343,7 +345,7 @@ struct LessonVideoView: View {
                     .background(Color.black.opacity(0.04))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
-                Button("重新生成") { generate() }
+                Button("重新生成") { generate(force: true) }
                     .buttonStyle(PrimaryButtonStyle())
             }
             .padding(18)
@@ -364,6 +366,12 @@ struct LessonVideoView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                     controls(model)
+                    if usingCachedLesson {
+                        Text("已保存本地")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 chapters(model)
             }
             .padding(14)
@@ -459,6 +467,19 @@ struct LessonVideoView: View {
                     .foregroundStyle(Theme.primary)
                     .contentShape(Circle())
             }
+
+            Button {
+                generate(force: true)
+            } label: {
+                Label("重新生成讲解", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.primary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                    .background(Capsule().stroke(Theme.primary, lineWidth: 1.2))
+            }
+            .buttonStyle(.plain)
+            .disabled(generating)
         }
         .padding(13)
         .background(Color.white)
@@ -517,7 +538,21 @@ struct LessonVideoView: View {
         }
     }
 
-    private func generate() {
+    private func generate(force: Bool) {
+        guard !generating else { return }
+        generating = true
+        player?.stop()
+        player = nil
+        usingCachedLesson = false
+
+        let fingerprint = lessonSourceFingerprint()
+        if !force, let cached = LessonCacheService.load(
+            mistakeID: mistakeID, sourceFingerprint: fingerprint) {
+            applyLesson(cached, fromCache: true)
+            generating = false
+            return
+        }
+
         loading = true
         errorText = nil
         detailText = nil
@@ -532,21 +567,42 @@ struct LessonVideoView: View {
                 stage = "正在理解题目和学生答案..."
                 let value = try await AIService.shared.lesson(mistake: mistake, grade: store.student.grade)
                 guard !value.scenes.isEmpty else { throw AIError.parsing("未解析到讲解章节") }
+                LessonCacheService.save(
+                    mistakeID: mistakeID, sourceFingerprint: fingerprint, lesson: value)
                 stage = "马上开始播放..."
                 progress = 97
-                lesson = value
-                let model = LessonPlayerModel(lesson: value)
-                player = model
-                loading = false
-                stopPulse()
-                model.start()
+                applyLesson(value, fromCache: false)
             } catch {
                 errorText = error.localizedDescription
                 detailText = String(describing: error)
                 loading = false
                 stopPulse()
             }
+            generating = false
         }
+    }
+
+    private func applyLesson(_ value: AILesson, fromCache: Bool) {
+        lesson = value
+        usingCachedLesson = fromCache
+        let model = LessonPlayerModel(lesson: value)
+        player = model
+        loading = false
+        stopPulse()
+        model.start()
+    }
+
+    private func lessonSourceFingerprint() -> String {
+        guard let mistake = store.mistake(id: mistakeID) else { return mistakeID }
+        return [
+            store.student.grade.rawValue,
+            mistake.question,
+            mistake.studentAnswer,
+            mistake.standardAnswer,
+            mistake.knowledgeSummary,
+            mistake.subject.rawValue,
+            mistake.errorType.rawValue
+        ].joined(separator: "\u{1F}")
     }
 
     private func startPulse() {

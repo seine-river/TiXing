@@ -60,10 +60,10 @@ struct BackupService {
                           userInfo: [NSLocalizedDescriptionKey: "备份数据解析失败"])
         }
         let storage: PersistentStore
-        if let harmonyData = try? millisDecoder.decode(HarmonyBackupData.self, from: dataData) {
-            storage = BackupCompatibility.storage(from: harmonyData, student: currentStudent)
-        } else if let iosStorage = try? decoder.decode(PersistentStore.self, from: dataData) {
+        if let iosStorage = try? decoder.decode(PersistentStore.self, from: dataData) {
             storage = iosStorage
+        } else if let harmonyData = try? millisDecoder.decode(HarmonyBackupData.self, from: dataData) {
+            storage = BackupCompatibility.storage(from: harmonyData, student: currentStudent)
         } else {
             throw NSError(domain: "TiXing.Backup", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "备份数据解析失败"])
@@ -73,6 +73,7 @@ struct BackupService {
             sourceURL: url,
             storage: storage,
             imageData: files.filter { $0.key.hasPrefix("images/") },
+            notesImageData: files.filter { $0.key.hasPrefix("notes/") },
             audioData: files.filter { $0.key.hasPrefix("audio/") })
         return preview
     }
@@ -89,6 +90,7 @@ struct BackupPreview {
     let sourceURL: URL
     let storage: PersistentStore
     let imageData: [String: Data]
+    let notesImageData: [String: Data]
     let audioData: [String: Data]
 
     var mistakeCount: Int { storage.mistakes.count }

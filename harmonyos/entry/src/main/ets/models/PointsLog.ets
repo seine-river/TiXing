@@ -23,3 +23,11 @@ export class PointsSummary {
   todayPoints: number = 0;
   streakDays: number = 0;
 }
+
+export class RedemptionRecord {
+  id: string = '';
+  studentId: string = '';
+  itemId: string = '';
+  cost: number = 0;
+  redeemedAt: number = 0;
+}

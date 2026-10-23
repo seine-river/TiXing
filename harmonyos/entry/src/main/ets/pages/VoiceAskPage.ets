@@ -21,7 +21,7 @@ struct VoiceAskPage {
   @State recording: boolean = false;
   @State elapsedSeconds: number = 0;
   @State busy: boolean = false;
-  @State stage: string = '点下面大麦克风，开口问一个问题';
+  @State stage: string = '开口问一个问题';
   @State questionText: string = '';
   @State errorText: string = '';
   @State hasRecord: boolean = false;
@@ -321,17 +321,6 @@ struct VoiceAskPage {
       .width(140)
       .height(140)
 
-      Text(this.recording ? '点这里结束录音' : this.hasRecord && !this.hasQuestion
-        ? '没听清？点这里重说' : '点一下，开始说话')
-        .fontSize(15)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(AppColors.SOLID_PRIMARY)
-        .backgroundColor(Color.White)
-        .padding({ left: 18, right: 18, top: 9, bottom: 9 })
-        .borderRadius(19)
-        .border({ width: 1, color: '#E6FFFFFF' })
-        .shadow({ radius: 12, color: '#4D23264A', offsetY: 4 })
-        .margin({ top: 6 })
     }
     .alignItems(HorizontalAlign.Center)
     .constraintSize({ minHeight: AppSizes.TOUCH_TARGET })
@@ -607,7 +596,7 @@ struct VoiceAskPage {
     this.hasRecord = false;
     this.hasQuestion = false;
     this.hasAnswer = false;
-    this.stage = '点下面大麦克风，开口问一个问题';
+    this.stage = '开口问一个问题';
   }
 
   private cleanUserText(raw: string, fallback: string): string {

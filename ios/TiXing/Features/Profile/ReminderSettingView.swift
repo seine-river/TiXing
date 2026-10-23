@@ -66,8 +66,10 @@ struct ReminderSettingView: View {
         resultText = ""
         Task {
             do {
-                let delivery = try await ReminderService.apply(draft)
+                // 先持久化用户配置；提醒发布失败时也不丢配置，
+                // 用户修正系统权限后可以直接重试发布。
                 store.updateSettings(draft)
+                let delivery = try await ReminderService.apply(draft)
                 resultOK = true
                 resultText = delivery == .calendar ? "成功设置日历" : "成功设置复习提醒"
             } catch {

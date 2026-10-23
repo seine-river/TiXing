@@ -2,6 +2,7 @@ import { Mistake } from '../models/Mistake';
 import { Student } from '../models/Student';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { AiService, AiServiceError, AiLesson, AiLessonScene, AiLessonVisual } from '../services/AiService';
+import { LessonCacheService } from '../services/LessonCacheService';
 import { AppColors, AppSizes, generateId, subjectLabel } from '../common/Constants';
 import { PageHeader } from '../components/CommonComponents';
 import { EmptyBlock } from '../components/BasicWidgets';
@@ -51,6 +52,7 @@ struct LessonVideoPage {
   @State isFinished: boolean = false;
   @State audioEnabled: boolean = true;
   @State audioAvailable: boolean = false;
+  @State usingCachedLesson: boolean = false;
 
   private mistakeId: string = '';
   private timerId: number = -1;
@@ -82,7 +84,8 @@ struct LessonVideoPage {
   }
 
   private async loadData(): Promise<void> {
-    this.setLoadingStage('正在读取错题信息...', 12);
+    // 点击入口后的前几秒不能给用户“马上就好”的错觉，进度从低位缓慢起步。
+    this.setLoadingStage('正在读取错题信息...', 6);
     try {
       const m: Mistake | undefined = await dbHelper.queryMistakeById(this.mistakeId);
       if (m === undefined) {
@@ -108,7 +111,7 @@ struct LessonVideoPage {
           'lesson student not found, fallback grade: studentId=%{public}s, fallbackGrade=%{public}s',
           m.studentId, this.student.grade);
       }
-      await this.generateLesson();
+      await this.generateLesson(false);
     } catch (e) {
       const detail: string = e instanceof Error
         ? `name=${e.name}, message=${e.message}, stack=${e.stack === undefined ? '' : e.stack}`
@@ -120,7 +123,7 @@ struct LessonVideoPage {
     }
   }
 
-  private async generateLesson(): Promise<void> {
+  private async generateLesson(forceGeneration: boolean): Promise<void> {
     if (this.generating) {
       hilog.warn(LOG_DOMAIN, LOG_TAG, 'generateLesson ignored: another generation is running');
       return;
@@ -131,6 +134,34 @@ struct LessonVideoPage {
     this.loadError = '';
     this.errorDetail = '';
     this.stopPlayback(false);
+    this.usingCachedLesson = false;
+
+    if (!forceGeneration) {
+      const cached: AiLesson | undefined =
+        await LessonCacheService.load(this.mistakeId, this.lessonSourceFingerprint());
+      if (!this.alive) {
+        this.generating = false;
+        return;
+      }
+      if (cached !== undefined && this.alive) {
+        this.lesson = cached;
+        this.usingCachedLesson = true;
+        this.setLoadingStage('已找到本地讲解，正在准备播放...', 82);
+        await this.initializeAudioWithTimeout();
+        if (!this.alive) {
+          return;
+        }
+        this.setLoadingStage('马上开始播放...', 97);
+        this.loading = false;
+        hilog.info(LOG_DOMAIN, LOG_TAG,
+          'lesson cache ready to play: mistakeId=%{public}s, sceneCount=%{public}d',
+          this.mistakeId, cached.scenes.length);
+        this.startPlayback(0);
+        this.generating = false;
+        return;
+      }
+    }
+
     this.startLoadingPulse();
     hilog.info(LOG_DOMAIN, LOG_TAG,
       'generateLesson flow start: mistakeId=%{public}s, questionLength=%{public}d, ' +
@@ -155,6 +186,7 @@ struct LessonVideoPage {
         return;
       }
       this.lesson = lesson;
+      await LessonCacheService.save(this.mistakeId, this.lessonSourceFingerprint(), lesson);
       hilog.info(LOG_DOMAIN, LOG_TAG,
         'generateLesson flow received script: sceneCount=%{public}d, totalDuration=%{public}d',
         lesson.scenes.length, lesson.totalDuration);
@@ -194,14 +226,43 @@ struct LessonVideoPage {
     this.loadingProgress = progress;
   }
 
+  private lessonSourceFingerprint(): string {
+    // 年级或错题内容变化时自动失效，避免播放与当前题目不匹配的旧讲解。
+    return JSON.stringify([
+      this.student.grade,
+      this.mistake.ocrText,
+      this.mistake.studentAnswer,
+      this.mistake.standardAnswer,
+      this.mistake.knowledgeSummary,
+      this.mistake.subject,
+      this.mistake.errorType
+    ]);
+  }
+
   private startLoadingPulse(): void {
     this.stopLoadingPulse();
-    this.setLoadingStage('正在理解题目和学生答案...', 28);
+    this.setLoadingStage('正在理解题目和学生答案...', 8);
     this.loadingTimerId = setInterval((): void => {
       this.loadingSeconds++;
-      this.loadingProgress = Math.min(this.loadingProgress + 1, 88);
+      this.loadingProgress = Math.min(
+        this.loadingProgress + this.loadingProgressIncrement(),
+        88
+      );
       this.loadingStage = this.generationStageHint();
     }, 1000);
+  }
+
+  private loadingProgressIncrement(): number {
+    if (this.loadingSeconds < 4) {
+      return 0.5;
+    }
+    if (this.loadingSeconds < 10) {
+      return 0.8;
+    }
+    if (this.loadingSeconds < 20) {
+      return 1.2;
+    }
+    return 1.5;
   }
 
   private stopLoadingPulse(): void {
@@ -784,7 +845,7 @@ struct LessonVideoPage {
             .borderRadius(22)
             .layoutWeight(1)
             .onClick(() => {
-              this.generateLesson();
+              this.generateLesson(true);
             })
         }
         .width('100%')
@@ -805,6 +866,21 @@ struct LessonVideoPage {
       Column() {
         this.VideoStage()
         this.ControlBar()
+
+      Button('🔄 重新生成讲解')
+        .height(38)
+        .fontSize(13)
+        .fontWeight(FontWeight.Bold)
+        .backgroundColor(Color.White)
+        .fontColor(AppColors.PRIMARY)
+        .borderRadius(19)
+        .border({ width: 1.2, color: AppColors.PRIMARY })
+        .margin({ top: 10 })
+        .enabled(!this.generating)
+        .onClick(() => {
+          this.generateLesson(true);
+        })
+
         this.SceneList()
 
         Row({ space: 8 }) {
@@ -812,6 +888,11 @@ struct LessonVideoPage {
             .fontSize(11)
             .fontColor(AppColors.TEXT_SECONDARY)
             .layoutWeight(1)
+          if (this.usingCachedLesson) {
+            Text('已保存本地')
+              .fontSize(11)
+              .fontColor(AppColors.PRIMARY)
+          }
           Text(this.audioEnabled ? '关闭语音' : '开启语音')
             .fontSize(12)
             .fontWeight(FontWeight.Medium)

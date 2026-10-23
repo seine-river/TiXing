@@ -27,7 +27,7 @@ struct DataManagementPage {
               .fontColor(AppColors.TEXT_PRIMARY)
               .width('100%')
               .margin({ bottom: 8 })
-            Text('打包错题、复习记录、图片、问一问记录、好奇星球报告与原始录音后，会弹出系统保存窗口，由你选择备份文件的存储位置和文件名。')
+            Text('打包学生资料、复习设置、错题与复习进度、图片笔记、积分兑换、问一问记录、好奇星球报告与原始录音后，会弹出系统保存窗口，由你选择备份文件的存储位置和文件名。')
               .fontSize(13)
               .fontColor(AppColors.TEXT_SECONDARY)
               .margin({ bottom: 12 })
@@ -70,8 +70,8 @@ struct DataManagementPage {
                 this.doPickImport();
               })
 
-            if (this.preview.mistakeCount > 0 || this.preview.voiceAskCount > 0) {
-              Text(`预览：${this.preview.mistakeCount} 道错题，${this.preview.voiceAskCount} 条问一问，${this.preview.audioCount} 段原始录音，${this.preview.insightCount} 份好奇报告`)
+            if (this.preview.bundleRoot.length > 0) {
+              Text(`预览：${this.preview.mistakeCount} 道错题，${this.preview.logCount} 条复习记录，${this.preview.pointsLogCount} 条积分记录，${this.preview.redemptionCount} 条兑换记录`)
                 .fontSize(13)
                 .fontColor(AppColors.TEXT_REGULAR)
                 .margin({ top: 12, bottom: 8 })
@@ -203,7 +203,7 @@ struct DataManagementPage {
     try {
       this.preview = await DataPortabilityService.parseBundlePreview(path);
       this.statusOk = true;
-      this.statusMsg = `已解析 ${this.preview.mistakeCount} 道错题、${this.preview.voiceAskCount} 条问一问，请核对后确认导入`;
+      this.statusMsg = `已解析 ${this.preview.mistakeCount} 道错题、${this.preview.logCount} 条复习记录、${this.preview.pointsLogCount} 条积分记录，请核对后确认导入`;
     } catch (e) {
       const reason: string = e instanceof Error ? e.message : '文件解析失败';
       this.preview = new BundlePreview();
@@ -215,7 +215,7 @@ struct DataManagementPage {
   }
 
   private async doImport(): Promise<void> {
-    if (this.busy || (this.preview.mistakeCount === 0 && this.preview.voiceAskCount === 0)) {
+    if (this.busy || this.preview.bundleRoot.length === 0) {
       return;
     }
     this.setBusy('导入中...');

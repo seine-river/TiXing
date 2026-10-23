@@ -19,9 +19,6 @@ struct AboutView: View {
                     VStack(spacing: 9) {
                         row("应用名称", "题醒")
                         row("当前版本", "1.0.3")
-                        row("版本编号", "1000003")
-                        row("包名", "com.tixing.me.ios")
-                        row("提供者", "TiXing")
                     }
                 }
                 AppCard {

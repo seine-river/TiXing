@@ -79,12 +79,6 @@ struct VoiceAskView: View {
                             .font(.system(size: 34, weight: .bold))
                             .foregroundStyle(.white)
                     }
-                    Text(actionLabel)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Theme.primary)
-                        .padding(.horizontal, 15)
-                        .padding(.vertical, 7)
-                        .background(Capsule().fill(.white))
                 }
             }
             .buttonStyle(.plain)
@@ -171,18 +165,9 @@ struct VoiceAskView: View {
         .disabled(busy || (phase == .confirm && question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
     }
 
-    private var actionLabel: String {
-        switch phase {
-        case .recording: return "点这里结束录音"
-        case .idle: return "点一下，开始说话"
-        case .confirm: return "没听清？点这里重说"
-        default: return "再问一个新的问题"
-        }
-    }
-
     private var stageText: String {
         switch phase {
-        case .idle: return "点下面大麦克风，开口问一个问题"
+        case .idle: return "开口问一个问题"
         case .recording: return "正在听你说…"
         case .converting: return "正在转换为文字…"
         case .confirm: return "确认一下醒醒听到的问题"

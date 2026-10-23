@@ -157,52 +157,57 @@
 
 		000000000000000000000059 /* PBXBuildFile */ = {
 			isa = PBXBuildFile;
-			fileRef = 000000000000000000000058 /* Services/ReminderService.swift */;
+			fileRef = 000000000000000000000058 /* Services/LessonCacheService.swift */;
 		};
 
 		00000000000000000000005B /* PBXBuildFile */ = {
 			isa = PBXBuildFile;
-			fileRef = 00000000000000000000005A /* Services/ZipService.swift */;
+			fileRef = 00000000000000000000005A /* Services/ReminderService.swift */;
 		};
 
 		00000000000000000000005D /* PBXBuildFile */ = {
 			isa = PBXBuildFile;
-			fileRef = 00000000000000000000005C /* Store/AppStore.swift */;
+			fileRef = 00000000000000000000005C /* Services/ZipService.swift */;
 		};
 
 		00000000000000000000005F /* PBXBuildFile */ = {
 			isa = PBXBuildFile;
-			fileRef = 00000000000000000000005E /* Store/SQLiteStoreService.swift */;
+			fileRef = 00000000000000000000005E /* Store/AppStore.swift */;
 		};
 
 		000000000000000000000061 /* PBXBuildFile */ = {
 			isa = PBXBuildFile;
-			fileRef = 000000000000000000000060 /* Theme/Theme.swift */;
+			fileRef = 000000000000000000000060 /* Store/SQLiteStoreService.swift */;
 		};
 
 		000000000000000000000063 /* PBXBuildFile */ = {
 			isa = PBXBuildFile;
-			fileRef = 000000000000000000000062 /* AlignmentTests.swift */;
+			fileRef = 000000000000000000000062 /* Theme/Theme.swift */;
 		};
 
 		000000000000000000000065 /* PBXBuildFile */ = {
 			isa = PBXBuildFile;
-			fileRef = 000000000000000000000064 /* HarmonyParityTests.swift */;
+			fileRef = 000000000000000000000064 /* AlignmentTests.swift */;
 		};
 
 		000000000000000000000067 /* PBXBuildFile */ = {
 			isa = PBXBuildFile;
-			fileRef = 000000000000000000000066 /* JSONExtractorTests.swift */;
+			fileRef = 000000000000000000000066 /* HarmonyParityTests.swift */;
 		};
 
 		000000000000000000000069 /* PBXBuildFile */ = {
 			isa = PBXBuildFile;
-			fileRef = 000000000000000000000068 /* TiXingTests.swift */;
+			fileRef = 000000000000000000000068 /* JSONExtractorTests.swift */;
 		};
 
 		00000000000000000000006B /* PBXBuildFile */ = {
 			isa = PBXBuildFile;
-			fileRef = 00000000000000000000006A /* Resources/Assets.xcassets */;
+			fileRef = 00000000000000000000006A /* TiXingTests.swift */;
+		};
+
+		00000000000000000000006D /* PBXBuildFile */ = {
+			isa = PBXBuildFile;
+			fileRef = 00000000000000000000006C /* Resources/Assets.xcassets */;
 		};
 
 		00000000000000000000001C /* PBXFileReference */ = {
@@ -418,67 +423,74 @@
 		000000000000000000000058 /* PBXFileReference */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
-			path = "Services/ReminderService.swift";
+			path = "Services/LessonCacheService.swift";
 			sourceTree = "<group>";
 		};
 
 		00000000000000000000005A /* PBXFileReference */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
-			path = "Services/ZipService.swift";
+			path = "Services/ReminderService.swift";
 			sourceTree = "<group>";
 		};
 
 		00000000000000000000005C /* PBXFileReference */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
-			path = "Store/AppStore.swift";
+			path = "Services/ZipService.swift";
 			sourceTree = "<group>";
 		};
 
 		00000000000000000000005E /* PBXFileReference */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
-			path = "Store/SQLiteStoreService.swift";
+			path = "Store/AppStore.swift";
 			sourceTree = "<group>";
 		};
 
 		000000000000000000000060 /* PBXFileReference */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
-			path = "Theme/Theme.swift";
+			path = "Store/SQLiteStoreService.swift";
 			sourceTree = "<group>";
 		};
 
 		000000000000000000000062 /* PBXFileReference */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
-			path = "AlignmentTests.swift";
+			path = "Theme/Theme.swift";
 			sourceTree = "<group>";
 		};
 
 		000000000000000000000064 /* PBXFileReference */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
-			path = "HarmonyParityTests.swift";
+			path = "AlignmentTests.swift";
 			sourceTree = "<group>";
 		};
 
 		000000000000000000000066 /* PBXFileReference */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
-			path = "JSONExtractorTests.swift";
+			path = "HarmonyParityTests.swift";
 			sourceTree = "<group>";
 		};
 
 		000000000000000000000068 /* PBXFileReference */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
-			path = "TiXingTests.swift";
+			path = "JSONExtractorTests.swift";
 			sourceTree = "<group>";
 		};
 
 		00000000000000000000006A /* PBXFileReference */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = "TiXingTests.swift";
+			sourceTree = "<group>";
+		};
+
+		00000000000000000000006C /* PBXFileReference */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = folder.assetcatalog;
 			path = "Resources/Assets.xcassets";
@@ -503,14 +515,14 @@
 
 		00000000000000000000001A /* PBXGroup */ = {
 			isa = PBXGroup;
-			children = (00000000000000000000001C /* App/RootView.swift */, 00000000000000000000001E /* App/TiXingApp.swift */, 000000000000000000000020 /* Features/About/AboutView.swift */, 000000000000000000000022 /* Features/Curiosity/CuriosityPlanetView.swift */, 000000000000000000000024 /* Features/Data/DataManagementView.swift */, 000000000000000000000026 /* Features/Home/HomeView.swift */, 000000000000000000000028 /* Features/Lesson/LessonVideoView.swift */, 00000000000000000000002A /* Features/Mistakes/CaptureFlowView.swift */, 00000000000000000000002C /* Features/Mistakes/MistakeDetailView.swift */, 00000000000000000000002E /* Features/Mistakes/MistakeRow.swift */, 000000000000000000000030 /* Features/Mistakes/MistakesView.swift */, 000000000000000000000032 /* Features/Points/PointsCenterView.swift */, 000000000000000000000034 /* Features/Profile/OpsOverviewView.swift */, 000000000000000000000036 /* Features/Profile/ProfileSettingView.swift */, 000000000000000000000038 /* Features/Profile/ProfileView.swift */, 00000000000000000000003A /* Features/Profile/ReminderSettingView.swift */, 00000000000000000000003C /* Features/Report/ReportView.swift */, 00000000000000000000003E /* Features/Review/ReviewView.swift */, 000000000000000000000040 /* Features/VoiceAsk/VoiceAskDetailView.swift */, 000000000000000000000042 /* Features/VoiceAsk/VoiceAskListView.swift */, 000000000000000000000044 /* Features/VoiceAsk/VoiceAskView.swift */, 000000000000000000000046 /* Models/AIModels.swift */, 000000000000000000000048 /* Models/DomainModels.swift */, 00000000000000000000004A /* Services/AIService.swift */, 00000000000000000000004C /* Services/AudioAndSpeechService.swift */, 00000000000000000000004E /* Services/AudioSessionService.swift */, 000000000000000000000050 /* Services/BackupCompatibility.swift */, 000000000000000000000052 /* Services/BackupService.swift */, 000000000000000000000054 /* Services/HashService.swift */, 000000000000000000000056 /* Services/ImageQualityService.swift */, 000000000000000000000058 /* Services/ReminderService.swift */, 00000000000000000000005A /* Services/ZipService.swift */, 00000000000000000000005C /* Store/AppStore.swift */, 00000000000000000000005E /* Store/SQLiteStoreService.swift */, 000000000000000000000060 /* Theme/Theme.swift */, 00000000000000000000006A /* Resources/Assets.xcassets */,);
+			children = (00000000000000000000001C /* App/RootView.swift */, 00000000000000000000001E /* App/TiXingApp.swift */, 000000000000000000000020 /* Features/About/AboutView.swift */, 000000000000000000000022 /* Features/Curiosity/CuriosityPlanetView.swift */, 000000000000000000000024 /* Features/Data/DataManagementView.swift */, 000000000000000000000026 /* Features/Home/HomeView.swift */, 000000000000000000000028 /* Features/Lesson/LessonVideoView.swift */, 00000000000000000000002A /* Features/Mistakes/CaptureFlowView.swift */, 00000000000000000000002C /* Features/Mistakes/MistakeDetailView.swift */, 00000000000000000000002E /* Features/Mistakes/MistakeRow.swift */, 000000000000000000000030 /* Features/Mistakes/MistakesView.swift */, 000000000000000000000032 /* Features/Points/PointsCenterView.swift */, 000000000000000000000034 /* Features/Profile/OpsOverviewView.swift */, 000000000000000000000036 /* Features/Profile/ProfileSettingView.swift */, 000000000000000000000038 /* Features/Profile/ProfileView.swift */, 00000000000000000000003A /* Features/Profile/ReminderSettingView.swift */, 00000000000000000000003C /* Features/Report/ReportView.swift */, 00000000000000000000003E /* Features/Review/ReviewView.swift */, 000000000000000000000040 /* Features/VoiceAsk/VoiceAskDetailView.swift */, 000000000000000000000042 /* Features/VoiceAsk/VoiceAskListView.swift */, 000000000000000000000044 /* Features/VoiceAsk/VoiceAskView.swift */, 000000000000000000000046 /* Models/AIModels.swift */, 000000000000000000000048 /* Models/DomainModels.swift */, 00000000000000000000004A /* Services/AIService.swift */, 00000000000000000000004C /* Services/AudioAndSpeechService.swift */, 00000000000000000000004E /* Services/AudioSessionService.swift */, 000000000000000000000050 /* Services/BackupCompatibility.swift */, 000000000000000000000052 /* Services/BackupService.swift */, 000000000000000000000054 /* Services/HashService.swift */, 000000000000000000000056 /* Services/ImageQualityService.swift */, 000000000000000000000058 /* Services/LessonCacheService.swift */, 00000000000000000000005A /* Services/ReminderService.swift */, 00000000000000000000005C /* Services/ZipService.swift */, 00000000000000000000005E /* Store/AppStore.swift */, 000000000000000000000060 /* Store/SQLiteStoreService.swift */, 000000000000000000000062 /* Theme/Theme.swift */, 00000000000000000000006C /* Resources/Assets.xcassets */,);
 			path = TiXing;
 			sourceTree = "<group>";
 		};
 
 		00000000000000000000001B /* PBXGroup */ = {
 			isa = PBXGroup;
-			children = (000000000000000000000062 /* AlignmentTests.swift */, 000000000000000000000064 /* HarmonyParityTests.swift */, 000000000000000000000066 /* JSONExtractorTests.swift */, 000000000000000000000068 /* TiXingTests.swift */,);
+			children = (000000000000000000000064 /* AlignmentTests.swift */, 000000000000000000000066 /* HarmonyParityTests.swift */, 000000000000000000000068 /* JSONExtractorTests.swift */, 00000000000000000000006A /* TiXingTests.swift */,);
 			path = TiXingTests;
 			sourceTree = "<group>";
 		};
@@ -569,12 +581,12 @@
 
 		000000000000000000000011 /* PBXSourcesBuildPhase */ = {
 			isa = PBXSourcesBuildPhase;
-			files = (00000000000000000000001D /* App/RootView.swift */, 00000000000000000000001F /* App/TiXingApp.swift */, 000000000000000000000021 /* Features/About/AboutView.swift */, 000000000000000000000023 /* Features/Curiosity/CuriosityPlanetView.swift */, 000000000000000000000025 /* Features/Data/DataManagementView.swift */, 000000000000000000000027 /* Features/Home/HomeView.swift */, 000000000000000000000029 /* Features/Lesson/LessonVideoView.swift */, 00000000000000000000002B /* Features/Mistakes/CaptureFlowView.swift */, 00000000000000000000002D /* Features/Mistakes/MistakeDetailView.swift */, 00000000000000000000002F /* Features/Mistakes/MistakeRow.swift */, 000000000000000000000031 /* Features/Mistakes/MistakesView.swift */, 000000000000000000000033 /* Features/Points/PointsCenterView.swift */, 000000000000000000000035 /* Features/Profile/OpsOverviewView.swift */, 000000000000000000000037 /* Features/Profile/ProfileSettingView.swift */, 000000000000000000000039 /* Features/Profile/ProfileView.swift */, 00000000000000000000003B /* Features/Profile/ReminderSettingView.swift */, 00000000000000000000003D /* Features/Report/ReportView.swift */, 00000000000000000000003F /* Features/Review/ReviewView.swift */, 000000000000000000000041 /* Features/VoiceAsk/VoiceAskDetailView.swift */, 000000000000000000000043 /* Features/VoiceAsk/VoiceAskListView.swift */, 000000000000000000000045 /* Features/VoiceAsk/VoiceAskView.swift */, 000000000000000000000047 /* Models/AIModels.swift */, 000000000000000000000049 /* Models/DomainModels.swift */, 00000000000000000000004B /* Services/AIService.swift */, 00000000000000000000004D /* Services/AudioAndSpeechService.swift */, 00000000000000000000004F /* Services/AudioSessionService.swift */, 000000000000000000000051 /* Services/BackupCompatibility.swift */, 000000000000000000000053 /* Services/BackupService.swift */, 000000000000000000000055 /* Services/HashService.swift */, 000000000000000000000057 /* Services/ImageQualityService.swift */, 000000000000000000000059 /* Services/ReminderService.swift */, 00000000000000000000005B /* Services/ZipService.swift */, 00000000000000000000005D /* Store/AppStore.swift */, 00000000000000000000005F /* Store/SQLiteStoreService.swift */, 000000000000000000000061 /* Theme/Theme.swift */,);
+			files = (00000000000000000000001D /* App/RootView.swift */, 00000000000000000000001F /* App/TiXingApp.swift */, 000000000000000000000021 /* Features/About/AboutView.swift */, 000000000000000000000023 /* Features/Curiosity/CuriosityPlanetView.swift */, 000000000000000000000025 /* Features/Data/DataManagementView.swift */, 000000000000000000000027 /* Features/Home/HomeView.swift */, 000000000000000000000029 /* Features/Lesson/LessonVideoView.swift */, 00000000000000000000002B /* Features/Mistakes/CaptureFlowView.swift */, 00000000000000000000002D /* Features/Mistakes/MistakeDetailView.swift */, 00000000000000000000002F /* Features/Mistakes/MistakeRow.swift */, 000000000000000000000031 /* Features/Mistakes/MistakesView.swift */, 000000000000000000000033 /* Features/Points/PointsCenterView.swift */, 000000000000000000000035 /* Features/Profile/OpsOverviewView.swift */, 000000000000000000000037 /* Features/Profile/ProfileSettingView.swift */, 000000000000000000000039 /* Features/Profile/ProfileView.swift */, 00000000000000000000003B /* Features/Profile/ReminderSettingView.swift */, 00000000000000000000003D /* Features/Report/ReportView.swift */, 00000000000000000000003F /* Features/Review/ReviewView.swift */, 000000000000000000000041 /* Features/VoiceAsk/VoiceAskDetailView.swift */, 000000000000000000000043 /* Features/VoiceAsk/VoiceAskListView.swift */, 000000000000000000000045 /* Features/VoiceAsk/VoiceAskView.swift */, 000000000000000000000047 /* Models/AIModels.swift */, 000000000000000000000049 /* Models/DomainModels.swift */, 00000000000000000000004B /* Services/AIService.swift */, 00000000000000000000004D /* Services/AudioAndSpeechService.swift */, 00000000000000000000004F /* Services/AudioSessionService.swift */, 000000000000000000000051 /* Services/BackupCompatibility.swift */, 000000000000000000000053 /* Services/BackupService.swift */, 000000000000000000000055 /* Services/HashService.swift */, 000000000000000000000057 /* Services/ImageQualityService.swift */, 000000000000000000000059 /* Services/LessonCacheService.swift */, 00000000000000000000005B /* Services/ReminderService.swift */, 00000000000000000000005D /* Services/ZipService.swift */, 00000000000000000000005F /* Store/AppStore.swift */, 000000000000000000000061 /* Store/SQLiteStoreService.swift */, 000000000000000000000063 /* Theme/Theme.swift */,);
 		};
 
 		000000000000000000000014 /* PBXSourcesBuildPhase */ = {
 			isa = PBXSourcesBuildPhase;
-			files = (000000000000000000000063 /* AlignmentTests.swift */, 000000000000000000000065 /* HarmonyParityTests.swift */, 000000000000000000000067 /* JSONExtractorTests.swift */, 000000000000000000000069 /* TiXingTests.swift */,);
+			files = (000000000000000000000065 /* AlignmentTests.swift */, 000000000000000000000067 /* HarmonyParityTests.swift */, 000000000000000000000069 /* JSONExtractorTests.swift */, 00000000000000000000006B /* TiXingTests.swift */,);
 		};
 
 		000000000000000000000012 /* PBXFrameworksBuildPhase */ = {
@@ -591,7 +603,7 @@
 
 		000000000000000000000013 /* PBXResourcesBuildPhase */ = {
 			isa = PBXResourcesBuildPhase;
-			files = (00000000000000000000006B /* Resources/Assets.xcassets */,);
+			files = (00000000000000000000006D /* Resources/Assets.xcassets */,);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 

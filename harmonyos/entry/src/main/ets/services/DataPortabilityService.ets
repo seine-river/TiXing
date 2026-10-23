@@ -5,7 +5,14 @@ import { taskpool } from '@kit.ArkTS';
 import { Mistake } from '../models/Mistake';
 import { ReviewLog } from '../models/ReviewLog';
 import { ReminderSettings } from '../models/ReminderSettings';
-import { Subject, ErrorType, MistakeStatus, AnswerType, GradingMethod, InputMethod } from '../models/Enums';
+import { Student } from '../models/Student';
+import { PointsLog, RedemptionRecord } from '../models/PointsLog';
+import { AnalyticsEvent } from '../models/AnalyticsEvent';
+import { KnowledgeProfile } from '../models/KnowledgeTag';
+import {
+  Subject, ErrorType, MistakeStatus, AnswerType, GradingMethod, InputMethod,
+  Grade, TextbookVersion, PointsActionType, Trend
+} from '../models/Enums';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { DbResult } from '../common/DbResult';
 import { AppContextHolder } from '../common/AppContext';
@@ -73,12 +80,66 @@ interface ExportSettings {
   notificationEnabled: boolean;
 }
 
+interface ExportStudent {
+  id: string;
+  parentId: string;
+  nickname: string;
+  grade: string;
+  textbookVersion: string;
+  region: string;
+  school: string;
+  communityBrowseEnabled: boolean;
+  communityShareEnabled: boolean;
+  createdAt: number;
+}
+
+interface ExportPointsLog {
+  id: string;
+  studentId: string;
+  actionType: string;
+  points: number;
+  createdAt: number;
+}
+
+interface ExportRedemption {
+  id: string;
+  studentId: string;
+  itemId: string;
+  cost: number;
+  redeemedAt: number;
+}
+
+interface ExportKnowledgeProfile {
+  id: string;
+  studentId: string;
+  knowledgeTagId: string;
+  totalMistakes: number;
+  masteredCount: number;
+  currentMasteryScore: number;
+  trend: string;
+  updatedAt: number;
+}
+
+interface ExportAnalyticsEvent {
+  id: string;
+  eventType: string;
+  studentIdHash: string;
+  platform: string;
+  properties: string;
+  occurredAt: number;
+}
+
 interface ExportDataRoot {
+  student?: ExportStudent;
   mistakes: ExportMistake[];
   reviewLogs: ExportLog[];
   settings: ExportSettings;
   voiceAsks?: ExportVoiceAsk[];
   interestInsights?: ExportInsight[];
+  pointsLogs?: ExportPointsLog[];
+  redemptions?: ExportRedemption[];
+  knowledgeProfiles?: ExportKnowledgeProfile[];
+  analyticsEvents?: ExportAnalyticsEvent[];
 }
 
 interface ExportVoiceAsk {
@@ -129,6 +190,10 @@ interface TaskSummary {
   voiceAskCount: number;
   insightCount: number;
   audioCount: number;
+  pointsLogCount: number;
+  redemptionCount: number;
+  knowledgeProfileCount: number;
+  analyticsEventCount: number;
   preview: PreviewItemRaw[];
   voicePreview: VoicePreviewRaw[];
 }
@@ -175,6 +240,10 @@ export class BundlePreview {
   voiceAskCount: number = 0;
   insightCount: number = 0;
   audioCount: number = 0;
+  pointsLogCount: number = 0;
+  redemptionCount: number = 0;
+  knowledgeProfileCount: number = 0;
+  analyticsEventCount: number = 0;
   exportedAt: number = 0;
   previewItems: BundlePreviewItem[] = [];
   voicePreviewItems: VoiceBundlePreviewItem[] = [];
@@ -215,6 +284,10 @@ async function parseBundleTask(zipPath: string, extractDir: string, previewLimit
     voiceAskCount: 0,
     insightCount: 0,
     audioCount: 0,
+    pointsLogCount: 0,
+    redemptionCount: 0,
+    knowledgeProfileCount: 0,
+    analyticsEventCount: 0,
     preview: [],
     voicePreview: []
   };
@@ -245,6 +318,10 @@ async function parseBundleTask(zipPath: string, extractDir: string, previewLimit
     summary.logCount = data.reviewLogs !== undefined ? data.reviewLogs.length : 0;
     summary.voiceAskCount = data.voiceAsks !== undefined ? data.voiceAsks.length : 0;
     summary.insightCount = data.interestInsights !== undefined ? data.interestInsights.length : 0;
+    summary.pointsLogCount = data.pointsLogs !== undefined ? data.pointsLogs.length : 0;
+    summary.redemptionCount = data.redemptions !== undefined ? data.redemptions.length : 0;
+    summary.knowledgeProfileCount = data.knowledgeProfiles !== undefined ? data.knowledgeProfiles.length : 0;
+    summary.analyticsEventCount = data.analyticsEvents !== undefined ? data.analyticsEvents.length : 0;
     const imagesDir: string = root + '/images';
     if (fs.accessSync(imagesDir)) {
       const files: string[] = fs.listFileSync(imagesDir);
@@ -292,9 +369,12 @@ async function parseBundleTask(zipPath: string, extractDir: string, previewLimit
     }
     summary.preview = items;
     summary.voicePreview = voicePreview;
-    summary.ok = summary.mistakeCount > 0 || summary.voiceAskCount > 0;
+    summary.ok = data.student !== undefined || data.settings !== undefined ||
+      summary.mistakeCount > 0 || summary.logCount > 0 || summary.voiceAskCount > 0 ||
+      summary.insightCount > 0 || summary.pointsLogCount > 0 || summary.redemptionCount > 0 ||
+      summary.knowledgeProfileCount > 0 || summary.analyticsEventCount > 0;
     if (!summary.ok) {
-      summary.reason = '备份包中没有错题或问一问数据';
+      summary.reason = '备份包中没有可导入的数据';
     }
     return JSON.stringify(summary);
   } catch (e) {
@@ -374,17 +454,24 @@ export class DataPortabilityService {
   }
 
   private static async buildBundle(studentId: string, zipPath: string): Promise<void> {
+    const student: Student | undefined = await dbHelper.queryStudent(studentId);
     const mistakes: Mistake[] = await dbHelper.queryMistakesByStudent(studentId);
     const logs: ReviewLog[] = await dbHelper.queryReviewLogsByStudent(studentId);
     const settings: ReminderSettings = await dbHelper.queryReminderSettings(studentId);
     const voiceAsks: VoiceAskRecord[] = await dbHelper.queryVoiceAskRecords(studentId);
     const insights: InterestInsight[] = await dbHelper.queryInterestInsights(studentId, 100);
+    const pointsLogs: PointsLog[] = await dbHelper.queryPointsLogs(studentId);
+    const redemptions: RedemptionRecord[] = await dbHelper.queryRedemptions(studentId);
+    const knowledgeProfiles: KnowledgeProfile[] = await dbHelper.queryKnowledgeProfiles(studentId);
+    const analyticsEvents: AnalyticsEvent[] = await dbHelper.queryAnalyticsEvents();
 
     const ctx = AppContextHolder.require();
     const stagingDir: string = `${ctx.cacheDir}/export_staging_${Date.now()}`;
     const imagesDir: string = `${stagingDir}/images`;
+    const notesDir: string = `${stagingDir}/notes`;
     const audioDir: string = `${stagingDir}/audio`;
     fs.mkdirSync(imagesDir, true);
+    fs.mkdirSync(notesDir, true);
     fs.mkdirSync(audioDir, true);
 
     try {
@@ -395,6 +482,19 @@ export class DataPortabilityService {
         studentId: studentId
       };
       DataPortabilityService.writeText(`${stagingDir}/manifest.json`, JSON.stringify(manifest));
+
+      const studentExport: ExportStudent | undefined = student === undefined ? undefined : {
+        id: student.id,
+        parentId: student.parentId,
+        nickname: student.nickname,
+        grade: student.grade,
+        textbookVersion: student.textbookVersion,
+        region: student.region,
+        school: student.school,
+        communityBrowseEnabled: student.communityBrowseEnabled,
+        communityShareEnabled: student.communityShareEnabled,
+        createdAt: student.createdAt
+      };
 
       const mistakesArr: ExportMistake[] = [];
       const ownedDir: string = ctx.filesDir + '/mistakes';
@@ -420,6 +520,15 @@ export class DataPortabilityService {
             }
           } catch (e) {
             PerformanceMonitor.warn('export copy image failed: ' + m.id);
+          }
+        }
+        if (m.notesAttachmentUrl.length > 0 && m.notesAttachmentUrl.startsWith(ownedDir)) {
+          try {
+            if (fs.accessSync(m.notesAttachmentUrl)) {
+              fs.copyFileSync(m.notesAttachmentUrl, `${notesDir}/${m.id}.jpg`);
+            }
+          } catch (e) {
+            PerformanceMonitor.warn('export copy note image failed: ' + m.id);
           }
         }
       }
@@ -483,12 +592,59 @@ export class DataPortabilityService {
         doNotDisturb: settings.doNotDisturb,
         notificationEnabled: settings.notificationEnabled
       };
+      const pointsArr: ExportPointsLog[] = pointsLogs.map((log: PointsLog): ExportPointsLog => {
+        return {
+          id: log.id,
+          studentId: log.studentId,
+          actionType: log.actionType,
+          points: log.points,
+          createdAt: log.createdAt
+        };
+      });
+      const redemptionArr: ExportRedemption[] = redemptions.map((record: RedemptionRecord): ExportRedemption => {
+        return {
+          id: record.id,
+          studentId: record.studentId,
+          itemId: record.itemId,
+          cost: record.cost,
+          redeemedAt: record.redeemedAt
+        };
+      });
+      const knowledgeProfileArr: ExportKnowledgeProfile[] =
+        knowledgeProfiles.map((profile: KnowledgeProfile): ExportKnowledgeProfile => {
+          return {
+            id: profile.id,
+            studentId: profile.studentId,
+            knowledgeTagId: profile.knowledgeTagId,
+            totalMistakes: profile.totalMistakes,
+            masteredCount: profile.masteredCount,
+            currentMasteryScore: profile.currentMasteryScore,
+            trend: profile.trend,
+            updatedAt: profile.updatedAt
+          };
+        });
+      const analyticsArr: ExportAnalyticsEvent[] =
+        analyticsEvents.map((event: AnalyticsEvent): ExportAnalyticsEvent => {
+          return {
+            id: event.id,
+            eventType: event.eventType,
+            studentIdHash: event.studentIdHash,
+            platform: event.platform,
+            properties: event.properties,
+            occurredAt: event.occurredAt
+          };
+        });
       const dataRoot: ExportDataRoot = {
+        student: studentExport,
         mistakes: mistakesArr,
         reviewLogs: logsArr,
         settings: settingsExport,
         voiceAsks: voiceArr,
-        interestInsights: insightArr
+        interestInsights: insightArr,
+        pointsLogs: pointsArr,
+        redemptions: redemptionArr,
+        knowledgeProfiles: knowledgeProfileArr,
+        analyticsEvents: analyticsArr
       };
       DataPortabilityService.writeText(`${stagingDir}/data.json`, JSON.stringify(dataRoot));
 
@@ -573,7 +729,7 @@ export class DataPortabilityService {
 
     const stat = fs.statSync(zipPath);
     if (stat.size > MAX_BUNDLE_SIZE) {
-      throw new Error(`备份文件超过 10MB 上限（当前 ${Math.round(stat.size / 1024 / 1024)}MB），请精简后重试`);
+      throw new Error(`备份文件超过 100MB 上限（当前 ${Math.round(stat.size / 1024 / 1024)}MB），请精简后重试`);
     }
 
     const ctx = AppContextHolder.require();
@@ -591,6 +747,10 @@ export class DataPortabilityService {
     preview.voiceAskCount = summary.voiceAskCount;
     preview.insightCount = summary.insightCount;
     preview.audioCount = summary.audioCount;
+    preview.pointsLogCount = summary.pointsLogCount;
+    preview.redemptionCount = summary.redemptionCount;
+    preview.knowledgeProfileCount = summary.knowledgeProfileCount;
+    preview.analyticsEventCount = summary.analyticsEventCount;
     const items: BundlePreviewItem[] = [];
     for (const raw of summary.preview) {
       const item = new BundlePreviewItem();
@@ -640,6 +800,14 @@ export class DataPortabilityService {
       data.voiceAsks !== undefined ? data.voiceAsks : []);
     const insights: InterestInsight[] = DataPortabilityService.toInsights(
       data.interestInsights !== undefined ? data.interestInsights : []);
+    const pointsLogs: PointsLog[] = DataPortabilityService.toPointsLogs(
+      data.pointsLogs !== undefined ? data.pointsLogs : []);
+    const redemptions: RedemptionRecord[] = DataPortabilityService.toRedemptions(
+      data.redemptions !== undefined ? data.redemptions : []);
+    const knowledgeProfiles: KnowledgeProfile[] = DataPortabilityService.toKnowledgeProfiles(
+      data.knowledgeProfiles !== undefined ? data.knowledgeProfiles : []);
+    const analyticsEvents: AnalyticsEvent[] = DataPortabilityService.toAnalyticsEvents(
+      data.analyticsEvents !== undefined ? data.analyticsEvents : []);
 
     // 图片回填：包内图片拷贝到本机错题目录，并替换 imageUrl 为本机路径
     const ownedDir: string = ctx.filesDir + '/mistakes';
@@ -648,11 +816,17 @@ export class DataPortabilityService {
     }
     for (const m of mistakes) {
       const bundledImage: string = `${preview.bundleRoot}/images/${m.id}.jpg`;
+      const bundledNote: string = `${preview.bundleRoot}/notes/${m.id}.jpg`;
       try {
         if (fs.accessSync(bundledImage)) {
           const destPath: string = `${ownedDir}/import_${m.id}.jpg`;
           fs.copyFileSync(bundledImage, destPath);
           m.imageUrl = destPath;
+        }
+        if (fs.accessSync(bundledNote)) {
+          const notePath: string = `${ownedDir}/import_note_${m.id}.jpg`;
+          fs.copyFileSync(bundledNote, notePath);
+          m.notesAttachmentUrl = notePath;
         }
       } catch (e) {
         PerformanceMonitor.warn('import copy image failed: ' + m.id);
@@ -722,7 +896,38 @@ export class DataPortabilityService {
           }
         }
       }
-      PerformanceMonitor.writeStatistic('import_bundle', { 'inserted': inserted, 'logs': logs.length });
+      for (const log of pointsLogs) {
+        if (!(await dbHelper.hasPointsLog(log.id))) {
+          const res: DbResult = await dbHelper.insertPointsLog(log);
+          if (!res.success) {
+            return res;
+          }
+        }
+      }
+      const existingRedemptions: RedemptionRecord[] = await dbHelper.queryRedemptions('stu_default');
+      for (const record of redemptions) {
+        if (!existingRedemptions.some((item: RedemptionRecord): boolean => item.id === record.id)) {
+          const res: DbResult = await dbHelper.importRedemption(record);
+          if (!res.success) {
+            return res;
+          }
+        }
+      }
+      for (const event of analyticsEvents) {
+        if (!(await dbHelper.hasAnalyticsEvent(event.id))) {
+          const res: DbResult = await dbHelper.insertAnalyticsEvent(event);
+          if (!res.success) {
+            return res;
+          }
+        }
+      }
+      PerformanceMonitor.writeStatistic('import_bundle', {
+        'inserted': inserted,
+        'logs': logs.length,
+        'points': pointsLogs.length,
+        'redemptions': redemptions.length,
+        'analytics': analyticsEvents.length
+      });
       return DbResult.ok();
     });
     if (!importRes.success) {
@@ -744,6 +949,14 @@ export class DataPortabilityService {
       await dbHelper.saveReminderSettings(s);
     }
 
+    if (data.student !== undefined) {
+      await dbHelper.upsertStudent(DataPortabilityService.toStudent(data.student));
+    }
+
+    if (knowledgeProfiles.length > 0) {
+      await dbHelper.upsertKnowledgeProfiles(knowledgeProfiles);
+    }
+
     await KnowledgeProfileAggregator.recomputeForStudent('stu_default');
     return DbResult.ok();
   }
@@ -760,7 +973,7 @@ export class DataPortabilityService {
     for (const em of arr) {
       const m = new Mistake();
       m.id = em.id;
-      m.studentId = em.studentId !== undefined && em.studentId.length > 0 ? em.studentId : 'stu_default';
+      m.studentId = 'stu_default';
       m.imageUrl = em.imageUrl !== undefined ? em.imageUrl : '';
       m.ocrText = em.ocrText !== undefined ? em.ocrText : '';
       m.ocrConfidence = em.ocrConfidence !== undefined ? em.ocrConfidence : 0;
@@ -807,8 +1020,7 @@ export class DataPortabilityService {
     for (const raw of arr) {
       const record = new VoiceAskRecord();
       record.id = raw.id;
-      record.studentId = raw.studentId !== undefined && raw.studentId.length > 0
-        ? raw.studentId : 'stu_default';
+      record.studentId = 'stu_default';
       record.questionText = raw.questionText !== undefined ? raw.questionText : '';
       record.answerText = raw.answerText !== undefined ? raw.answerText : '';
       record.subject = raw.subject !== undefined ? raw.subject : 'other';
@@ -834,8 +1046,7 @@ export class DataPortabilityService {
     for (const raw of arr) {
       const insight = new InterestInsight();
       insight.id = raw.id;
-      insight.studentId = raw.studentId !== undefined && raw.studentId.length > 0
-        ? raw.studentId : 'stu_default';
+      insight.studentId = 'stu_default';
       insight.periodStart = raw.periodStart !== undefined ? raw.periodStart : 0;
       insight.periodEnd = raw.periodEnd !== undefined ? raw.periodEnd : Date.now();
       insight.questionCount = raw.questionCount !== undefined ? raw.questionCount : 0;
@@ -849,6 +1060,82 @@ export class DataPortabilityService {
         ? raw.recommendedActivities : [];
       insight.generatedAt = raw.generatedAt !== undefined ? raw.generatedAt : Date.now();
       list.push(insight);
+    }
+    return list;
+  }
+
+  private static toStudent(raw: ExportStudent): Student {
+    const student = new Student();
+    // 单学生应用固定读取 stu_default；导入时恢复资料内容，但统一挂到本机活跃学生。
+    student.id = 'stu_default';
+    student.parentId = raw.parentId !== undefined ? raw.parentId : '';
+    student.nickname = raw.nickname !== undefined ? raw.nickname : '';
+    student.grade = raw.grade as Grade;
+    student.textbookVersion = raw.textbookVersion as TextbookVersion;
+    student.region = raw.region !== undefined ? raw.region : '';
+    student.school = raw.school !== undefined ? raw.school : '';
+    student.communityBrowseEnabled = raw.communityBrowseEnabled === true;
+    student.communityShareEnabled = raw.communityShareEnabled === true;
+    student.createdAt = raw.createdAt !== undefined ? raw.createdAt : Date.now();
+    return student;
+  }
+
+  private static toPointsLogs(arr: ExportPointsLog[]): PointsLog[] {
+    const list: PointsLog[] = [];
+    for (const raw of arr) {
+      const log = new PointsLog();
+      log.id = raw.id;
+      log.studentId = 'stu_default';
+      log.actionType = raw.actionType as PointsActionType;
+      log.points = raw.points !== undefined ? raw.points : 0;
+      log.createdAt = raw.createdAt !== undefined ? raw.createdAt : Date.now();
+      list.push(log);
+    }
+    return list;
+  }
+
+  private static toRedemptions(arr: ExportRedemption[]): RedemptionRecord[] {
+    const list: RedemptionRecord[] = [];
+    for (const raw of arr) {
+      const record = new RedemptionRecord();
+      record.id = raw.id;
+      record.studentId = 'stu_default';
+      record.itemId = raw.itemId !== undefined ? raw.itemId : '';
+      record.cost = raw.cost !== undefined ? raw.cost : 0;
+      record.redeemedAt = raw.redeemedAt !== undefined ? raw.redeemedAt : Date.now();
+      list.push(record);
+    }
+    return list;
+  }
+
+  private static toKnowledgeProfiles(arr: ExportKnowledgeProfile[]): KnowledgeProfile[] {
+    const list: KnowledgeProfile[] = [];
+    for (const raw of arr) {
+      const profile = new KnowledgeProfile();
+      profile.id = raw.id;
+      profile.studentId = 'stu_default';
+      profile.knowledgeTagId = raw.knowledgeTagId !== undefined ? raw.knowledgeTagId : '';
+      profile.totalMistakes = raw.totalMistakes !== undefined ? raw.totalMistakes : 0;
+      profile.masteredCount = raw.masteredCount !== undefined ? raw.masteredCount : 0;
+      profile.currentMasteryScore = raw.currentMasteryScore !== undefined ? raw.currentMasteryScore : 0;
+      profile.trend = raw.trend as Trend;
+      profile.updatedAt = raw.updatedAt !== undefined ? raw.updatedAt : Date.now();
+      list.push(profile);
+    }
+    return list;
+  }
+
+  private static toAnalyticsEvents(arr: ExportAnalyticsEvent[]): AnalyticsEvent[] {
+    const list: AnalyticsEvent[] = [];
+    for (const raw of arr) {
+      const event = new AnalyticsEvent();
+      event.id = raw.id;
+      event.eventType = raw.eventType !== undefined ? raw.eventType : '';
+      event.studentIdHash = raw.studentIdHash !== undefined ? raw.studentIdHash : '';
+      event.platform = raw.platform !== undefined && raw.platform.length > 0 ? raw.platform : 'harmonyos';
+      event.properties = raw.properties !== undefined ? raw.properties : '{}';
+      event.occurredAt = raw.occurredAt !== undefined ? raw.occurredAt : Date.now();
+      list.push(event);
     }
     return list;
   }

@@ -6,9 +6,6 @@ import { PageHeader } from '../components/CommonComponents';
 @Component
 struct AboutPage {
   @State versionName: string = '1.0.3';
-  @State versionCode: string = '1000003';
-  @State bundleName: string = 'com.tixing.me';
-  @State vendor: string = 'TiXing';
 
   aboutToAppear(): void {
     this.loadBundleInfo();
@@ -19,9 +16,6 @@ struct AboutPage {
       const info = await bundleManager.getBundleInfoForSelf(
         bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
       this.versionName = info.versionName;
-      this.versionCode = `${info.versionCode}`;
-      this.bundleName = info.name;
-      this.vendor = info.vendor.length > 0 ? info.vendor : this.vendor;
     } catch (e) {
       // 保持与 AppScope/app.json5 一致的兜底信息，避免系统信息读取失败时页面空白。
     }
@@ -70,9 +64,6 @@ struct AboutPage {
               .margin({ bottom: 4 })
             this.InfoRow('应用名称', AppStrings.APP_NAME)
             this.InfoRow('当前版本', this.versionName)
-            this.InfoRow('版本编号', this.versionCode)
-            this.InfoRow('包名', this.bundleName)
-            this.InfoRow('提供者', this.vendor)
           }
           .width('100%')
           .padding(16)
@@ -112,25 +103,6 @@ struct AboutPage {
             this.FeatureRow('📊', '家长看板', '查看掌握情况、复习表现和本地统计')
           }
           .width('100%')
-          .padding(16)
-          .backgroundColor(AppColors.BG_CARD)
-          .borderRadius(AppSizes.CORNER_RADIUS)
-          .margin({ left: 16, right: 16, top: 12 })
-
-          Column() {
-            Text('数据与隐私')
-              .fontSize(16)
-              .fontWeight(FontWeight.Medium)
-              .fontColor(AppColors.TEXT_PRIMARY)
-              .width('100%')
-              .margin({ bottom: 8 })
-            Text('错题、复习记录和学习统计默认保存在本机。联网能力用于 AI 识别和 AI 讲解；你可以随时通过「导出与导入」备份或迁移数据。')
-              .fontSize(13)
-              .lineHeight(21)
-              .fontColor(AppColors.TEXT_REGULAR)
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Start)
           .padding(16)
           .backgroundColor(AppColors.BG_CARD)
           .borderRadius(AppSizes.CORNER_RADIUS)

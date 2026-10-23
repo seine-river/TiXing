@@ -157,17 +157,37 @@ struct ReminderSettingPage {
               .fontSize(14)
               .fontColor(this.settingLabelColor())
               .margin({ bottom: 8 })
-            this.SubjectToggle('数学', this.mathEnabled, (v: boolean) => {
-              this.mathEnabled = v;
+            SubjectToggleRow({
+              label: '数学',
+              isOn: this.mathEnabled,
+              controlEnabled: this.notificationEnabled,
+              onToggle: (v: boolean) => {
+                this.mathEnabled = v;
+              }
             })
-            this.SubjectToggle('语文', this.chineseEnabled, (v: boolean) => {
-              this.chineseEnabled = v;
+            SubjectToggleRow({
+              label: '语文',
+              isOn: this.chineseEnabled,
+              controlEnabled: this.notificationEnabled,
+              onToggle: (v: boolean) => {
+                this.chineseEnabled = v;
+              }
             })
-            this.SubjectToggle('英语', this.englishEnabled, (v: boolean) => {
-              this.englishEnabled = v;
+            SubjectToggleRow({
+              label: '英语',
+              isOn: this.englishEnabled,
+              controlEnabled: this.notificationEnabled,
+              onToggle: (v: boolean) => {
+                this.englishEnabled = v;
+              }
             })
-            this.SubjectToggle('科学', this.scienceEnabled, (v: boolean) => {
-              this.scienceEnabled = v;
+            SubjectToggleRow({
+              label: '科学',
+              isOn: this.scienceEnabled,
+              controlEnabled: this.notificationEnabled,
+              onToggle: (v: boolean) => {
+                this.scienceEnabled = v;
+              }
             })
           }
           .width('100%')
@@ -265,26 +285,6 @@ struct ReminderSettingPage {
     return this.notificationEnabled ? AppColors.CHIP_BG : AppColors.DISABLED;
   }
 
-  @Builder
-  SubjectToggle(label: string, isOn: boolean, onChange: (v: boolean) => void) {
-    Row() {
-      Text(label)
-        .fontSize(15)
-        .fontColor(this.settingTextColor())
-        .layoutWeight(1)
-      Toggle({ type: ToggleType.Switch, isOn: isOn })
-        .enabled(this.notificationEnabled)
-        .onChange((v: boolean) => {
-          if (this.notificationEnabled) {
-            onChange(v);
-          }
-        })
-    }
-    .width('100%')
-    .padding({ top: 8, bottom: 8 })
-    .enabled(this.notificationEnabled)
-  }
-
   /**
    * 保存（T023/FR-009）：代理提醒权限由安装声明授予，这里只申请通知开关。
    */
@@ -350,5 +350,33 @@ struct ReminderSettingPage {
       this.statusMsg = '❌ ' + applyRes.reason;
       Toast.show('提醒发布失败，请重试');
     }
+  }
+}
+
+@Component
+struct SubjectToggleRow {
+  @Prop label: string = '';
+  @Prop isOn: boolean = false;
+  @Prop controlEnabled: boolean = true;
+  onToggle: (v: boolean) => void = (_v: boolean): void => {
+  };
+
+  build() {
+    Row() {
+      Text(this.label)
+        .fontSize(15)
+        .fontColor(this.controlEnabled ? AppColors.TEXT_PRIMARY : AppColors.DISABLED)
+        .layoutWeight(1)
+      Toggle({ type: ToggleType.Switch, isOn: this.isOn })
+        .enabled(this.controlEnabled)
+        .onChange((v: boolean) => {
+          if (this.controlEnabled) {
+            this.onToggle(v);
+          }
+        })
+    }
+    .width('100%')
+    .padding({ top: 8, bottom: 8 })
+    .enabled(this.controlEnabled)
   }
 }

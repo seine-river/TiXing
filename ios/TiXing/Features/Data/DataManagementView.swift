@@ -87,7 +87,7 @@ struct DataManagementView: View {
                 AppCard {
                     VStack(alignment: .leading, spacing: 9) {
                         Text("导出数据").font(.system(size: 17, weight: .bold))
-                        Text("打包错题、复习记录、图片、问一问记录、好奇星球报告与原始录音后，会弹出系统保存窗口，由你选择备份文件的存储位置和文件名。")
+                        Text("打包学生资料、复习设置、错题与复习进度、图片笔记、积分兑换、问一问记录、好奇星球报告与原始录音后，会弹出系统保存窗口，由你选择备份文件的存储位置和文件名。")
                             .font(.system(size: 12))
                             .foregroundStyle(Theme.textSecondary)
                         Button("导出到指定位置（zip）") { exporting = true }
@@ -141,8 +141,12 @@ struct DataManagementView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("备份预览").font(.system(size: 16, weight: .bold))
                 row("备份时间", preview.manifest.exportedAt.formatted(date: .abbreviated, time: .shortened))
+                row("学生与复习设置", "已包含")
                 row("错题", "\(preview.mistakeCount) 条")
                 row("复习记录", "\(preview.reviewCount) 条")
+                row("积分记录", "\(preview.storage.pointsLogs.count) 条")
+                row("兑换记录", "\((preview.storage.redemptionRecords ?? []).count) 条")
+                row("匿名统计", "\(preview.storage.analytics.count) 条")
                 row("问一问", "\(preview.voiceCount) 条")
                 row("好奇星球报告", "\(preview.insightCount) 份")
                 Button("确认导入") {

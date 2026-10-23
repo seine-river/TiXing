@@ -134,7 +134,7 @@ final class AppStore: ObservableObject {
             } else {
                 mistake.imagePath = nil
             }
-            if let data = preview.imageData["notes/\(mistake.id).jpg"] {
+            if let data = preview.notesImageData["notes/\(mistake.id).jpg"] {
                 mistake.notesImagePath = try? saveNoteImage(data, mistakeID: mistake.id)
             } else {
                 mistake.notesImagePath = nil
@@ -171,9 +171,19 @@ final class AppStore: ObservableObject {
         for insight in incoming.insights where !existing.insights.contains(where: { $0.id == insight.id }) {
             existing.insights.append(insight)
         }
+        for event in incoming.analytics where !existing.analytics.contains(where: { $0.id == event.id }) {
+            existing.analytics.append(event)
+        }
+        let existingRedemptions = existing.redemptionRecords ?? []
+        let incomingRedemptions = incoming.redemptionRecords ?? []
+        var mergedRedemptions = existingRedemptions
+        for record in incomingRedemptions where !existingRedemptions.contains(where: { $0.id == record.id }) {
+            mergedRedemptions.append(record)
+        }
+        existing.redemptionRecords = mergedRedemptions
         existing.settings = incoming.settings
         existing.student = incoming.student
-        existing.redeemedItemIds.formUnion(incoming.redeemedItemIds)
+        existing.redeemedItemIds.formUnion(Set(mergedRedemptions.map(\.itemID)))
         existing.mistakes.sort { $0.createdAt > $1.createdAt }
         existing.voiceAsks.sort { $0.createdAt > $1.createdAt }
         incoming = existing
