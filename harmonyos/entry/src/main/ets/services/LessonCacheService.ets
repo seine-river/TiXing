@@ -1,6 +1,7 @@
 import fs from '@ohos.file.fs';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { AiLesson } from './AiService';
+import { Mistake } from '../models/Mistake';
 import { AppContextHolder } from '../common/AppContext';
 
 const LOG_DOMAIN: number = 0xA009;
@@ -17,6 +18,38 @@ interface CachedLessonRecord {
  * 讲解“视频”由脚本 + 本地动画 + TTS 实时渲染，因此持久化脚本即可完整复原播放内容。
  */
 export class LessonCacheService {
+  static sourceFingerprint(mistake: Mistake, grade: string): string {
+    return JSON.stringify([
+      grade,
+      mistake.ocrText,
+      mistake.studentAnswer,
+      mistake.standardAnswer,
+      mistake.knowledgeSummary,
+      mistake.subject,
+      mistake.errorType
+    ]);
+  }
+
+  static async hasValidCache(mistakeId: string, sourceFingerprint: string): Promise<boolean> {
+    if (mistakeId.length === 0) {
+      return false;
+    }
+    try {
+      const path: string = LessonCacheService.cachePath(mistakeId);
+      if (!fs.accessSync(path)) {
+        return false;
+      }
+      const record: CachedLessonRecord =
+        JSON.parse(fs.readTextSync(path)) as CachedLessonRecord;
+      return record.sourceFingerprint === sourceFingerprint &&
+        record.lesson !== undefined &&
+        record.lesson.scenes !== undefined &&
+        record.lesson.scenes.length > 0;
+    } catch (e) {
+      return false;
+    }
+  }
+
   static async load(mistakeId: string, sourceFingerprint: string): Promise<AiLesson | undefined> {
     if (mistakeId.length === 0) {
       return undefined;

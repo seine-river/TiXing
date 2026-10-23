@@ -7,6 +7,7 @@ import { ReviewSubmitter, ReviewSubmitResult } from '../usecases/ReviewSubmitter
 import { PointsCalculator } from '../usecases/PointsCalculator';
 import { KnowledgeProfileAggregator } from '../usecases/KnowledgeProfileAggregator';
 import { PerformanceMonitor } from '../services/PerformanceMonitor';
+import { LessonCacheService } from '../services/LessonCacheService';
 import { AppColors, AppSizes, AppStrings, generateId, isAnswerEqual } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
@@ -44,6 +45,7 @@ struct ReviewPage {
   @State startTime: number = 0;
   @State selectedAnswer: number = -1;
   @State showSelfEval: boolean = false;
+  @State currentLessonCached: boolean = false;
   private alive: boolean = true;
   private profileDirty: boolean = false;
 
@@ -80,6 +82,7 @@ struct ReviewPage {
     const subjects: Subject[] = enabledSubjects(settings);
     this.reviewList = await dbHelper.queryTodayReviewMistakes('stu_default', settings.dailyLimit, subjects);
     this.totalCount = this.reviewList.length;
+    await this.refreshLessonCacheState();
   }
 
   onBackPress(): boolean {
@@ -380,7 +383,7 @@ struct ReviewPage {
           .fontSize(16)
           .fontColor(AppColors.TEXT_REGULAR)
           .margin({ top: 8 })
-        Button('🎬 AI 视频讲解')
+        Button(this.currentLessonCached ? '▶️ 播放讲解视频' : '🎬 生成讲解视频')
           .width('90%')
           .height(42)
           .fontSize(14)
@@ -603,6 +606,7 @@ struct ReviewPage {
     this.studentAnswer = '';
     this.selectedAnswer = -1;
     this.startTime = Date.now();
+    this.refreshLessonCacheState();
     if (this.currentIndex >= this.totalCount) {
       this.isFinished = true;
       this.recomputeProfileIfDirty();
@@ -617,5 +621,18 @@ struct ReviewPage {
       return InputMethod.NUMERIC_KEYPAD;
     }
     return InputMethod.KEYBOARD;
+  }
+
+  private async refreshLessonCacheState(): Promise<void> {
+    if (this.currentIndex < 0 || this.currentIndex >= this.reviewList.length) {
+      this.currentLessonCached = false;
+      return;
+    }
+    const mistake: Mistake = this.reviewList[this.currentIndex];
+    const student = await dbHelper.queryStudent(mistake.studentId);
+    this.currentLessonCached = await LessonCacheService.hasValidCache(
+      mistake.id,
+      LessonCacheService.sourceFingerprint(mistake, student?.grade ?? '3')
+    );
   }
 }

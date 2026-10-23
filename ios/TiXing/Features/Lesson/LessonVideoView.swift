@@ -594,15 +594,7 @@ struct LessonVideoView: View {
 
     private func lessonSourceFingerprint() -> String {
         guard let mistake = store.mistake(id: mistakeID) else { return mistakeID }
-        return [
-            store.student.grade.rawValue,
-            mistake.question,
-            mistake.studentAnswer,
-            mistake.standardAnswer,
-            mistake.knowledgeSummary,
-            mistake.subject.rawValue,
-            mistake.errorType.rawValue
-        ].joined(separator: "\u{1F}")
+        return LessonCacheService.sourceFingerprint(mistake: mistake, grade: store.student.grade)
     }
 
     private func startPulse() {

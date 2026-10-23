@@ -9,6 +9,27 @@ private struct CachedLessonRecord: Codable {
 /// AI 讲解脚本本地缓存。
 /// 讲解“视频”由脚本 + 本地动画 + TTS 实时渲染，因此持久化脚本即可完整复原播放内容。
 struct LessonCacheService {
+    static func sourceFingerprint(mistake: Mistake, grade: Grade) -> String {
+        [
+            grade.rawValue,
+            mistake.question,
+            mistake.studentAnswer,
+            mistake.standardAnswer,
+            mistake.knowledgeSummary,
+            mistake.subject.rawValue,
+            mistake.errorType.rawValue
+        ].joined(separator: "\u{1F}")
+    }
+
+    static func hasCachedLesson(mistakeID: String, sourceFingerprint: String) -> Bool {
+        guard !mistakeID.isEmpty else { return false }
+        guard let data = try? Data(contentsOf: cacheURL(mistakeID: mistakeID)),
+              let record = try? JSONDecoder().decode(CachedLessonRecord.self, from: data) else {
+            return false
+        }
+        return record.sourceFingerprint == sourceFingerprint && !record.lesson.scenes.isEmpty
+    }
+
     static func load(mistakeID: String, sourceFingerprint: String) -> AILesson? {
         guard !mistakeID.isEmpty else { return nil }
         let url = cacheURL(mistakeID: mistakeID)

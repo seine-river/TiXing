@@ -136,7 +136,8 @@ struct ReviewView: View {
                 NavigationLink {
                     LessonVideoView(mistakeID: mistake.id)
                 } label: {
-                    Label("AI 视频讲解", systemImage: "play.rectangle.fill")
+                    Label(hasCachedLesson(mistake) ? "播放讲解视频" : "生成讲解视频",
+                          systemImage: hasCachedLesson(mistake) ? "play.rectangle.fill" : "wand.and.stars")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Theme.primary)
                         .frame(maxWidth: .infinity, minHeight: 42)
@@ -149,6 +150,13 @@ struct ReviewView: View {
                 .buttonStyle(PrimaryButtonStyle())
             }
         }
+    }
+
+    private func hasCachedLesson(_ mistake: Mistake) -> Bool {
+        LessonCacheService.hasCachedLesson(
+            mistakeID: mistake.id,
+            sourceFingerprint: LessonCacheService.sourceFingerprint(
+                mistake: mistake, grade: store.student.grade))
     }
 
     private var summary: some View {

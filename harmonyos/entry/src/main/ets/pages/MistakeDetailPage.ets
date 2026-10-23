@@ -3,6 +3,7 @@ import { ReviewLog } from '../models/ReviewLog';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { MediaService } from '../services/MediaService';
 import { AiService } from '../services/AiService';
+import { LessonCacheService } from '../services/LessonCacheService';
 import { AppColors, AppSizes, AppStrings, subjectLabel, statusLabel, formatDate, toFileUri } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { StatusTag, SubjectTag, PageHeader } from '../components/CommonComponents';
@@ -25,10 +26,13 @@ struct MistakeDetailPage {
   @State editKnowledge: string = '';
   @State fieldBusy: string = '';
   @State notFound: boolean = false;
+  @State hasLessonCache: boolean = false;
+  private loadedMistakeId: string = '';
 
   aboutToAppear(): void {
     const params = this.getUIContext().getRouter().getParams() as MistakeDetailParams;
     const id: string = params?.mistakeId ?? '';
+    this.loadedMistakeId = id;
     if (id.length > 0) {
       this.loadMistake(id);
     } else {
@@ -50,6 +54,24 @@ struct MistakeDetailPage {
       return;
     }
     this.reviewLogs = await dbHelper.queryReviewLogs(id);
+    await this.refreshLessonCacheState();
+  }
+
+  onPageShow(): void {
+    if (this.loadedMistakeId.length > 0) {
+      this.refreshLessonCacheState();
+    }
+  }
+
+  private async refreshLessonCacheState(): Promise<void> {
+    if (this.mistake.id.length === 0) {
+      return;
+    }
+    const student = await dbHelper.queryStudent(this.mistake.studentId);
+    this.hasLessonCache = await LessonCacheService.hasValidCache(
+      this.mistake.id,
+      LessonCacheService.sourceFingerprint(this.mistake, student?.grade ?? '3')
+    );
   }
 
   @Builder
@@ -225,7 +247,7 @@ struct MistakeDetailPage {
               .width('100%')
 
               PrimaryButton({
-                text: '生成并播放讲解',
+                text: this.hasLessonCache ? '播放讲解视频' : '生成并播放讲解',
                 onTap: (): void => {
                   this.getUIContext().getRouter().pushUrl({
                     url: 'pages/LessonVideoPage',

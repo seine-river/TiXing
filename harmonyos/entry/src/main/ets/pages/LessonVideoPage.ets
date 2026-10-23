@@ -227,16 +227,7 @@ struct LessonVideoPage {
   }
 
   private lessonSourceFingerprint(): string {
-    // 年级或错题内容变化时自动失效，避免播放与当前题目不匹配的旧讲解。
-    return JSON.stringify([
-      this.student.grade,
-      this.mistake.ocrText,
-      this.mistake.studentAnswer,
-      this.mistake.standardAnswer,
-      this.mistake.knowledgeSummary,
-      this.mistake.subject,
-      this.mistake.errorType
-    ]);
+    return LessonCacheService.sourceFingerprint(this.mistake, this.student.grade);
   }
 
   private startLoadingPulse(): void {

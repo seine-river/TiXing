@@ -17,6 +17,14 @@ struct MistakeDetailView: View {
         store.mistake(id: mistakeID)
     }
 
+    private var hasCachedLesson: Bool {
+        guard let mistake else { return false }
+        return LessonCacheService.hasCachedLesson(
+            mistakeID: mistake.id,
+            sourceFingerprint: LessonCacheService.sourceFingerprint(
+                mistake: mistake, grade: store.student.grade))
+    }
+
     var body: some View {
         Group {
             if let mistake {
@@ -67,7 +75,7 @@ struct MistakeDetailView: View {
                                     .foregroundStyle(Theme.textSecondary)
                             }
                         }
-                        Text("生成并播放讲解")
+                        Text(hasCachedLesson ? "播放讲解视频" : "生成并播放讲解")
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity, minHeight: 44)

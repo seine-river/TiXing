@@ -466,10 +466,12 @@ final class HarmonyParityTests: XCTestCase {
 
         XCTAssertNil(LessonCacheService.load(mistakeID: id, sourceFingerprint: fingerprint))
         LessonCacheService.save(mistakeID: id, sourceFingerprint: fingerprint, lesson: first)
+        XCTAssertTrue(LessonCacheService.hasCachedLesson(mistakeID: id, sourceFingerprint: fingerprint))
         XCTAssertEqual(
             LessonCacheService.load(mistakeID: id, sourceFingerprint: fingerprint)?.title,
             "第一次讲解")
         XCTAssertNil(LessonCacheService.load(mistakeID: id, sourceFingerprint: "changed"))
+        XCTAssertFalse(LessonCacheService.hasCachedLesson(mistakeID: id, sourceFingerprint: "changed"))
 
         LessonCacheService.save(mistakeID: id, sourceFingerprint: fingerprint, lesson: second)
         XCTAssertEqual(
