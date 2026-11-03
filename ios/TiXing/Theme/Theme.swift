@@ -112,10 +112,11 @@ struct EmptyBlock: View {
 
 struct ErrorBanner: View {
     let message: String
+    var title = "刚才遇到一点小问题"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("刚才遇到一点小问题")
+            Text(title)
                 .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.danger)
             Text(message)

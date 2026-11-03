@@ -1,9 +1,10 @@
+import fs from '@ohos.file.fs';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { DbResult } from '../common/DbResult';
 import { AppColors, AppSizes } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
-import { PrimaryButton, EmptyBlock } from '../components/BasicWidgets';
+import { EmptyBlock } from '../components/BasicWidgets';
 import { AudioRecorderService, RecordedAudio } from '../services/AudioRecorderService';
 import { CoreSpeechService } from '../services/CoreSpeechService';
 import { AiService, AiVoiceAnswer } from '../services/AiService';
@@ -27,6 +28,7 @@ struct VoiceAskPage {
   @State hasRecord: boolean = false;
   @State hasQuestion: boolean = false;
   @State hasAnswer: boolean = false;
+  @State answerSaved: boolean = false;
   @State answer: AiVoiceAnswer = new AiVoiceAnswer();
   private record: VoiceAskRecord = new VoiceAskRecord();
   private studentGrade: string = '3';
@@ -47,10 +49,7 @@ struct VoiceAskPage {
   }
 
   onBackPress(): boolean {
-    if (this.recording) {
-      this.cancelRecording();
-      return true;
-    }
+    this.exitPage();
     return false;
   }
 
@@ -70,11 +69,7 @@ struct VoiceAskPage {
       PageHeader({
         title: '问一问',
         onBack: (): void => {
-          if (this.recording) {
-            this.cancelRecording();
-          } else {
-            this.getUIContext().getRouter().back();
-          }
+          this.exitPage();
         }
       })
       Scroll() {
@@ -105,33 +100,28 @@ struct VoiceAskPage {
           }
 
           if (this.hasRecord) {
-            Column() {
-              Text(this.hasQuestion ? '醒醒听到的问题' : '也可以自己写下问题')
-                .fontSize(15)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(AppColors.TEXT_PRIMARY)
-                .width('100%')
-                .margin({ bottom: 8 })
-              TextArea({ text: this.questionText, placeholder: '例如：恐龙为什么会灭绝？' })
-                .height(96)
-                .fontSize(15)
-                .fontColor(AppColors.TEXT_PRIMARY)
-                .backgroundColor(AppColors.BG_CHIP)
-                .borderRadius(AppSizes.CORNER_RADIUS)
-                .enabled(!this.busy)
-                .onChange((value: string) => {
-                  this.questionText = value;
-                  this.hasQuestion = value.trim().length > 0;
-                })
-
+            if (!this.busy && !this.hasAnswer) {
+              EmptyBlock({ message: '没听清或回答失败时，点麦克风再说一次' })
+            }
               if (this.hasAnswer) {
                 Column() {
+                  Text('醒醒听到的问题')
+                    .fontSize(15)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(AppColors.TEXT_PRIMARY)
+                    .width('100%')
+                    .margin({ bottom: 6 })
+                  Text(this.questionText)
+                    .fontSize(15)
+                    .lineHeight(24)
+                    .fontColor(AppColors.TEXT_REGULAR)
+                    .width('100%')
                   Text('醒醒的回答')
                     .fontSize(15)
                     .fontWeight(FontWeight.Bold)
                     .fontColor(AppColors.TEXT_PRIMARY)
                     .width('100%')
-                    .margin({ bottom: 8 })
+                    .margin({ top: 14, bottom: 8 })
                   Text(this.answer.answerText)
                     .fontSize(15)
                     .lineHeight(25)
@@ -183,45 +173,10 @@ struct VoiceAskPage {
                 .shadow({ radius: 12, color: AppColors.SHADOW_SOFT, offsetY: 3 })
                 .margin({ top: 12 })
               }
-            }
-            .alignItems(HorizontalAlign.Start)
-            .width('100%')
-            .padding(16)
-            .backgroundColor(AppColors.BG_CARD)
-            .borderRadius(AppSizes.CORNER_RADIUS_LG)
-            .shadow({ radius: 12, color: AppColors.SHADOW_SOFT, offsetY: 3 })
-            .margin({ top: 16 })
           } else {
             EmptyBlock({ message: '原始录音会保存在你的手机里，以后可以回听当时的问题' })
           }
 
-          Column() {
-            if (!this.busy) {
-              PrimaryButton({
-                text: this.buttonText(),
-                isEnabled: this.buttonEnabled(),
-                onTap: (): void => {
-                  this.handleMainAction();
-                }
-              })
-            }
-            if (this.hasRecord && !this.hasAnswer) {
-              Button('放弃这条录音')
-                .width('100%')
-                .height(44)
-                .fontSize(14)
-                .fontColor(AppColors.DANGER)
-                .backgroundColor(AppColors.SOFT_DANGER)
-                .borderRadius(22)
-                .margin({ top: 10 })
-                .enabled(!this.busy && !this.recording)
-                .onClick(() => {
-                  this.discardRecord();
-                })
-            }
-          }
-          .width('100%')
-          .margin({ top: 16 })
         }
         .width('100%')
         .padding({ left: 16, right: 16, bottom: 28 })
@@ -343,61 +298,6 @@ struct VoiceAskPage {
       .borderRadius(10)
   }
 
-  private buttonText(): string {
-    if (this.recording) {
-      return '说完了，保存声音';
-    }
-    if (this.busy) {
-      return this.stage;
-    }
-    if (!this.hasRecord) {
-      return '开始录音';
-    }
-    if (!this.hasAnswer) {
-      if (this.questionText.trim().length === 0) {
-        return '重新录音';
-      }
-      return '让醒醒回答';
-    }
-    return '收进好奇星球';
-  }
-
-  private buttonEnabled(): boolean {
-    if (this.busy) {
-      return false;
-    }
-    if (this.recording) {
-      return true;
-    }
-    if (!this.hasRecord) {
-      return true;
-    }
-    if (!this.hasAnswer) {
-      return true;
-    }
-    return this.questionText.trim().length > 0 && this.answer.answerText.length > 0;
-  }
-
-  private async handleMainAction(): Promise<void> {
-    if (this.recording) {
-      await this.stopAndTranscribe();
-      return;
-    }
-    if (!this.hasRecord) {
-      await this.startRecording();
-      return;
-    }
-    if (!this.hasAnswer) {
-      if (this.questionText.trim().length === 0) {
-        await this.handleMicrophoneAction();
-        return;
-      }
-      await this.generateAnswer();
-      return;
-    }
-    await this.saveAnswer();
-  }
-
   private async handleMicrophoneAction(): Promise<void> {
     if (this.busy) {
       return;
@@ -412,6 +312,13 @@ struct VoiceAskPage {
 
   private async prepareNewRecording(): Promise<void> {
     if (this.record.id.length > 0 && !this.hasAnswer) {
+      if (this.record.audioPath.length > 0) {
+        try {
+          fs.unlinkSync(this.record.audioPath);
+        } catch (e) {
+          PerformanceMonitor.warn('discard old voice audio failed');
+        }
+      }
       this.record.status = 'discarded';
       this.record.updatedAt = Date.now();
       await dbHelper.updateVoiceAskRecord(this.record);
@@ -471,6 +378,10 @@ struct VoiceAskPage {
     let audio: RecordedAudio = new RecordedAudio();
     try {
       audio = await AudioRecorderService.stop();
+      if (!this.alive) {
+        this.busy = false;
+        return;
+      }
       this.hasRecord = true;
       this.record = VoiceAskRecord.create('stu_default', this.studentGrade,
         audio.path, audio.durationSeconds);
@@ -493,36 +404,53 @@ struct VoiceAskPage {
         (fedSeconds: number, totalSeconds: number): void => {
           this.stage = `正在转换为文字… ${fedSeconds}/${totalSeconds}秒`;
         });
+      if (!this.alive) {
+        this.busy = false;
+        return;
+      }
       this.hasQuestion = this.questionText.trim().length > 0;
       this.record.questionText = this.questionText;
       this.record.asrStatus = 'done';
       this.record.status = 'active';
       this.record.updatedAt = Date.now();
       await dbHelper.updateVoiceAskRecord(this.record);
-      this.stage = '确认一下醒醒听到的问题';
+      this.stage = '醒醒正在思考…';
     } catch (e) {
       this.record.asrStatus = 'failed';
       this.record.status = 'discarded';
       this.record.updatedAt = Date.now();
       await dbHelper.updateVoiceAskRecord(this.record);
-      this.errorText = AiService.userMessage(e, '语音转文字失败，请重新录制或手动输入问题');
-      this.stage = '没听清？点大麦克风重说，也可以手动写问题';
-      Toast.show(this.errorText);
+      this.errorText = AiService.userMessage(e, '没有听清问题，点麦克风再说一次');
+      this.stage = '没听清，点麦克风再说一次';
+      // 与 iOS 保持一致：没听清时只在页面内提示，不额外弹出系统 Toast。
+      this.busy = false;
+      return;
     }
     this.busy = false;
+    if (!this.alive) {
+      return;
+    }
+    await this.generateAnswer();
+    if (this.alive && this.hasAnswer) {
+      await this.saveAnswer();
+    }
   }
 
   private async generateAnswer(): Promise<void> {
     const question: string = this.questionText.trim();
     if (question.length === 0) {
-      Toast.show('先写下或重新录一次问题');
+      this.stage = '没听清，点麦克风再说一次';
       return;
     }
     this.busy = true;
+    this.answerSaved = false;
     this.errorText = '';
     this.stage = '醒醒正在思考…';
     try {
       this.answer = await AiService.answerVoiceQuestion(question, this.record.gradeLevel);
+      if (!this.alive) {
+        return;
+      }
       this.hasAnswer = true;
       this.record.status = 'active';
       this.record.questionText = question;
@@ -535,57 +463,68 @@ struct VoiceAskPage {
       this.record.aiStatus = 'done';
       this.record.updatedAt = Date.now();
       await dbHelper.updateVoiceAskRecord(this.record);
-      this.stage = '回答好了，看看要不要收进好奇星球';
+      this.stage = '回答好了，正在保存…';
     } catch (e) {
       this.record.aiStatus = 'failed';
       this.record.updatedAt = Date.now();
       await dbHelper.updateVoiceAskRecord(this.record);
       this.errorText = AiService.userMessage(e, 'AI 回答失败，请稍后重试');
-      this.stage = '这次回答没有成功，可以再试一次';
+      this.stage = '回答没有成功，点麦克风再说一次';
       Toast.show(this.errorText);
     }
     this.busy = false;
   }
 
   private async saveAnswer(): Promise<void> {
+    if (!this.alive) {
+      return;
+    }
     this.busy = true;
-    this.stage = '正在收进好奇星球…';
     const result: DbResult = await dbHelper.updateVoiceAskRecord(this.record);
     this.busy = false;
     if (!result.success) {
       this.errorText = this.cleanUserText(result.reason, '保存失败，请重试');
-      Toast.show('保存失败，请重试');
+      this.stage = '回答保存失败，答案仍在页面上';
       return;
     }
     PerformanceMonitor.writeStatistic('voice_ask_saved', {
       'audioDuration': this.record.audioDuration,
       'subject': this.record.subject
     });
-    Toast.show('已收进好奇星球');
+    this.answerSaved = true;
+    this.stage = '看看醒醒的回答吧';
+  }
+
+  private exitPage(): void {
+    this.clearTimer();
+    if (this.recording) {
+      this.recording = false;
+      AudioRecorderService.cancel().catch((_e: Object): void => {
+      });
+    }
+    if (this.hasRecord && !this.hasAnswer) {
+      this.discardCurrentRecord();
+    }
     this.getUIContext().getRouter().back();
   }
 
-  private async cancelRecording(): Promise<void> {
-    this.clearTimer();
-    this.recording = false;
-    this.busy = false;
-    this.stage = '已取消这次录音';
-    await AudioRecorderService.cancel();
-  }
-
-  private async discardRecord(): Promise<void> {
+  private async discardCurrentRecord(): Promise<void> {
     if (this.record.id.length === 0) {
-      this.resetUi();
       return;
+    }
+    if (this.record.audioPath.length > 0) {
+      try {
+        fs.unlinkSync(this.record.audioPath);
+      } catch (e) {
+        PerformanceMonitor.warn('discard unanswered voice audio failed');
+      }
     }
     this.record.status = 'discarded';
     this.record.updatedAt = Date.now();
     const result: DbResult = await dbHelper.updateVoiceAskRecord(this.record);
     if (!result.success) {
-      Toast.show('暂时无法放弃，请稍后再试');
-      return;
+      PerformanceMonitor.warn('discard voice ask on exit failed: ' + result.reason);
     }
-    this.resetUi();
   }
 
   private resetUi(): void {
@@ -596,6 +535,7 @@ struct VoiceAskPage {
     this.hasRecord = false;
     this.hasQuestion = false;
     this.hasAnswer = false;
+    this.answerSaved = false;
     this.stage = '开口问一个问题';
   }
 

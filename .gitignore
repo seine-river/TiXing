@@ -21,3 +21,5 @@ ios/build/
 ios/DerivedData/
 ios/*.xcuserstate
 ios/TiXing/Resources/apiconfig.json
+ios/TiXing/Vendor/
+ios/TiXing/Resources/buglyconfig.json

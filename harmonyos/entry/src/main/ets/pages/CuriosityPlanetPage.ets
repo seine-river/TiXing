@@ -20,6 +20,7 @@ struct CuriosityPlanetPage {
   @State busy: boolean = false;
   @State stage: string = '点亮好奇星球';
   @State errorText: string = '';
+  @State detailRecord: VoiceAskRecord | undefined = undefined;
   private grade: string = '3';
 
   aboutToAppear(): void {
@@ -27,6 +28,7 @@ struct CuriosityPlanetPage {
   }
 
   build() {
+    Stack({ alignContent: Alignment.Center }) {
     Column() {
       PageHeader({ title: '好奇星球' })
       Scroll() {
@@ -134,17 +136,70 @@ struct CuriosityPlanetPage {
                 .margin({ bottom: 8 })
               ForEach(this.insights, (item: InterestInsight, index: number) => {
                 if (index > 0) {
-                  Row() {
-                    Text(formatDate(item.generatedAt))
-                      .fontSize(13)
-                      .fontColor(AppColors.TEXT_PRIMARY)
-                    Text(`${item.questionCount} 个问题`)
-                      .fontSize(12)
-                      .fontColor(AppColors.TEXT_SECONDARY)
-                      .margin({ left: 10 })
+                  Column() {
+                    Row() {
+                      Text(formatDate(item.generatedAt))
+                        .fontSize(13)
+                        .fontColor(AppColors.TEXT_PRIMARY)
+                      Text(`${item.questionCount} 个问题`)
+                        .fontSize(12)
+                        .fontColor(AppColors.TEXT_SECONDARY)
+                        .margin({ left: 10 })
+                    }
+                    .width('100%')
+
+                    Text('当时的问题和回答')
+                      .fontSize(11)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor(AppColors.PRIMARY)
+                      .width('100%')
+                      .margin({ top: 8, bottom: 4 })
+
+                    if (CuriosityAggregator.coveredRecords(this.records, item).length === 0) {
+                      Text('这份报告对应的问答记录暂未找到')
+                        .fontSize(12)
+                        .fontColor(AppColors.TEXT_SECONDARY)
+                        .width('100%')
+                    } else {
+                      ForEach(CuriosityAggregator.coveredRecords(this.records, item),
+                        (record: VoiceAskRecord) => {
+                          Column() {
+                            Text(record.questionText)
+                              .fontSize(13)
+                              .fontWeight(FontWeight.Medium)
+                              .fontColor(AppColors.TEXT_PRIMARY)
+                              .width('100%')
+                              .maxLines(2)
+                              .textOverflow({ overflow: TextOverflow.Ellipsis })
+                            Text(record.answerText)
+                              .fontSize(12)
+                              .fontColor(AppColors.TEXT_SECONDARY)
+                              .width('100%')
+                              .margin({ top: 4 })
+                              .maxLines(3)
+                              .textOverflow({ overflow: TextOverflow.Ellipsis })
+                            Text('点击查看完整问答')
+                              .fontSize(10)
+                              .fontWeight(FontWeight.Medium)
+                              .fontColor(AppColors.PRIMARY)
+                              .width('100%')
+                              .margin({ top: 5 })
+                          }
+                          .alignItems(HorizontalAlign.Start)
+                          .width('100%')
+                          .padding(10)
+                          .backgroundColor(AppColors.BG_CHIP)
+                          .borderRadius(AppSizes.CORNER_RADIUS_SM)
+                          .margin({ top: 5 })
+                          .onClick(() => {
+                            this.detailRecord = record;
+                          })
+                        }, (record: VoiceAskRecord) => record.id)
+                    }
                   }
                   .width('100%')
-                  .padding({ top: 8, bottom: 8 })
+                  .alignItems(HorizontalAlign.Start)
+                  .padding({ top: 8, bottom: 10 })
                 }
               }, (item: InterestInsight) => item.id)
             }
@@ -166,6 +221,88 @@ struct CuriosityPlanetPage {
     .width('100%')
     .height('100%')
     .backgroundColor(AppColors.BG_PAGE)
+
+      if (this.detailRecord !== undefined) {
+        Column()
+          .width('100%')
+          .height('100%')
+          .backgroundColor('#66000000')
+          .onClick(() => {
+            this.detailRecord = undefined;
+          })
+
+        Column() {
+          Row() {
+            Text('完整问答')
+              .fontSize(17)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(AppColors.TEXT_PRIMARY)
+              .layoutWeight(1)
+            Text('关闭')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(AppColors.PRIMARY)
+              .padding({ left: 12, right: 4, top: 4, bottom: 4 })
+              .onClick(() => {
+                this.detailRecord = undefined;
+              })
+          }
+          .width('100%')
+          .margin({ bottom: 12 })
+
+          Scroll() {
+            Column() {
+              Text(formatDate(this.detailRecord.createdAt))
+                .fontSize(12)
+                .fontColor(AppColors.PRIMARY)
+                .width('100%')
+                .margin({ bottom: 8 })
+              Text(this.detailRecord.questionText)
+                .fontSize(17)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(AppColors.TEXT_PRIMARY)
+                .lineHeight(28)
+                .width('100%')
+              Divider()
+                .color(AppColors.DIVIDER)
+                .margin({ top: 14, bottom: 14 })
+              Text('醒醒的回答')
+                .fontSize(13)
+                .fontColor(AppColors.TEXT_SECONDARY)
+                .width('100%')
+                .margin({ bottom: 7 })
+              Text(this.detailRecord.answerText)
+                .fontSize(15)
+                .fontColor(AppColors.TEXT_REGULAR)
+                .lineHeight(26)
+                .width('100%')
+            }
+            .width('100%')
+            .alignItems(HorizontalAlign.Start)
+            .padding({ bottom: 8 })
+          }
+          .layoutWeight(1)
+          .scrollBar(BarState.Auto)
+          .edgeEffect(EdgeEffect.Spring)
+
+          PrimaryButton({
+            text: '关闭',
+            isEnabled: true,
+            onTap: (): void => {
+              this.detailRecord = undefined;
+            }
+          })
+            .margin({ top: 12 })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .width('86%')
+        .constraintSize({ maxHeight: '78%' })
+        .padding(18)
+        .backgroundColor(AppColors.BG_CARD)
+        .borderRadius(AppSizes.CORNER_RADIUS_LG)
+        .shadow({ radius: 24, color: AppColors.SHADOW_SOFT, offsetY: 8 })
+      }
+    }
   }
 
   @Builder

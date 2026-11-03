@@ -29,6 +29,10 @@
       "value": "用于拍照识别错题和语音问答时调用智能识别服务"
     },
     {
+      "name": "reason_network_info",
+      "value": "用于判断统计和监控数据能否联网上报"
+    },
+    {
       "name": "reason_microphone",
       "value": "用于录制孩子的语音问题并转换为文字"
     }

@@ -25,6 +25,7 @@ final class AppStore: ObservableObject {
     private let database: SQLiteStoreService?
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private var deferredDataLoaded = true
 
     init(directory: URL? = nil) {
         let base = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -55,12 +56,14 @@ final class AppStore: ObservableObject {
                 initializedStorage = legacy
                 initializedStorage.knowledgeProfiles = KnowledgeProfileAggregator.aggregate(initializedStorage)
                 try sqlite.save(initializedStorage)
+                deferredDataLoaded = true
             } else {
-                var loaded = try sqlite.load()
+                var loaded = try sqlite.loadStartup()
                 if databaseIsEmpty {
                     loaded.hasSeededExamples = nil
                 }
                 initializedStorage = loaded
+                deferredDataLoaded = false
             }
         } catch {
             initializationError = error
@@ -75,6 +78,8 @@ final class AppStore: ObservableObject {
         database = initializedDatabase
         if let initializationError {
             lastError = "本地数据库初始化失败，已临时使用备用数据：\(initializationError.localizedDescription)"
+            ObservabilityService.shared.reportError(name: "database.init", message: initializationError.localizedDescription,
+                                                    detail: "stage=startup")
         }
         seedInitialExamplesIfNeeded()
     }
@@ -100,6 +105,7 @@ final class AppStore: ObservableObject {
     var knowledgeProfiles: [KnowledgeProfile] { storage.knowledgeProfiles ?? [] }
 
     func save() {
+        loadDeferredDataIfNeeded()
         do {
             guard let database else {
                 storage.knowledgeProfiles = KnowledgeProfileAggregator.aggregate(storage)
@@ -115,12 +121,54 @@ final class AppStore: ObservableObject {
         }
     }
 
+    /// RootView 首帧后调用；避免复习日志、问一问、报告、统计等非首屏数据阻塞首帧。
+    func loadDeferredDataIfNeeded() {
+        guard let database, !deferredDataLoaded else { return }
+        do {
+            var loaded = storage
+            try database.loadDeferred(into: &loaded)
+
+            // 如果首帧后用户已产生写入，保留当前内存中的新增记录，再补齐数据库里的历史记录。
+            loaded.reviewLogs = merged(old: loaded.reviewLogs, current: storage.reviewLogs)
+            loaded.knowledgeProfiles = merged(
+                old: loaded.knowledgeProfiles ?? [],
+                current: storage.knowledgeProfiles ?? [])
+            loaded.redemptionRecords = merged(
+                old: loaded.redemptionRecords ?? [],
+                current: storage.redemptionRecords ?? [])
+            loaded.voiceAsks = merged(old: loaded.voiceAsks, current: storage.voiceAsks)
+            loaded.insights = merged(old: loaded.insights, current: storage.insights)
+            loaded.analytics = merged(old: loaded.analytics, current: storage.analytics)
+            loaded.redeemedItemIds = Set((loaded.redemptionRecords ?? []).map(\.itemID))
+
+            // 启动段已加载且可能被用户更新的数据仍以当前内存为准。
+            loaded.student = storage.student
+            loaded.mistakes = storage.mistakes
+            loaded.pointsLogs = storage.pointsLogs
+            loaded.settings = storage.settings
+            loaded.hasSeededExamples = storage.hasSeededExamples
+            storage = loaded
+            deferredDataLoaded = true
+        } catch {
+            lastError = "补充加载数据失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func merged<T: Identifiable>(old: [T], current: [T]) -> [T] {
+        var result = current
+        let currentIDs = Set(current.map(\.id))
+        result.append(contentsOf: old.filter { !currentIDs.contains($0.id) })
+        return result
+    }
+
     func replaceStorage(_ value: PersistentStore) {
         storage = value
+        deferredDataLoaded = true
         save()
     }
 
     func importBackup(_ preview: BackupPreview) {
+        loadDeferredDataIfNeeded()
         var incoming = preview.storage
         var existing = storage
 
@@ -545,6 +593,7 @@ final class AppStore: ObservableObject {
         if storage.analytics.count > 1_000 {
             storage.analytics.removeLast(storage.analytics.count - 1_000)
         }
+        ObservabilityService.shared.track(kind: .behavior, name: type)
     }
 
     private func todayString() -> String {
@@ -555,6 +604,17 @@ final class AppStore: ObservableObject {
 }
 
 enum CuriosityAggregator {
+    /// 历史报告生成时使用的是当时已有的最新 N 条问答记录。
+    /// 这里按生成时间截取，避免后续新增问题改变旧报告的明细。
+    static func coveredRecords(_ records: [VoiceAskRecord], insight: InterestInsight) -> [VoiceAskRecord] {
+        Array(
+            records
+                .filter { $0.createdAt <= insight.generatedAt }
+                .sorted { $0.createdAt > $1.createdAt }
+                .prefix(max(0, insight.questionCount))
+        )
+    }
+
     static func count(_ values: [String]) -> [CuriosityStats.CountItem] {
         Dictionary(grouping: values, by: { $0 }).map { key, list in
             CuriosityStats.CountItem(key: key, count: list.count)

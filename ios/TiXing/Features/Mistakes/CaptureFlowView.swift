@@ -293,6 +293,7 @@ struct CaptureFlowView: View {
 
     private func loadPhoto(_ item: PhotosPickerItem) async {
         guard let data = try? await item.loadTransferable(type: Data.self) else {
+            ObservabilityService.shared.reportError(name: "capture.photo", message: "Photo data load failed")
             errorText = "图片读取失败，请重新选择"
             return
         }
@@ -307,6 +308,7 @@ struct CaptureFlowView: View {
         do {
             let quality = ImageQualityService.analyze(data: data)
             if let blocking = quality.blockingMessage {
+                ObservabilityService.shared.track(kind: .metric, name: "image_quality", attributes: ["success": "0", "stage": "blocking"])
                 errorText = blocking
                 qualityWarning = quality.warningMessage
                 imagePath = nil
@@ -316,7 +318,11 @@ struct CaptureFlowView: View {
             let path = try store.saveImage(data, id: UUID().uuidString)
             imagePath = path
             busyText = "AI 识别题目与答案…"
+            let recognizeStartedAt = Date()
             let items = try await AIService.shared.recognizeQuestions(imageData: data)
+            ObservabilityService.shared.trackDuration("ai_recognize", milliseconds: Int(Date().timeIntervalSince(recognizeStartedAt) * 1000), attributes: [
+                "success": "1", "question_count": String(items.count)
+            ])
             questions = items
             if items.count > 1 {
                 selectedIDs = Set(items.map(\.id))
@@ -324,10 +330,13 @@ struct CaptureFlowView: View {
             } else if let first = items.first {
                 apply(first)
             } else {
+                ObservabilityService.shared.track(kind: .metric, name: "ai_recognize", attributes: ["success": "0", "stage": "empty"])
                 errorText = "AI 未能识别出题目，请手动核对填写"
                 step = .analyzing
             }
         } catch {
+            ObservabilityService.shared.track(kind: .metric, name: "ai_recognize", attributes: ["success": "0", "stage": "failed"])
+            ObservabilityService.shared.reportError(name: "capture.ai", message: error.localizedDescription, detail: "stage=recognize")
             errorText = error.localizedDescription
             step = .analyzing
         }

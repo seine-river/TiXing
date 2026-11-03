@@ -25,6 +25,30 @@ final class TiXingTests: XCTestCase {
         XCTAssertEqual(items.first?.count, 2)
     }
 
+    func testCuriosityHistoryKeepsQuestionsAndAnswersAtReportTime() {
+        var oldQuestion = VoiceAskRecord()
+        oldQuestion.question = "为什么天空是蓝色？"
+        oldQuestion.answer = "因为空气会散射阳光。"
+        oldQuestion.createdAt = Date(timeIntervalSince1970: 100)
+
+        var laterQuestion = VoiceAskRecord()
+        laterQuestion.question = "星星晚上去哪里了？"
+        laterQuestion.answer = "星星还在，只是白天太阳太亮。"
+        laterQuestion.createdAt = Date(timeIntervalSince1970: 200)
+
+        let insight = InterestInsight(
+            periodStart: Date(timeIntervalSince1970: 90),
+            periodEnd: Date(timeIntervalSince1970: 150),
+            questionCount: 1,
+            topSubjects: [], topTopics: [], interestTags: [],
+            trend: "stable", childSummary: "", parentSummary: "",
+            recommendedActivities: [], generatedAt: Date(timeIntervalSince1970: 150))
+
+        let records = CuriosityAggregator.coveredRecords([oldQuestion, laterQuestion], insight: insight)
+        XCTAssertEqual(records.map(\.question), ["为什么天空是蓝色？"])
+        XCTAssertEqual(records.map(\.answer), ["因为空气会散射阳光。"])
+    }
+
     func testZipRoundTrip() throws {
         let entries: [(String, Data)] = [
             ("manifest.json", Data("{\"app\":\"tixing\"}".utf8)),
@@ -72,9 +96,25 @@ final class TiXingTests: XCTestCase {
         let friendly = SpeechTranscriptionService.friendlySpeechError(retry) as NSError
         XCTAssertEqual(
             friendly.localizedDescription,
-            "语音识别服务暂时不可用，请再试一次；也可以手动写下问题"
+            "没有听清或语音服务暂时不可用，点麦克风再说一次"
         )
     }
+
+    func testSpeechFallbackConvertsTraditionalChineseToSimplified() {
+        XCTAssertEqual(
+            SpeechTranscriptionService.simplifiedChinese("家長為什麼會有這麼多心情？"),
+            "家长为什么会有这么多心情？"
+        )
+    }
+
+    func testVoiceAnswerDecodesNormalizedQuestion() throws {
+        let data = Data("""
+        {"normalizedQuestion":"天上为什么会有这么多星星？","answerText":"因为宇宙里有数不清的星星。","subject":"science","topic":"星空","interestTags":["星空"],"questionType":"reason","safetyLevel":"normal","followUpQuestion":"晚上可以和爸爸妈妈一起看星星。"}
+        """.utf8)
+        let answer = try JSONDecoder().decode(AIVoiceAnswer.self, from: data)
+        XCTAssertEqual(answer.normalizedQuestion, "天上为什么会有这么多星星？")
+    }
+
 
     func testAudioSessionErrorUsesFriendlyChineseMessage() {
         let busy = NSError(
@@ -85,6 +125,26 @@ final class TiXingTests: XCTestCase {
             AudioSessionService.friendlyMessage(for: busy),
             "音频设备正在切换，请稍后再试"
         )
+    }
+
+    @MainActor
+    func testDeferredStoreDataLoadsAfterFirstFrame() {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TiXingDeferredTest-\(UUID().uuidString)", isDirectory: true)
+        let first = AppStore(directory: directory)
+        var record = VoiceAskRecord()
+        record.id = "deferred-voice"
+        record.question = "为什么天空是蓝色？"
+        record.answer = "因为瑞利散射。"
+        first.insert(record)
+
+        let second = AppStore(directory: directory)
+        XCTAssertTrue(second.voiceAsks.isEmpty)
+        second.loadDeferredDataIfNeeded()
+        XCTAssertEqual(second.voiceAsks.map(\.id), ["deferred-voice"])
+        XCTAssertEqual(second.voiceAsks.first?.question, "为什么天空是蓝色？")
+
+        try? FileManager.default.removeItem(at: directory)
     }
 
     @MainActor

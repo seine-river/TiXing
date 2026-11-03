@@ -4,6 +4,7 @@ struct CuriosityPlanetView: View {
     @EnvironmentObject private var store: AppStore
     @State private var busy = false
     @State private var errorText = ""
+    @State private var selectedRecord: VoiceAskRecord?
 
     private var stats: CuriosityStats { store.curiosityStats() }
 
@@ -30,6 +31,9 @@ struct CuriosityPlanetView: View {
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("好奇星球")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $selectedRecord) { record in
+            recordDetailSheet(record)
+        }
     }
 
     private var hero: some View {
@@ -107,13 +111,52 @@ struct CuriosityPlanetView: View {
             VStack(alignment: .leading, spacing: 7) {
                 Text("历史报告").font(.system(size: 16, weight: .bold))
                 ForEach(store.insights.dropFirst()) { item in
-                    HStack {
-                        Text(item.generatedAt.formatted(.dateTime.year().month().day()))
-                        Spacer()
-                        Text("\(item.questionCount) 个问题")
-                            .foregroundStyle(Theme.textSecondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(item.generatedAt.formatted(.dateTime.year().month().day()))
+                            Spacer()
+                            Text("\(item.questionCount) 个问题")
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        .font(.system(size: 13))
+
+                        Text("当时的问题和回答")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.primary)
+
+                        let records = CuriosityAggregator.coveredRecords(store.voiceAsks, insight: item)
+                        if records.isEmpty {
+                            Text("这份报告对应的问答记录暂未找到")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.textSecondary)
+                        } else {
+                            ForEach(records) { record in
+                                Button {
+                                    selectedRecord = record
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(record.question)
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .lineLimit(2)
+                                            .multilineTextAlignment(.leading)
+                                        Text(record.answer)
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(Theme.textSecondary)
+                                            .lineLimit(3)
+                                            .multilineTextAlignment(.leading)
+                                        Label("点击查看完整问答", systemImage: "plus.circle")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundStyle(Theme.primary)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(10)
+                                    .background(RoundedRectangle(cornerRadius: 12).fill(Theme.chip))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                     }
-                    .font(.system(size: 13))
+                    .padding(.vertical, 6)
                 }
             }
         }
@@ -142,5 +185,33 @@ struct CuriosityPlanetView: View {
             errorText = error.localizedDescription
         }
         busy = false
+    }
+
+    private func recordDetailSheet(_ record: VoiceAskRecord) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(record.createdAt.formatted(.dateTime.year().month().day()))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.primary)
+                Text(record.question)
+                    .font(.system(size: 18, weight: .bold))
+                    .lineSpacing(6)
+                Divider()
+                Text("醒醒的回答")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                Text(record.answer)
+                    .font(.system(size: 15))
+                    .lineSpacing(7)
+                Button("关闭") {
+                    selectedRecord = nil
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .frame(maxWidth: .infinity, minHeight: 46)
+                .buttonStyle(PrimaryButtonStyle())
+            }
+            .padding(18)
+        }
+        .background(Theme.background.ignoresSafeArea())
     }
 }

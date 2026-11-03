@@ -388,6 +388,18 @@ export class DatabaseHelper {
       this.makeTag('kt_g4_chinese_01', Subject.CHINESE, Grade.G4, TextbookVersion.PEP, '段落分析', ''),
       this.makeTag('kt_g4_chinese_02', Subject.CHINESE, Grade.G4, TextbookVersion.PEP, '作文基础', '')
     ];
+    try {
+      const countRs = await store.querySql('SELECT COUNT(*) AS cnt FROM knowledge_tag');
+      try {
+        if (countRs.goToFirstRow() && rs_col_long(countRs, 'cnt') >= seeds.length) {
+          return DbResult.ok();
+        }
+      } finally {
+        countRs.close();
+      }
+    } catch (e) {
+      DbLog.warn('seedKnowledgeTags', 'seed check failed: ' + errText(e));
+    }
     store.beginTransaction();
     try {
       for (const tag of seeds) {
@@ -655,6 +667,29 @@ export class DatabaseHelper {
     return undefined;
   }
 
+  async queryVoiceAskCount(studentId: string): Promise<number> {
+    const op: string = 'queryVoiceAskCount';
+    const store = await this.awaitStore(op);
+    if (store === undefined) {
+      return 0;
+    }
+    try {
+      const resultSet = await store.querySql(
+        `SELECT COUNT(*) AS cnt FROM voice_ask_record
+         WHERE studentId = ? AND status = 'active'`, [studentId]);
+      try {
+        if (resultSet.goToFirstRow()) {
+          return rs_col_long(resultSet, 'cnt');
+        }
+      } finally {
+        resultSet.close();
+      }
+    } catch (e) {
+      DbLog.error(op, errText(e));
+    }
+    return 0;
+  }
+
   async queryVoiceAskRecords(studentId: string, keyword?: string,
     subject?: string, questionType?: string): Promise<VoiceAskRecord[]> {
     const op: string = 'queryVoiceAskRecords';
@@ -747,6 +782,34 @@ export class DatabaseHelper {
     return list;
   }
 
+  /**
+   * 备份必须导出全部好奇星球报告；页面展示仍使用带 limit 的查询。
+   */
+  async queryAllInterestInsights(studentId: string): Promise<InterestInsight[]> {
+    const op: string = 'queryAllInterestInsights';
+    const list: InterestInsight[] = [];
+    const store = await this.awaitStore(op);
+    if (store === undefined) {
+      return list;
+    }
+    try {
+      const predicates = new relationalStore.RdbPredicates('interest_insight');
+      predicates.equalTo('studentId', studentId);
+      predicates.orderByDesc('generatedAt');
+      const resultSet = await store.query(predicates);
+      try {
+        while (resultSet.goToNextRow()) {
+          list.push(this.rowToInterestInsight(resultSet));
+        }
+      } finally {
+        resultSet.close();
+      }
+    } catch (e) {
+      DbLog.error(op, errText(e));
+    }
+    return list;
+  }
+
   private rowToVoiceAsk(resultSet: relationalStore.ResultSet): VoiceAskRecord | undefined {
     try {
       const record = new VoiceAskRecord();
@@ -808,6 +871,36 @@ export class DatabaseHelper {
    * 今日复习队列（T009/T034）：按学生过滤 + 每日上限截断 + 科目开关过滤。
    * subjects 为空数组视为「无启用科目」，返回空队列（设置真实生效）。
    */
+  async queryTodayReviewCount(studentId: string, subjects: Subject[]): Promise<number> {
+    const op: string = 'queryTodayReviewCount';
+    const store = await this.awaitStore(op);
+    if (store === undefined || subjects.length === 0) {
+      return 0;
+    }
+    try {
+      const placeholders: string = subjects.map((): string => '?').join(',');
+      const args: Array<relationalStore.ValueType> = [studentId, Date.now(), MistakeStatus.MASTERED];
+      for (const subject of subjects) {
+        args.push(subject);
+      }
+      const resultSet = await store.querySql(
+        `SELECT COUNT(*) AS cnt FROM mistake
+         WHERE studentId = ? AND nextReviewDate <= ? AND status != ? AND subject IN (${placeholders})
+         LIMIT 1`,
+        args);
+      try {
+        if (resultSet.goToFirstRow()) {
+          return rs_col_long(resultSet, 'cnt');
+        }
+      } finally {
+        resultSet.close();
+      }
+    } catch (e) {
+      DbLog.error(op, errText(e));
+    }
+    return 0;
+  }
+
   async queryTodayReviewMistakes(studentId: string, limit: number, subjects: Subject[]): Promise<Mistake[]> {
     const op: string = 'queryTodayReviewMistakes';
     const list: Mistake[] = [];

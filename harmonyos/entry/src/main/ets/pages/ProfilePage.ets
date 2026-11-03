@@ -5,7 +5,7 @@ import { AppColors, AppSizes, AppStrings } from '../common/Constants';
 import { TabController } from '../common/TabController';
 import { GradientHeader } from '../components/GradientHeader';
 import { PointsSummary } from '../models/PointsLog';
-import { InterestInsight, VoiceAskRecord } from '../models/VoiceAsk';
+import { InterestInsight } from '../models/VoiceAsk';
 
 class MenuEntry {
   icon: string = '';
@@ -22,6 +22,7 @@ export struct ProfilePage {
   @State voiceAskCount: number = 0;
   @State latestInsight: InterestInsight | undefined = undefined;
   @State isLoaded: boolean = false;
+  private loading: boolean = false;
 
   aboutToAppear(): void {
     this.controller.reload = (): void => { this.loadData(); };
@@ -29,23 +30,31 @@ export struct ProfilePage {
   }
 
   async loadData(): Promise<void> {
-    const s = await dbHelper.queryStudent('stu_default');
-    if (s !== undefined) {
-      this.student = s;
-    } else {
-      this.student.id = 'stu_default';
-      this.student.nickname = '同学';
-      this.student.grade = Grade.G3;
-      this.student.textbookVersion = TextbookVersion.PEP;
-      this.student.createdAt = Date.now();
-      await dbHelper.insertStudent(this.student);
+    if (this.loading) {
+      return;
     }
-    this.pointsSummary = await dbHelper.queryPointsSummary(this.student.id);
-    const voiceRecords: VoiceAskRecord[] = await dbHelper.queryVoiceAskRecords(this.student.id);
-    this.voiceAskCount = voiceRecords.length;
-    const insights: InterestInsight[] = await dbHelper.queryInterestInsights(this.student.id, 1);
-    this.latestInsight = insights.length > 0 ? insights[0] : undefined;
-    this.isLoaded = true;
+    this.loading = true;
+    try {
+      const s = await dbHelper.queryStudent('stu_default');
+      if (s !== undefined) {
+        this.student = s;
+      } else {
+        this.student.id = 'stu_default';
+        this.student.nickname = '同学';
+        this.student.grade = Grade.G3;
+        this.student.textbookVersion = TextbookVersion.PEP;
+        this.student.createdAt = Date.now();
+        await dbHelper.insertStudent(this.student);
+      }
+      this.pointsSummary = await dbHelper.queryPointsSummary(this.student.id);
+      // “我的”页只需要数量；全量问一问记录会加载问题和回答等长文本。
+      this.voiceAskCount = await dbHelper.queryVoiceAskCount(this.student.id);
+      const insights: InterestInsight[] = await dbHelper.queryInterestInsights(this.student.id, 1);
+      this.latestInsight = insights.length > 0 ? insights[0] : undefined;
+      this.isLoaded = true;
+    } finally {
+      this.loading = false;
+    }
   }
 
   private menuItems(): MenuEntry[] {

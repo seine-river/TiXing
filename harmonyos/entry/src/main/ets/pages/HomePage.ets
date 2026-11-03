@@ -53,6 +53,7 @@ export struct HomePage {
   @State recentMistakes: Mistake[] = [];
   @State studentPoints: number = 0;
   private studentId: string = 'stu_default';
+  private loading: boolean = false;
 
   aboutToAppear(): void {
     this.controller.reload = (): void => {
@@ -62,18 +63,28 @@ export struct HomePage {
   }
 
   async loadData(): Promise<void> {
-    const settings: ReminderSettings = await dbHelper.queryReminderSettings(this.studentId);
-    const todayList = await dbHelper.queryTodayReviewMistakes(this.studentId, settings.dailyLimit,
-      enabledSubjectsOf(settings));
-    this.todayReviewCount = todayList.length;
-    // 统计改 SQL 聚合（T036/FR-019），recent 限条数
-    const stats: MistakeStats = await dbHelper.queryMistakeStats(this.studentId);
-    this.totalMistakes = stats.total;
-    this.masteredCount = stats.mastered;
-    this.reviewingCount = stats.reviewing + stats.unmastered;
-    this.recentMistakes = await dbHelper.queryMistakesByStudent(this.studentId, 0, 5);
-    const summary = await dbHelper.queryPointsSummary(this.studentId);
-    this.studentPoints = summary.totalPoints;
+    if (this.loading) {
+      return;
+    }
+    this.loading = true;
+    try {
+      const settings: ReminderSettings = await dbHelper.queryReminderSettings(this.studentId);
+      const subjects: Subject[] = enabledSubjectsOf(settings);
+      const statsPromise: Promise<MistakeStats> = dbHelper.queryMistakeStats(this.studentId);
+      const recentPromise: Promise<Mistake[]> = dbHelper.queryMistakesByStudent(this.studentId, 0, 5);
+      const summaryPromise: Promise<number> =
+        dbHelper.queryPointsSummary(this.studentId).then((summary): number => summary.totalPoints);
+      // 首页只需要数量，不加载今日复习题全文和答案等大字段。
+      this.todayReviewCount = await dbHelper.queryTodayReviewCount(this.studentId, subjects);
+      const stats: MistakeStats = await statsPromise;
+      this.totalMistakes = stats.total;
+      this.masteredCount = stats.mastered;
+      this.reviewingCount = stats.reviewing + stats.unmastered;
+      this.recentMistakes = await recentPromise;
+      this.studentPoints = await summaryPromise;
+    } finally {
+      this.loading = false;
+    }
   }
 
   private todayDateText(): string {

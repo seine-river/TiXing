@@ -2,9 +2,13 @@
   "modelVersion": "26.0.0",
   "description": "题醒 - 小学生智能错题记录与科学复习工具（HarmonyOS）",
   "dependencies": {
+    "@umeng/common": "^1.2.0",
+    "@umeng/analytics": "^1.2.12",
+    "bugly": "^0.7.2"
   },
   "devDependencies": {
     "@ohos/hypium": "1.0.25",
     "@ohos/hamock": "1.0.0"
-  }
+  },
+  "dynamicDependencies": {}
 }

@@ -13,6 +13,8 @@ import { MediaService } from '../services/MediaService';
 import { AiConfig } from '../common/AiConfig';
 import { ReminderService } from '../services/ReminderService';
 import { ReminderSettings } from '../models/ReminderSettings';
+import { TelemetryConsentService, TelemetryConsentState } from '../services/telemetry/TelemetryConsentService';
+import { TelemetryRouter } from '../services/telemetry/TelemetryRouter';
 
 /**
  * Dock 导航项（独立组件 + @Prop active 驱动）：
@@ -171,11 +173,15 @@ struct DockTabItem {
 struct Index {
   @State currentTab: number = 0;
   @State dbInitialized: boolean = false;
+  @State showTelemetryConsent: boolean = false;
+  // Swiper 会提前构建子节点；只挂载已访问 Tab，避免启动时执行错题本/报告/我的查询。
+  @State loadedTabs: boolean[] = [true, false, false, false];
   private homeController: TabController = new TabController();
   private mistakesController: TabController = new TabController();
   private reportController: TabController = new TabController();
   private profileController: TabController = new TabController();
   private swiperController: SwiperController = new SwiperController();
+  private skipNextPageShowReload: boolean = true;
 
   aboutToAppear(): void {
     if (!this.dbInitialized) {
@@ -183,14 +189,32 @@ struct Index {
       AppContextHolder.set(ctx);
       this.dbInitialized = true;
       this.bootstrapApp(ctx);
+      this.checkTelemetryConsent(ctx);
     }
   }
 
+  /** 首次启动先说明匿名质量统计；用户选择前不激活第三方 SDK。 */
+  private async checkTelemetryConsent(ctx: Context): Promise<void> {
+    const state: TelemetryConsentState = await TelemetryConsentService.getConsent(ctx);
+    this.showTelemetryConsent = state === TelemetryConsentState.UNKNOWN;
+  }
+
+  private async acceptTelemetry(ctx: Context, granted: boolean): Promise<void> {
+    this.showTelemetryConsent = false;
+    await TelemetryConsentService.setConsent(ctx,
+      granted ? TelemetryConsentState.GRANTED : TelemetryConsentState.DENIED);
+    if (granted) {
+      await TelemetryRouter.activate(ctx);
+    }
+    PerformanceMonitor.writeBehavior('telemetry_consent', { 'granted': granted });
+  }
+
   /**
-   * 冷启动引导（T016/D3）：等待数据库就绪后再触发各 Tab 首次加载；
-   * init 失败给出用户可见提示与致命日志；顺带加载本地 AI 配置与应用提醒。
+   * 冷启动引导（T016/D3）：数据库 ready 后不再等待提醒系统；
+   * 首页数据由 HomePage 自己等待 DB ready，提醒同步延迟到首帧之后。
    */
   private async bootstrapApp(ctx: Context): Promise<void> {
+    const bootstrapTrace = PerformanceMonitor.startTrace('app_bootstrap');
     AiConfig.load().catch((_e: Object): void => {
       PerformanceMonitor.warn('ai config load failed');
     });
@@ -202,12 +226,20 @@ struct Index {
       PerformanceMonitor.errorRaw('db init failed: ' + initResult.reason);
       Toast.show('数据库初始化失败，数据可能暂时不可用，请重启应用');
     }
-    // 就绪（或失败提示）后再触发当前 Tab 数据加载，避免首屏空数据假象
-    await this.applyReminder();
-    this.reloadTab(this.currentTab);
+    PerformanceMonitor.endTrace('app_bootstrap', bootstrapTrace);
+    // 首页 aboutToAppear 已发起加载，awaitStore 会等待本次 init 完成。
+    // 提醒/日历链路耗时可达数百毫秒，不能阻塞首页数据和首帧。
+    setTimeout((): void => {
+      this.applyReminder();
+    }, 200);
   }
 
   onPageShow(): void {
+    if (this.skipNextPageShowReload) {
+      // 首次 onPageShow 与 Index aboutToAppear/Home aboutToAppear 重叠，避免首页重复查询。
+      this.skipNextPageShowReload = false;
+      return;
+    }
     this.reloadTab(this.currentTab);
   }
 
@@ -237,19 +269,41 @@ struct Index {
 
   private selectTab(index: number): void {
     if (this.currentTab !== index) {
+      const firstMount: boolean = !this.loadedTabs[index];
+      this.mountTab(index);
       this.currentTab = index;
-      this.reloadTab(index);
+      // 首次挂载的页面会在 aboutToAppear 中加载；已访问页面切换回来时刷新。
+      if (!firstMount) {
+        this.reloadTab(index);
+      }
     }
     this.swiperController.changeIndex(index, true);
   }
 
   build() {
-    Column() {
+    Stack() {
+      Column() {
       Swiper(this.swiperController) {
-        HomePage({ controller: this.homeController })
-        MistakesPage({ controller: this.mistakesController })
-        ReportPage({ controller: this.reportController })
-        ProfilePage({ controller: this.profileController })
+        Stack() {
+          if (this.loadedTabs[0]) {
+            HomePage({ controller: this.homeController })
+          }
+        }
+        Stack() {
+          if (this.loadedTabs[1]) {
+            MistakesPage({ controller: this.mistakesController })
+          }
+        }
+        Stack() {
+          if (this.loadedTabs[2]) {
+            ReportPage({ controller: this.reportController })
+          }
+        }
+        Stack() {
+          if (this.loadedTabs[3]) {
+            ProfilePage({ controller: this.profileController })
+          }
+        }
       }
       .loop(false)
       .indicator(false)
@@ -258,8 +312,12 @@ struct Index {
       .layoutWeight(1)
       .onChange((index: number) => {
         if (this.currentTab !== index) {
+          const firstMount: boolean = !this.loadedTabs[index];
+          this.mountTab(index);
           this.currentTab = index;
-          this.reloadTab(index);
+          if (!firstMount) {
+            this.reloadTab(index);
+          }
         }
       })
 
@@ -296,10 +354,72 @@ struct Index {
       .padding({ left: 6, right: 6 })
       .backgroundColor(AppColors.BG_CARD)
       .shadow({ radius: 20, color: AppColors.SHADOW_CARD, offsetY: -4 })
+      }
+      .width('100%')
+      .height('100%')
+      .backgroundColor(AppColors.BG_PAGE)
+
+      if (this.showTelemetryConsent) {
+        this.TelemetryConsentSheet()
+      }
     }
     .width('100%')
     .height('100%')
     .backgroundColor(AppColors.BG_PAGE)
+  }
+
+  @Builder
+  TelemetryConsentSheet() {
+    Column({ space: 14 }) {
+      Text('🛡️')
+        .fontSize(38)
+      Text('帮助题醒变得更稳定')
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.TEXT_PRIMARY)
+      Text('我们会匿名统计启动、页面、性能和崩溃信息。不会上传题目照片、语音内容、答案、姓名或联系方式。')
+        .fontSize(13.5)
+        .lineHeight(21)
+        .textAlign(TextAlign.Center)
+        .fontColor(AppColors.TEXT_SECONDARY)
+      Button('同意并帮助改进')
+        .height(44)
+        .fontSize(15)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.HERO_BTN_TEXT)
+        .backgroundColor(AppColors.PRIMARY)
+        .borderRadius(22)
+        .width('100%')
+        .onClick(() => {
+          const ctx = this.getUIContext().getHostContext() as Context;
+          this.acceptTelemetry(ctx, true);
+        })
+      Button('暂不')
+        .height(38)
+        .fontSize(14)
+        .fontColor(AppColors.TEXT_SECONDARY)
+        .backgroundColor(AppColors.SOFT_PRIMARY)
+        .borderRadius(19)
+        .width('100%')
+        .onClick(() => {
+          const ctx = this.getUIContext().getHostContext() as Context;
+          this.acceptTelemetry(ctx, false);
+        })
+    }
+    .width('82%')
+    .padding(22)
+    .backgroundColor(AppColors.BG_CARD)
+    .borderRadius(24)
+    .shadow({ radius: 28, color: AppColors.SHADOW_CARD, offsetY: 8 })
+  }
+
+  private mountTab(index: number): void {
+    if (index < 0 || index >= this.loadedTabs.length || this.loadedTabs[index]) {
+      return;
+    }
+    const next: boolean[] = this.loadedTabs.slice(0);
+    next[index] = true;
+    this.loadedTabs = next;
   }
 
   /** 中央语音问答 FAB：麦克风图形精确居中，不再承担拍照录题入口。 */

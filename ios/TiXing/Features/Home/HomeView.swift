@@ -3,11 +3,18 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject private var store: AppStore
     @State private var showCapture = false
+    private static let todayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh-CN")
+        formatter.dateFormat = "M月d日 · EEEE"
+        return formatter
+    }()
 
     var body: some View {
+        let todayQueue = store.todayReviewQueue
         ScrollView {
             VStack(spacing: 16) {
-                hero
+                hero(todayQueue)
                 statGrid
                 Button {
                     showCapture = true
@@ -31,7 +38,7 @@ struct HomeView: View {
         }
     }
 
-    private var hero: some View {
+    private func hero(_ queue: [Mistake]) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 5) {
@@ -55,10 +62,10 @@ struct HomeView: View {
 
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(store.todayReviewQueue.count)")
+                    Text("\(queue.count)")
                         .font(.system(size: 48, weight: .bold))
                         .foregroundStyle(.white)
-                    Text(store.todayReviewQueue.isEmpty ? "今日复习已完成" : "题待复习")
+                    Text(queue.isEmpty ? "今日复习已完成" : "题待复习")
                         .font(.system(size: 14))
                         .foregroundStyle(.white.opacity(0.9))
                 }
@@ -70,8 +77,8 @@ struct HomeView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 26))
             }
 
-            if !store.todayReviewQueue.isEmpty {
-                NavigationLink {
+        if !queue.isEmpty {
+            NavigationLink {
                     ReviewView()
                 } label: {
                     HStack(spacing: 12) {
@@ -84,7 +91,7 @@ struct HomeView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("开始复习")
                                 .font(.system(size: 18, weight: .bold))
-                            Text("\(store.todayReviewQueue.count) 道题已经准备好")
+                            Text("\(queue.count) 道题已经准备好")
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.88))
                         }
@@ -182,9 +189,6 @@ struct HomeView: View {
     }
 
     private var todayText: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh-CN")
-        formatter.dateFormat = "M月d日 · EEEE"
-        return formatter.string(from: Date())
+        Self.todayFormatter.string(from: Date())
     }
 }

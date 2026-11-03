@@ -18,6 +18,7 @@ ids = {}
 source_build = {}
 test_build = {}
 resource_build = {}
+framework_build = {}
 
 project_id = ident("P")
 main_group = ident("M")
@@ -59,11 +60,30 @@ for path in test_files:
     ids[file_id] = path
     test_build[build_id] = file_id
 
-for path in ["Resources/Assets.xcassets"]:
+resource_paths = ["Resources/Assets.xcassets"]
+for optional_resource in ["Resources/apiconfig.json", "Resources/buglyconfig.json"]:
+    if (APP_DIR / optional_resource).exists():
+        resource_paths.append(optional_resource)
+
+for path in resource_paths:
     file_id = ident("F")
     build_id = ident("B")
     ids[file_id] = path
     resource_build[build_id] = file_id
+
+# Observability XCFrameworks are installed locally by Scripts/install_observability_sdks.sh.
+# Keep the generated project buildable on clean checkouts: when the vendor directory is
+# absent, Swift's canImport branch compiles a no-op provider instead.
+framework_paths = sorted(
+    str(path.relative_to(APP_DIR))
+    for path in (APP_DIR / "Vendor").glob("*/*.xcframework")
+) if (APP_DIR / "Vendor").exists() else []
+
+for path in framework_paths:
+    file_id = ident("F")
+    build_id = ident("B")
+    ids[file_id] = path
+    framework_build[build_id] = file_id
 
 objects = []
 
@@ -80,6 +100,8 @@ for build_id, file_id in test_build.items():
     object_block("PBXBuildFile", build_id, [("fileRef", f"{file_id} /* {ids[file_id]} */")])
 for build_id, file_id in resource_build.items():
     object_block("PBXBuildFile", build_id, [("fileRef", f"{file_id} /* {ids[file_id]} */")])
+for build_id, file_id in framework_build.items():
+    object_block("PBXBuildFile", build_id, [("fileRef", f"{file_id} /* {ids[file_id]} */")])
 
 for file_id, path in ids.items():
     if path.endswith(".swift"):
@@ -89,9 +111,17 @@ for file_id, path in ids.items():
             ("sourceTree", '"<group>"'),
         ])
 
-for file_id in resource_build.values():
+for file_id, path in ((file_id, ids[file_id]) for file_id in resource_build.values()):
+    file_type = "text.json" if path.endswith(".json") else "folder.assetcatalog"
     object_block("PBXFileReference", file_id, [
-        ("lastKnownFileType", "folder.assetcatalog"),
+        ("lastKnownFileType", f'"{file_type}"'),
+        ("path", f'"{path}"'),
+        ("sourceTree", '"<group>"'),
+    ])
+
+for file_id in framework_build.values():
+    object_block("PBXFileReference", file_id, [
+        ("lastKnownFileType", '"wrapper.xcframework"'),
         ("path", f'"{ids[file_id]}"'),
         ("sourceTree", '"<group>"'),
     ])
@@ -111,7 +141,8 @@ object_block("PBXFileReference", test_product, [
 
 object_block("PBXGroup", app_group, [
     ("children", "(" + ", ".join(f"{value} /* {ids[value]} */" for value in source_build.values()) +
-                ", " + ", ".join(f"{file_id} /* {ids[file_id]} */" for file_id in resource_build.values()) + ",)"),
+                ", " + ", ".join(f"{file_id} /* {ids[file_id]} */" for file_id in resource_build.values()) +
+                ", " + ", ".join(f"{file_id} /* {ids[file_id]} */" for file_id in framework_build.values()) + ",)"),
     ("path", "TiXing"),
     ("sourceTree", '"<group>"'),
 ])
@@ -168,7 +199,10 @@ object_block("PBXProject", project_id, [
 
 object_block("PBXSourcesBuildPhase", sources_phase, [("files", "(" + ", ".join(f"{key} /* {ids[value]} */" for key, value in source_build.items()) + ",)")])
 object_block("PBXSourcesBuildPhase", test_sources_phase, [("files", "(" + ", ".join(f"{key} /* {ids[value]} */" for key, value in test_build.items()) + ",)")])
-object_block("PBXFrameworksBuildPhase", frameworks_phase, [("files", "()"), ("runOnlyForDeploymentPostprocessing", "0")])
+object_block("PBXFrameworksBuildPhase", frameworks_phase, [
+    ("files", "(" + ", ".join(f"{build_id} /* {ids[file_id]} */" for build_id, file_id in framework_build.items()) + ",)"),
+    ("runOnlyForDeploymentPostprocessing", "0"),
+])
 object_block("PBXFrameworksBuildPhase", test_frameworks_phase, [("files", "()"), ("runOnlyForDeploymentPostprocessing", "0")])
 object_block("PBXResourcesBuildPhase", resources_phase, [("files", "(" + ", ".join(f"{key} /* {ids[value]} */" for key, value in resource_build.items()) + ",)"), ("runOnlyForDeploymentPostprocessing", "0")])
 object_block("PBXResourcesBuildPhase", test_resources_phase, [("files", "()"), ("runOnlyForDeploymentPostprocessing", "0")])
@@ -220,6 +254,9 @@ app_settings = [
     ("ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME", "AccentColor"),
     ("CODE_SIGN_STYLE", "Automatic"),
     ("CURRENT_PROJECT_VERSION", "1000003"),
+    # Local Apple Development certificate belongs to this team; without this
+    # value Xcode fails physical-device builds before compilation starts.
+    ("DEVELOPMENT_TEAM", "N7S6G3U32D"),
     ("DEVELOPMENT_ASSET_PATHS", '""'),
     ("ENABLE_PREVIEWS", "YES"),
     ("ENABLE_USER_SCRIPT_SANDBOXING", "NO"),
@@ -227,6 +264,9 @@ app_settings = [
     ("INFOPLIST_FILE", "TiXing/Resources/Info.plist"),
     ("LD_RUNPATH_SEARCH_PATHS", '"$(inherited) @executable_path/Frameworks"'),
     ("MARKETING_VERSION", "1.0.3"),
+    # Bugly Pro manual integration requires these system frameworks; the other
+    # flags support its Objective-C/C++ runtime and Umeng's zip compression.
+    ("OTHER_LDFLAGS", '"$(inherited) -ObjC -lc++ -lz -framework SystemConfiguration -framework Security -framework Network"'),
     ("PRODUCT_BUNDLE_IDENTIFIER", "com.tixing.me.ios"),
     ("PRODUCT_NAME", '"$(TARGET_NAME)"'),
     ("SUPPORTS_MACCATALYST", "NO"),

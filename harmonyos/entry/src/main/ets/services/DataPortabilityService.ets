@@ -459,7 +459,7 @@ export class DataPortabilityService {
     const logs: ReviewLog[] = await dbHelper.queryReviewLogsByStudent(studentId);
     const settings: ReminderSettings = await dbHelper.queryReminderSettings(studentId);
     const voiceAsks: VoiceAskRecord[] = await dbHelper.queryVoiceAskRecords(studentId);
-    const insights: InterestInsight[] = await dbHelper.queryInterestInsights(studentId, 100);
+    const insights: InterestInsight[] = await dbHelper.queryAllInterestInsights(studentId);
     const pointsLogs: PointsLog[] = await dbHelper.queryPointsLogs(studentId);
     const redemptions: RedemptionRecord[] = await dbHelper.queryRedemptions(studentId);
     const knowledgeProfiles: KnowledgeProfile[] = await dbHelper.queryKnowledgeProfiles(studentId);
@@ -886,7 +886,7 @@ export class DataPortabilityService {
           }
         }
       }
-      const existingInsights: InterestInsight[] = await dbHelper.queryInterestInsights('stu_default', 1000);
+      const existingInsights: InterestInsight[] = await dbHelper.queryAllInterestInsights('stu_default');
       for (const insight of insights) {
         const duplicate: boolean = existingInsights.some((item: InterestInsight): boolean => item.id === insight.id);
         if (!duplicate) {

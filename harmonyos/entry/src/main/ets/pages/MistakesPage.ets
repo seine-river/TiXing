@@ -96,6 +96,9 @@ export struct MistakesPage {
    * 数据库未就绪/初始化失败时展示失败态（读失败细节以日志为准）。
    */
   private async applyFilters(): Promise<void> {
+    if (this.loading) {
+      return;
+    }
     this.loading = true;
     this.loadFailed = false;
     this.queryOffset = 0;

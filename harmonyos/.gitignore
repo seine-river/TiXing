@@ -17,3 +17,6 @@
 /build-profile.signing.json5
 entry/src/main/resources/rawfile/ai_config.json
 entry/src/main/resources/rawfile/apiconfig.json
+
+# Code Scanner cache
+.codescanner/

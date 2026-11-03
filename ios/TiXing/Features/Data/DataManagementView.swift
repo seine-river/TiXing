@@ -121,8 +121,14 @@ struct DataManagementView: View {
                       defaultFilename: "TiXing-backup") { result in
             switch result {
             case .success:
-                break
+                ObservabilityService.shared.track(kind: .metric, name: "backup_export", attributes: [
+                    "success": "1",
+                    "mistake_count": String(store.mistakes.count),
+                    "voice_count": String(store.voiceAsks.count)
+                ])
             case .failure(let error):
+                ObservabilityService.shared.track(kind: .metric, name: "backup_export", attributes: ["success": "0"])
+                ObservabilityService.shared.reportError(name: "backup.export", message: error.localizedDescription, detail: "stage=export")
                 errorText = error.localizedDescription
             }
         }
@@ -151,6 +157,9 @@ struct DataManagementView: View {
                 row("好奇星球报告", "\(preview.insightCount) 份")
                 Button("确认导入") {
                     store.importBackup(preview)
+                    ObservabilityService.shared.track(kind: .metric, name: "backup_import", attributes: [
+                        "success": "1", "version": String(preview.manifest.version)
+                    ])
                     self.preview = nil
                 }
                 .buttonStyle(PrimaryButtonStyle())
@@ -176,7 +185,10 @@ struct DataManagementView: View {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         do {
             preview = try await BackupService.preview(at: url, currentStudent: store.student)
+            ObservabilityService.shared.track(kind: .metric, name: "backup_preview", attributes: ["success": "1"])
         } catch {
+            ObservabilityService.shared.track(kind: .metric, name: "backup_preview", attributes: ["success": "0"])
+            ObservabilityService.shared.reportError(name: "backup.preview", message: error.localizedDescription, detail: "stage=preview")
             errorText = error.localizedDescription
         }
         busyText = nil

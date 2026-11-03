@@ -9,9 +9,10 @@ import { ReminderSettings } from '../main/ets/models/ReminderSettings';
 import { AnalyticsEvent } from '../main/ets/models/AnalyticsEvent';
 import { RedeemableItem, RedeemableCategory } from '../main/ets/models/RedeemableItem';
 import {
-  VoiceAskRecord, voiceAskSubjectLabel, voiceAskQuestionTypeLabel, voiceAskSafetyLabel
+  VoiceAskRecord, InterestInsight, voiceAskSubjectLabel, voiceAskQuestionTypeLabel, voiceAskSafetyLabel
 } from '../main/ets/models/VoiceAsk';
 import { CuriosityAggregator } from '../main/ets/usecases/CuriosityAggregator';
+import { TelemetrySanitizer } from '../main/ets/services/telemetry/TelemetrySanitizer';
 import { WavAudioParser } from '../main/ets/common/WavAudio';
 import {
   MistakeStatus, AnswerType, GradingMethod, InputMethod, Subject, ErrorType,
@@ -26,6 +27,36 @@ import {
 } from '../main/ets/common/Constants';
 
 export default function coreAlgorithmTest() {
+  describe('TelemetrySanitizer', () => {
+    it('normalizes_event_ids_and_removes_sensitive_params', 0, () => {
+      const params: Record<string, string | number | boolean> = {
+        'api_key': 'secret',
+        'api_key_hint': 'secret',
+        'question': '孩子的问题',
+        'image_url': '/tmp/photo.jpg',
+        'success': true,
+        'duration_ms': 128,
+        'reason': 'timeout'
+      };
+      const safe: Record<string, string | number> = TelemetrySanitizer.params(params);
+      expect(TelemetrySanitizer.eventName('metric', 'AI Request/耗时')).assertEqual('metric_ai_request');
+      expect(safe['success']).assertEqual(1);
+      expect(safe['duration_ms']).assertEqual(128);
+      expect(safe['reason']).assertEqual('timeout');
+      expect(safe['api_key']).assertUndefined();
+      expect(safe['api_key_hint']).assertUndefined();
+      expect(safe['question']).assertUndefined();
+      expect(safe['image_url']).assertUndefined();
+    });
+
+    it('masks_tokens_emails_and_truncates_values', 0, () => {
+      const safe: string = TelemetrySanitizer.sanitizeValue('Bearer abc123\nuser@example.com\n' + 'x'.repeat(300));
+      expect(safe.includes('abc123')).assertFalse();
+      expect(safe.includes('user@example.com')).assertFalse();
+      expect(safe.length <= 180).assertTrue();
+    });
+  });
+
   describe('ReviewScheduler', () => {
     it('scheduleNextReview_correct_advances_interval', 0, () => {
       const mistake = new Mistake();
@@ -357,6 +388,26 @@ export default function coreAlgorithmTest() {
       expect(stats.subjects[0].count).assertEqual(2);
       expect(stats.topics[0].topic).assertEqual('恐龙');
       expect(stats.tags.length).assertEqual(2);
+    });
+
+    it('curiosity_history_keeps_questions_and_answers_at_report_time', 0, () => {
+      const oldRecord = new VoiceAskRecord();
+      oldRecord.questionText = '为什么天空是蓝色？';
+      oldRecord.answerText = '因为空气会散射阳光。';
+      oldRecord.createdAt = 100;
+      const laterRecord = new VoiceAskRecord();
+      laterRecord.questionText = '星星晚上去哪里了？';
+      laterRecord.answerText = '星星还在，只是白天太阳太亮。';
+      laterRecord.createdAt = 200;
+      const insight = new InterestInsight();
+      insight.periodStart = 90;
+      insight.periodEnd = 150;
+      insight.questionCount = 1;
+      insight.generatedAt = 150;
+      const records = CuriosityAggregator.coveredRecords([oldRecord, laterRecord], insight);
+      expect(records.length).assertEqual(1);
+      expect(records[0].questionText).assertEqual('为什么天空是蓝色？');
+      expect(records[0].answerText).assertEqual('因为空气会散射阳光。');
     });
 
     it('wav_parser_reads_generated_header_and_pcm', 0, () => {

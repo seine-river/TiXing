@@ -14,6 +14,17 @@ class CountEntry {
  * 这样兴趣数量、Top 标签不会被模型幻觉改写。
  */
 export class CuriosityAggregator {
+  /**
+   * 历史报告需要还原生成当时的问答明细。
+   * 报告生成使用当时已有的最新 N 条记录，这里同样按时间截取，避免后续新增问题影响旧报告。
+   */
+  static coveredRecords(records: VoiceAskRecord[], insight: InterestInsight): VoiceAskRecord[] {
+    return records
+      .filter((record: VoiceAskRecord): boolean => record.createdAt <= insight.generatedAt)
+      .sort((a: VoiceAskRecord, b: VoiceAskRecord): number => b.createdAt - a.createdAt)
+      .slice(0, Math.max(0, insight.questionCount));
+  }
+
   static aggregate(records: VoiceAskRecord[]): VoiceAskStats {
     const stats = new VoiceAskStats();
     stats.total = records.length;

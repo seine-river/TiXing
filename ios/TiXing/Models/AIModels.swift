@@ -40,6 +40,7 @@ struct AIQuestionEnvelope: Codable {
 
 struct AIVoiceAnswer: Codable, Equatable {
     var answerText: String
+    var normalizedQuestion: String?
     var subject: String
     var topic: String
     var interestTags: [String]

@@ -149,6 +149,12 @@ final class AudioRecorderService: NSObject, ObservableObject, AVAudioRecorderDel
 }
 
 struct SpeechTranscriptionService {
+    private struct RecognitionAttempt {
+        let localeIdentifier: String?
+        let requiresOnDevice: Bool
+        let name: String
+    }
+
     static func requestAuthorization() async -> Bool {
         let speech = await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { status in
@@ -160,58 +166,103 @@ struct SpeechTranscriptionService {
                 continuation.resume(returning: granted)
             }
         }
+        speechLogger.info(
+            "speech authorization checked: speech=\(speech, privacy: .public), microphone=\(microphone, privacy: .public), status=\(SFSpeechRecognizer.authorizationStatus().rawValue)"
+        )
         return speech && microphone
     }
 
     static func transcribe(url: URL) async throws -> String {
-        guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN")) else {
-            throw NSError(domain: "TiXing.Speech", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey: "本机语音识别引擎不可用，请检查系统语音服务后重试"])
+        let chineseRecognizer = makeRecognizer(localeIdentifier: "zh-CN")
+        var attempts: [RecognitionAttempt] = []
+        if let chineseRecognizer {
+            attempts.append(RecognitionAttempt(
+                localeIdentifier: "zh-CN",
+                requiresOnDevice: chineseRecognizer.supportsOnDeviceRecognition,
+                name: "chinese-primary"))
+            attempts.append(RecognitionAttempt(
+                localeIdentifier: "zh-CN",
+                requiresOnDevice: false,
+                name: "chinese-server"))
         }
+        // 某些 iOS 27 模拟器会误报简体中文支持端侧识别，但本地 Siri 资产缺失。
+        // 繁体中文在相同 Mandarin 音频上通常没有端侧资产，可迫使服务器识别。
+        attempts.append(RecognitionAttempt(
+            localeIdentifier: "zh-Hant-CN",
+            requiresOnDevice: false,
+            name: "chinese-server-hant"))
+        attempts.append(RecognitionAttempt(
+            localeIdentifier: nil,
+            requiresOnDevice: false,
+            name: "system-default"))
 
-        do {
-            return try await recognize(
-                url: url,
-                recognizer: recognizer,
-                requiresOnDevice: recognizer.supportsOnDeviceRecognition)
-        } catch {
-            let underlying = error as NSError
-            speechLogger.error(
-                "speech first pass failed: domain=\(underlying.domain, privacy: .public), code=\(underlying.code), onDevice=\(recognizer.supportsOnDeviceRecognition), message=\(underlying.localizedDescription, privacy: .public)"
+        var lastError: NSError = NSError(
+            domain: "TiXing.Speech",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "本机语音识别引擎不可用，请检查系统语音服务后重试"]
+        )
+
+        for attempt in attempts {
+            if attempt.name != "chinese-primary" {
+                // 203/300 常见原因是 Apple Speech 服务初始化抖动；短暂等待后重建 recognizer。
+                try await Task.sleep(nanoseconds: 900_000_000)
+            }
+            guard let recognizer = makeRecognizer(localeIdentifier: attempt.localeIdentifier) else {
+                speechLogger.notice("speech recognizer unavailable: attempt=\(attempt.name, privacy: .public)")
+                continue
+            }
+            if !attempt.requiresOnDevice {
+                recognizer.supportsOnDeviceRecognition = false
+            }
+            speechLogger.info(
+                "speech attempt start: attempt=\(attempt.name, privacy: .public), onDevice=\(attempt.requiresOnDevice, privacy: .public), available=\(recognizer.isAvailable, privacy: .public)"
             )
 
-            // iOS Speech 偶发返回 kAFAssistantErrorDomain/1101 “retry”。
-            // 端侧模型缺失或服务抖动时，关闭强制端侧并重试一次。
             do {
-                try await Task.sleep(nanoseconds: 400_000_000)
-                if recognizer.supportsOnDeviceRecognition {
-                    return try await recognize(
-                        url: url,
-                        recognizer: recognizer,
-                        requiresOnDevice: false)
-                }
-                if underlying.domain == "kAFAssistantErrorDomain" &&
-                    (underlying.code == 1101 || underlying.code == 203) {
-                    return try await recognize(
-                        url: url,
-                        recognizer: recognizer,
-                        requiresOnDevice: false)
-                }
-            } catch {
-                let secondError = error as NSError
-                speechLogger.error(
-                    "speech fallback failed: domain=\(secondError.domain, privacy: .public), code=\(secondError.code), message=\(secondError.localizedDescription, privacy: .public)"
+                let text = try await recognize(
+                    url: url,
+                    recognizer: recognizer,
+                    requiresOnDevice: attempt.requiresOnDevice
                 )
-                throw friendlySpeechError(secondError)
+                if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    let normalized = simplifiedChinese(text)
+                    speechLogger.info(
+                        "speech attempt succeeded: attempt=\(attempt.name, privacy: .public), textLength=\(text.count)"
+                    )
+                    return normalized
+                }
+                lastError = NSError(
+                    domain: "TiXing.Speech",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "没有听清孩子的问题，点麦克风再说一次"]
+                )
+            } catch {
+                lastError = error as NSError
+                speechLogger.error(
+                    "speech attempt failed: attempt=\(attempt.name, privacy: .public), domain=\(lastError.domain, privacy: .public), code=\(lastError.code), onDevice=\(attempt.requiresOnDevice, privacy: .public), message=\(lastError.localizedDescription, privacy: .public)"
+                )
             }
-            throw friendlySpeechError(underlying)
         }
+
+        throw friendlySpeechError(lastError)
+    }
+
+    private static func makeRecognizer(localeIdentifier: String?) -> SFSpeechRecognizer? {
+        if let localeIdentifier {
+            return SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier))
+        }
+        return SFSpeechRecognizer()
+    }
+
+    static func simplifiedChinese(_ text: String) -> String {
+        text.applyingTransform(StringTransform("Hant-Hans"), reverse: false) ?? text
     }
 
     private static func recognize(url: URL,
                                   recognizer: SFSpeechRecognizer,
                                   requiresOnDevice: Bool) async throws -> String {
         let request = SFSpeechURLRecognitionRequest(url: url)
+        request.taskHint = .dictation
         request.shouldReportPartialResults = true
         request.requiresOnDeviceRecognition = requiresOnDevice
         if #available(iOS 16.0, *) {
@@ -221,10 +272,12 @@ struct SpeechTranscriptionService {
         return try await withCheckedThrowingContinuation { continuation in
             var finished = false
             var bestText = ""
-            _ = recognizer.recognitionTask(with: request, resultHandler: { result, error in
+            var task: SFSpeechRecognitionTask?
+            task = recognizer.recognitionTask(with: request, resultHandler: { result, error in
                 if finished { return }
                 if let error {
                     finished = true
+                    task?.cancel()
                     let underlying = error as NSError
                     speechLogger.error(
                         "speech task failed: domain=\(underlying.domain, privacy: .public), code=\(underlying.code), bestTextLength=\(bestText.count), message=\(underlying.localizedDescription, privacy: .public)"
@@ -241,6 +294,7 @@ struct SpeechTranscriptionService {
                     bestText = result.bestTranscription.formattedString
                     if result.isFinal {
                         finished = true
+                        task?.cancel()
                         continuation.resume(
                             returning: bestText.trimmingCharacters(in: .whitespacesAndNewlines))
                     }
@@ -254,19 +308,21 @@ struct SpeechTranscriptionService {
         if error.domain == "kAFAssistantErrorDomain" {
             switch error.code {
             case 1020, 1101, 203:
-                message = "语音识别服务暂时不可用，请再试一次；也可以手动写下问题"
+                message = "没有听清或语音服务暂时不可用，点麦克风再说一次"
             case 1100:
                 message = "没有听清孩子的问题，请靠近麦克风重新录一次"
             case 209:
                 message = "语音识别权限不可用，请到系统设置中开启后重试"
             default:
-                message = "语音转文字失败，请重新录制或手动输入问题"
+                message = "语音转文字失败，点麦克风再说一次"
             }
         } else {
-            if error.code == -600 || error.localizedDescription.lowercased() == "retry" {
-                message = "语音识别服务暂时不可用，请再试一次；也可以手动写下问题"
+            if error.domain == "kLSRErrorDomain" && error.code == 300 {
+                message = "语音识别服务没有初始化成功，请在系统设置的键盘听写中开启中文听写后重试"
+            } else if error.code == -600 || error.localizedDescription.lowercased() == "retry" {
+                message = "没有听清或语音服务暂时不可用，点麦克风再说一次"
             } else {
-                message = "语音转文字失败，请重新录制或手动输入问题"
+                message = "语音转文字失败，点麦克风再说一次"
             }
         }
         return NSError(

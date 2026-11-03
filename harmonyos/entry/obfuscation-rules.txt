@@ -20,3 +20,9 @@
 -enable-toplevel-obfuscation
 -enable-filename-obfuscation
 -enable-export-obfuscation
+
+# Keep third-party observability HAR packages from release obfuscation.
+-keep
+../oh_modules/bugly
+-keep
+../oh_modules/@umeng

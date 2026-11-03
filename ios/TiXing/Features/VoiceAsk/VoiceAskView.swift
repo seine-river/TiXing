@@ -1,12 +1,14 @@
 import AVFoundation
+import os.log
 import SwiftUI
+
+private let voiceAskLogger = Logger(subsystem: "com.tixing.me.ios", category: "VoiceAsk")
 
 struct VoiceAskView: View {
     private enum Phase: Equatable {
         case idle
         case recording
         case converting
-        case confirm
         case thinking
         case answered
     }
@@ -18,31 +20,21 @@ struct VoiceAskView: View {
     @State private var question = ""
     @State private var answer: AIVoiceAnswer?
     @State private var errorText: String = ""
-    @State private var recordID = UUID().uuidString
     @State private var audioURL: URL?
     @State private var audioDuration = 0
     @State private var busy = false
+    @State private var voiceTask: Task<Void, Never>?
+    @State private var answerSaved = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
                 hero
-                if !errorText.isEmpty { ErrorBanner(message: errorText) }
-                if phase == .confirm || phase == .thinking || phase == .answered {
-                    questionEditor
+                if !errorText.isEmpty {
+                    ErrorBanner(message: errorText, title: "语音遇到一点小问题")
                 }
-                if phase == .answered, let answer {
-                    answerCard(answer)
-                }
-                primaryAction
-                if audioURL != nil && phase != .idle {
-                    Button(role: .destructive) {
-                        discard()
-                    } label: { Text("放弃这条录音") }
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.danger)
-                        .frame(maxWidth: .infinity, minHeight: 42)
-                        .background(Capsule().fill(Theme.softDanger))
+                if let answer {
+                    resultCard(answer)
                 }
             }
             .padding(16)
@@ -54,8 +46,7 @@ struct VoiceAskView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("返回") {
-                    if recorder.isRecording { recorder.cancel() }
-                    dismiss()
+                    abandonAndDismiss()
                 }
             }
         }
@@ -114,38 +105,32 @@ struct VoiceAskView: View {
         .shadow(color: Theme.primary.opacity(0.25), radius: 16, y: 7)
     }
 
-    private var questionEditor: some View {
-        AppCard {
-            VStack(alignment: .leading, spacing: 9) {
-                Text("醒醒听到的问题")
-                    .font(.system(size: 15, weight: .bold))
-                TextEditor(text: $question)
-                    .frame(minHeight: 90)
-                    .scrollContentBackground(.hidden)
-                    .padding(8)
-                    .background(Theme.chip)
-                    .clipShape(RoundedRectangle(cornerRadius: 13))
-            }
-        }
-    }
-
-    private func answerCard(_ answer: AIVoiceAnswer) -> some View {
+    private func resultCard(_ answer: AIVoiceAnswer) -> some View {
         AppCard {
             VStack(alignment: .leading, spacing: 10) {
+                Text("醒醒听到的问题")
+                    .font(.system(size: 15, weight: .bold))
+                Text(question)
+                    .font(.system(size: 15))
+                    .lineSpacing(6)
+
                 Text("醒醒的回答")
                     .font(.system(size: 15, weight: .bold))
+                    .padding(.top, 4)
                 Text(answer.answerText)
                     .font(.system(size: 15))
                     .lineSpacing(6)
+
                 if !answer.followUpQuestion.isEmpty {
                     Text("继续想一想：\(answer.followUpQuestion)")
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.primary)
                 }
+
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
-                        TagPill(text: subjectLabel(answer.subject), color: Theme.primary)
-                        TagPill(text: questionTypeLabel(answer.questionType), color: Theme.gradientEnd)
+                        TagPill(text: subjectName(answer.subject), color: Theme.primary)
+                        TagPill(text: questionTypeName(answer.questionType), color: Theme.gradientEnd)
                         ForEach(answer.interestTags, id: \.self) { tag in
                             TagPill(text: tag, color: Theme.secondary)
                         }
@@ -155,65 +140,34 @@ struct VoiceAskView: View {
         }
     }
 
-    private var primaryAction: some View {
-        Button {
-            handleMainAction()
-        } label: {
-            Text(mainActionText)
-        }
-        .buttonStyle(PrimaryButtonStyle())
-        .disabled(busy || (phase == .confirm && question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
-    }
-
     private var stageText: String {
         switch phase {
         case .idle: return "开口问一个问题"
         case .recording: return "正在听你说…"
         case .converting: return "正在转换为文字…"
-        case .confirm: return "确认一下醒醒听到的问题"
         case .thinking: return "醒醒正在思考…"
-        case .answered: return "回答好了，看看要不要收进好奇星球"
-        }
-    }
-
-    private var mainActionText: String {
-        switch phase {
-        case .recording: return "说完了，保存声音"
-        case .idle: return "开始录音"
-        case .confirm: return "让醒醒回答"
-        case .thinking: return "醒醒正在思考…"
-        case .answered: return "收进好奇星球"
-        case .converting: return "正在转换为文字…"
+        case .answered: return "看看醒醒的回答吧"
         }
     }
 
     private func handleMicTap() {
         if recorder.isRecording {
             recorder.stop()
-        } else if phase == .answered {
-            reset()
         } else {
-            Task { await runRecording() }
-        }
-    }
-
-    private func handleMainAction() {
-        if recorder.isRecording {
-            recorder.stop()
-        } else if phase == .confirm {
-            Task { await generateAnswer() }
-        } else if phase == .answered {
-            saveAnswer()
-        } else {
-            Task { await runRecording() }
+            voiceTask?.cancel()
+            voiceTask = Task { await runRecording() }
         }
     }
 
     private func runRecording() async {
+        if let audioURL, !answerSaved {
+            try? FileManager.default.removeItem(at: audioURL)
+        }
         reset(keepAnswer: false)
         phase = .recording
         let authorized = await SpeechTranscriptionService.requestAuthorization()
         guard authorized else {
+            ObservabilityService.shared.reportError(name: "voice.permission", message: "Speech or microphone permission denied")
             errorText = "未获得语音识别或麦克风权限，请到系统设置中开启后重试"
             phase = .idle
             busy = false
@@ -221,6 +175,7 @@ struct VoiceAskView: View {
         }
 
         guard let audio = await recorder.record() else {
+            ObservabilityService.shared.reportError(name: "voice.record", message: recorder.errorMessage ?? "Recorder failed")
             errorText = recorder.errorMessage ?? "录音启动失败，请检查麦克风权限后重试"
             phase = .idle
             busy = false
@@ -239,17 +194,38 @@ struct VoiceAskView: View {
                               userInfo: [NSLocalizedDescriptionKey: "录音太短了，请靠近麦克风再说一次"])
             }
             let text = try await SpeechTranscriptionService.transcribe(url: audio.url)
+            if Task.isCancelled { return }
             question = text
-            phase = .confirm
             if text.isEmpty {
-                errorText = "没有听清孩子的问题，请靠近麦克风重新录一次"
+                phase = .idle
+                ObservabilityService.shared.track(kind: .metric, name: "voice_transcription", attributes: ["success": "0", "stage": "empty"])
+                errorText = "没有听清孩子的问题，点麦克风再说一次"
+                busy = false
+                return
+            }
+
+            busy = false
+            await generateAnswer()
+            if Task.isCancelled { return }
+            if answer != nil {
+                saveAnswer()
             }
         } catch {
-            let rawMessage = error.localizedDescription
-            errorText = rawMessage.lowercased() == "retry" || rawMessage.isEmpty
-                ? "语音识别服务暂时不可用，请再试一次；也可以手动写下问题"
-                : rawMessage
-            phase = .confirm
+            guard !Task.isCancelled else {
+                phase = .idle
+                return
+            }
+            let nsError = error as NSError
+            ObservabilityService.shared.track(kind: .metric, name: "voice_transcription", attributes: [
+                "success": "0", "stage": "pipeline", "error_code": String(nsError.code)
+            ])
+            ObservabilityService.shared.reportError(name: "voice.pipeline", message: nsError.localizedDescription,
+                                                    detail: "stage=pipeline code=\(nsError.code)")
+            voiceAskLogger.error(
+                "voice ask pipeline failed: domain=\(nsError.domain, privacy: .public), code=\(nsError.code), message=\(nsError.localizedDescription, privacy: .public)"
+            )
+            errorText = nsError.localizedDescription
+            phase = .idle
         }
         busy = false
     }
@@ -262,10 +238,25 @@ struct VoiceAskView: View {
         phase = .thinking
         do {
             answer = try await AIService.shared.answerVoice(question: trimmed, grade: store.student.grade)
+            if let normalized = answer?.normalizedQuestion?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               !normalized.isEmpty {
+                question = normalized
+            }
+            ObservabilityService.shared.track(kind: .metric, name: "voice_answer", attributes: ["success": "1"])
             phase = .answered
         } catch {
-            errorText = error.localizedDescription
-            phase = .confirm
+            let nsError = error as NSError
+            ObservabilityService.shared.track(kind: .metric, name: "voice_answer", attributes: [
+                "success": "0", "error_code": String(nsError.code)
+            ])
+            ObservabilityService.shared.reportError(name: "voice.ai", message: nsError.localizedDescription,
+                                                    detail: "stage=answer code=\(nsError.code)")
+            voiceAskLogger.error(
+                "voice ask AI failed: domain=\(nsError.domain, privacy: .public), code=\(nsError.code), message=\(nsError.localizedDescription, privacy: .public)"
+            )
+            phase = .idle
+            errorText = nsError.localizedDescription
         }
         busy = false
     }
@@ -286,13 +277,20 @@ struct VoiceAskView: View {
         record.aiStatus = .done
         record.safetyLevel = answer.safetyLevel == "attention" ? .attention : .normal
         store.insert(record)
-        dismiss()
+        answerSaved = true
+        phase = .answered
     }
 
-    private func discard() {
+    private func abandonAndDismiss() {
+        if answerSaved {
+            dismiss()
+            return
+        }
+        voiceTask?.cancel()
         if recorder.isRecording { recorder.cancel() }
         if let audioURL { try? FileManager.default.removeItem(at: audioURL) }
         reset()
+        dismiss()
     }
 
     private func reset(keepAnswer: Bool = false) {
@@ -301,21 +299,22 @@ struct VoiceAskView: View {
         errorText = ""
         audioURL = nil
         audioDuration = 0
-        recordID = UUID().uuidString
+        answerSaved = false
         phase = .idle
         busy = false
     }
 
-    private func subjectLabel(_ value: String) -> String {
+    private func subjectName(_ value: String) -> String {
         let map = ["math": "数学", "chinese": "语文", "english": "英语", "science": "科学",
                    "history": "历史", "geography": "地理", "technology": "科技", "life": "生活",
                    "art": "艺术", "sports": "运动"]
         return map[value] ?? "其他"
     }
 
-    private func questionTypeLabel(_ value: String) -> String {
+    private func questionTypeName(_ value: String) -> String {
         let map = ["fact": "事实探索", "reason": "爱问为什么", "compare": "喜欢比较",
                    "imagine": "大胆想象", "how_to": "动手实践", "help": "求助"]
         return map[value] ?? "事实探索"
     }
+
 }

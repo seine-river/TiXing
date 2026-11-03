@@ -49,7 +49,10 @@ final class SQLiteStoreService {
         database = handle
         try execute("PRAGMA journal_mode=WAL")
         try execute("PRAGMA foreign_keys=ON")
-        try createSchema()
+        // 已是当前版本的数据库不再重复执行 20+ 条 CREATE TABLE/INDEX DDL。
+        if userVersion != SQLiteStoreService.schemaVersion {
+            try createSchema()
+        }
     }
 
     deinit {
@@ -305,6 +308,27 @@ final class SQLiteStoreService {
         try loadInsights(into: &store)
         try loadAnalytics(into: &store)
         return store
+    }
+
+    /// 首帧前只需要学生、错题、积分和复习设置；
+    /// 复习日志、问一问、好奇报告和统计事件延后加载。
+    func loadStartup() throws -> PersistentStore {
+        var store = PersistentStore()
+        store.hasSeededExamples = true
+        try loadStudent(into: &store)
+        try loadMistakes(into: &store)
+        try loadPointsLogs(into: &store)
+        try loadSettings(into: &store)
+        return store
+    }
+
+    func loadDeferred(into store: inout PersistentStore) throws {
+        try loadReviewLogs(into: &store)
+        try loadKnowledgeProfiles(into: &store)
+        try loadRedemptions(into: &store)
+        try loadVoiceAsks(into: &store)
+        try loadInsights(into: &store)
+        try loadAnalytics(into: &store)
     }
 
     func save(_ store: PersistentStore) throws {

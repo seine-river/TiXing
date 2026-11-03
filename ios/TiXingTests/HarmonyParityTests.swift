@@ -423,6 +423,72 @@ final class HarmonyParityTests: XCTestCase {
         XCTAssertEqual(restored.voiceAsks.first?.grade, .five)
     }
 
+    func testCuriosityHistoryDetailSurvivesBackupRoundTrip() async throws {
+        var store = PersistentStore()
+        var covered = VoiceAskRecord()
+        covered.id = "history-covered"
+        covered.question = "为什么天空是蓝色？"
+        covered.answer = "因为空气会散射阳光。"
+        covered.createdAt = Date(timeIntervalSince1970: 1_760_000_100)
+        var later = VoiceAskRecord()
+        later.id = "history-later"
+        later.question = "星星晚上去哪里了？"
+        later.answer = "星星还在，只是白天太阳太亮。"
+        later.createdAt = Date(timeIntervalSince1970: 1_760_000_200)
+        store.voiceAsks = [later, covered]
+        store.insights = [
+            InterestInsight(
+                id: "insight-history",
+                periodStart: Date(timeIntervalSince1970: 1_760_000_090),
+                periodEnd: Date(timeIntervalSince1970: 1_760_000_150),
+                questionCount: 1,
+                topSubjects: ["science"],
+                topTopics: ["天空"],
+                interestTags: ["自然"],
+                trend: "rising",
+                childSummary: "孩子对天空很好奇。",
+                parentSummary: "可以一起观察天空。",
+                recommendedActivities: ["看云"],
+                generatedAt: Date(timeIntervalSince1970: 1_760_000_150))
+        ]
+
+        let data = try BackupCompatibility.encode(
+            storage: store, exportedAt: Date(), studentID: store.student.id)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .millisecondsSince1970
+        let raw = try decoder.decode(HarmonyBackupData.self, from: data)
+        let restored = BackupCompatibility.storage(from: raw, student: store.student)
+        let insight = try XCTUnwrap(restored.insights.first)
+        let detail = CuriosityAggregator.coveredRecords(restored.voiceAsks, insight: insight)
+
+        XCTAssertEqual(restored.insights.count, 1)
+        XCTAssertEqual(detail.map(\.id), ["history-covered"])
+        XCTAssertEqual(detail.map(\.question), ["为什么天空是蓝色？"])
+        XCTAssertEqual(detail.map(\.answer), ["因为空气会散射阳光。"])
+
+        // 旧版本 manifest 升级导入：v1/v2/v3 备份在新版本中均可解析；
+        // 新增的好奇星球字段是可选字段，旧包缺失时不会阻塞导入。
+        let directory = makeDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let manifestEncoder = JSONEncoder()
+        manifestEncoder.dateEncodingStrategy = .millisecondsSince1970
+        let manifest = BackupManifest(
+            app: "tixing", version: 1, exportedAt: Date(), studentId: store.student.id)
+        let archive = directory.appendingPathComponent("curiosity-upgrade.zip")
+        try ZipService.write(entries: [
+            ("manifest.json", try manifestEncoder.encode(manifest)),
+            ("data.json", data)
+        ], to: archive)
+        let preview = try await BackupService.preview(at: archive, currentStudent: store.student)
+        let upgradedInsight = try XCTUnwrap(preview.storage.insights.first)
+        XCTAssertEqual(
+            CuriosityAggregator.coveredRecords(preview.storage.voiceAsks, insight: upgradedInsight)
+                .map(\.id),
+            ["history-covered"])
+
+        try? FileManager.default.removeItem(at: directory)
+    }
+
     func testBackupPreviewReadsLegacyPersistentStoreData() async throws {
         let directory = makeDirectory()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

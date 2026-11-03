@@ -153,7 +153,8 @@ struct AIService {
 你是一个叫醒醒的儿童学习伙伴，回答小学生通过语音提出的问题。请语气亲切、鼓励、简明，符合给定年级；如果问题不完整，请合理补全；如果涉及危险、隐私、身体健康或情绪困扰，要温和建议请家长一起处理。
 学生年级：\(grade.rawValue)年级
 问题：\(question)
-请只返回纯JSON，不要markdown代码块：{"answerText":"给孩子的回答，120-220字","subject":"math/chinese/english/science/history/geography/technology/life/art/sports/other","topic":"8字以内主题","interestTags":["兴趣标签1","兴趣标签2"],"questionType":"fact/reason/compare/imagine/how_to/help","safetyLevel":"normal/attention","followUpQuestion":"一个适合孩子继续思考的问题"}。字段名必须使用英文。
+语音识别可能包含繁体或明显同音错字。请仅在能根据儿童提问语境确定原意时，把修正后的简体问题写入 normalizedQuestion；无法确定就原样填写，不要凭空改写。
+请只返回纯JSON，不要markdown代码块：{"normalizedQuestion":"修正后的简体问题","answerText":"给孩子的回答，120-220字","subject":"math/chinese/english/science/history/geography/technology/life/art/sports/other","topic":"8字以内主题","interestTags":["兴趣标签1","兴趣标签2"],"questionType":"fact/reason/compare/imagine/how_to/help","safetyLevel":"normal/attention","followUpQuestion":"一个适合孩子继续思考的问题"}。字段名必须使用英文。
 """
         let raw = try await request(parts: [.text(prompt)], maxTokens: 4096)
         return try decode(raw)
@@ -202,7 +203,10 @@ struct AIService {
     }
 
     private func request(parts: [ContentPart], maxTokens: Int) async throws -> String {
-        guard let key = config.resolvedKey, !key.isEmpty else { throw AIError.notConfigured }
+        guard let key = config.resolvedKey, !key.isEmpty else {
+            ObservabilityService.shared.reportError(name: "ai.not_configured", message: "AI key missing", detail: "stage=config")
+            throw AIError.notConfigured
+        }
         let requestID = UUID().uuidString.prefix(8)
         let startedAt = Date()
         var request = URLRequest(url: endpoint, timeoutInterval: 90)
@@ -231,6 +235,12 @@ struct AIService {
             aiLogger.error(
                 "AI transport failed: id=\(requestID, privacy: .public), domain=\(nsError.domain, privacy: .public), code=\(nsError.code), message=\(nsError.localizedDescription, privacy: .public)"
             )
+            let elapsed = Int(Date().timeIntervalSince(startedAt) * 1000)
+            ObservabilityService.shared.trackDuration("ai_request", milliseconds: elapsed, attributes: [
+                "success": "0", "stage": "transport", "error_code": String(nsError.code)
+            ])
+            ObservabilityService.shared.reportError(name: "ai.transport", message: nsError.localizedDescription,
+                                                    detail: "stage=transport code=\(nsError.code)")
             if nsError.code == NSURLErrorTimedOut {
                 throw AIError.timeout
             }
@@ -245,6 +255,12 @@ struct AIService {
             aiLogger.error(
                 "AI HTTP error: id=\(requestID, privacy: .public), http=\(statusCode), body=\(String(text.prefix(1200)), privacy: .public)"
             )
+            let elapsed = Int(Date().timeIntervalSince(startedAt) * 1000)
+            ObservabilityService.shared.trackDuration("ai_request", milliseconds: elapsed, attributes: [
+                "success": "0", "stage": "http", "status_code": String(statusCode)
+            ])
+            ObservabilityService.shared.reportError(name: "ai.http", message: friendlyHTTP(statusCode: statusCode, body: text),
+                                                    detail: "stage=http status=\(statusCode)")
             throw AIError.server(friendlyHTTP(statusCode: statusCode, body: text))
         }
         guard let decoded = try? JSONDecoder().decode(ResponseBody.self, from: data),
@@ -254,12 +270,21 @@ struct AIService {
             aiLogger.error(
                 "AI response invalid: id=\(requestID, privacy: .public), body=\(String(text.prefix(1200)), privacy: .public)"
             )
+            let elapsed = Int(Date().timeIntervalSince(startedAt) * 1000)
+            ObservabilityService.shared.trackDuration("ai_request", milliseconds: elapsed, attributes: [
+                "success": "0", "stage": "decode"
+            ])
+            ObservabilityService.shared.reportError(name: "ai.invalid_response", message: "AI response invalid",
+                                                    detail: "stage=decode body_bytes=\(data.count)")
             throw AIError.invalidResponse(String(text.prefix(180)))
         }
         let usage = decoded.usage
         aiLogger.info(
             "AI choice parsed: id=\(requestID, privacy: .public), choices=\(decoded.choices.count), finish=\(firstChoice.finishReason ?? "unknown", privacy: .public), contentLength=\(content.count), promptTokens=\(usage?.promptTokens ?? -1), completionTokens=\(usage?.completionTokens ?? -1), totalTokens=\(usage?.totalTokens ?? -1)"
         )
+        ObservabilityService.shared.trackDuration("ai_request", milliseconds: Int(Date().timeIntervalSince(startedAt) * 1000), attributes: [
+            "success": "1", "status_code": String(statusCode)
+        ])
         return content
     }
 

@@ -15,6 +15,7 @@ export struct ReportPage {
   @State knowledgeProfiles: KnowledgeProfile[] = [];
   @State weakPoints: WeakPoint[] = [];
   @State subjectDistribution: SubjectDist[] = [];
+  private loading: boolean = false;
 
   aboutToAppear(): void {
     this.controller.reload = (): void => { this.loadReport(); };
@@ -22,36 +23,44 @@ export struct ReportPage {
   }
 
   async loadReport(): Promise<void> {
-    // 统计改 SQL 聚合（T036/FR-019）
-    const stats: MistakeStats = await dbHelper.queryMistakeStats('stu_default');
-    this.totalMistakes = stats.total;
-    this.masteredCount = stats.mastered;
-    this.reviewingCount = stats.reviewing;
-    this.unmasteredCount = stats.unmastered;
-
-    const profiles = await dbHelper.queryKnowledgeProfiles('stu_default');
-    this.knowledgeProfiles = profiles;
-
-    const distList: SubjectCount[] = await dbHelper.querySubjectDistribution('stu_default');
-    this.subjectDistribution = distList.map((d: SubjectCount): SubjectDist => {
-      const s = new SubjectDist();
-      s.subject = d.subject;
-      s.count = d.count;
-      return s;
-    });
-
-    const weakList: WeakPoint[] = [];
-    for (const p of profiles) {
-      if (p.currentMasteryScore < 0.6) {
-        const w = new WeakPoint();
-        w.tagId = p.knowledgeTagId;
-        w.score = p.currentMasteryScore;
-        w.totalMistakes = p.totalMistakes;
-        weakList.push(w);
-      }
+    if (this.loading) {
+      return;
     }
-    weakList.sort((a: WeakPoint, b: WeakPoint) => a.score - b.score);
-    this.weakPoints = weakList.slice(0, 3);
+    this.loading = true;
+    try {
+      // 统计改 SQL 聚合（T036/FR-019）
+      const stats: MistakeStats = await dbHelper.queryMistakeStats('stu_default');
+      this.totalMistakes = stats.total;
+      this.masteredCount = stats.mastered;
+      this.reviewingCount = stats.reviewing;
+      this.unmasteredCount = stats.unmastered;
+
+      const profiles = await dbHelper.queryKnowledgeProfiles('stu_default');
+      this.knowledgeProfiles = profiles;
+
+      const distList: SubjectCount[] = await dbHelper.querySubjectDistribution('stu_default');
+      this.subjectDistribution = distList.map((d: SubjectCount): SubjectDist => {
+        const s = new SubjectDist();
+        s.subject = d.subject;
+        s.count = d.count;
+        return s;
+      });
+
+      const weakList: WeakPoint[] = [];
+      for (const p of profiles) {
+        if (p.currentMasteryScore < 0.6) {
+          const w = new WeakPoint();
+          w.tagId = p.knowledgeTagId;
+          w.score = p.currentMasteryScore;
+          w.totalMistakes = p.totalMistakes;
+          weakList.push(w);
+        }
+      }
+      weakList.sort((a: WeakPoint, b: WeakPoint) => a.score - b.score);
+      this.weakPoints = weakList.slice(0, 3);
+    } finally {
+      this.loading = false;
+    }
   }
 
   build() {

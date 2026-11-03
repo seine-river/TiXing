@@ -1,5 +1,7 @@
 import { hiAppEvent } from '@kit.PerformanceAnalysisKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { TelemetryRouter } from './telemetry/TelemetryRouter';
+import { TelemetryEvent, TelemetryEventKind } from './telemetry/TelemetryModels';
 
 const LOG_DOMAIN: number = 0xA001;
 const LOG_TAG: string = 'TiXing';
@@ -60,6 +62,7 @@ export class PerformanceMonitor {
       }).catch((e: Error) => {
         PerformanceMonitor.errorRaw('write behavior event failed: ' + name);
       });
+      TelemetryRouter.track(new TelemetryEvent(TelemetryEventKind.BEHAVIOR, name, params));
     } catch (e) {
     }
   }
@@ -76,6 +79,7 @@ export class PerformanceMonitor {
       }).catch((e: Error) => {
         PerformanceMonitor.errorRaw('write statistic event failed: ' + name);
       });
+      TelemetryRouter.track(new TelemetryEvent(TelemetryEventKind.METRIC, name, params));
     } catch (e) {
     }
   }
@@ -93,6 +97,7 @@ export class PerformanceMonitor {
       }).catch((e: Error): void => {
         PerformanceMonitor.errorRaw('write fault event failed: ' + name);
       });
+      TelemetryRouter.reportFault(name, 'app fault event', params);
     } catch (e) {
     }
   }
@@ -110,10 +115,13 @@ export class PerformanceMonitor {
   }
 
   static uploadFaultLog(domain: string, name: string, params: object): void {
-    // 故障日志上传占位：按实际上架后的日志服务实现上传逻辑。
-    // 建议：将 domain/name/params 及本地 hiAppEvent 落盘日志路径打包，
-    // 经用户授权后通过 HTTPS 上传至日志收集服务端。
-    // 上传前需获得用户隐私授权同意，且仅上传脱敏后必要字段。
+    // Bugly SDK 已注册系统故障监听并自动上传崩溃/卡顿附件。
+    // 这里同步上报一个脱敏的自定义错误，用于把系统故障与业务遥测事件关联。
+    const safeParams: Record<string, string | number | boolean> = {
+      'fault_name': name,
+      'fault_domain': domain
+    };
+    TelemetryRouter.reportFault(`system_${name}`, `system fault: ${domain}/${name}`, safeParams);
   }
 
   static info(msg: string): void {
