@@ -197,4 +197,18 @@ final class TiXingTests: XCTestCase {
 
         try? FileManager.default.removeItem(at: directory)
     }
+
+    func testAIQuestionDecodingGeneratesIDsWhenModelOmitsID() throws {
+        // GLM 返回的 questions 条目没有客户端 id；解码时必须自动生成，
+        // 否则 AI 已成功识别，进入核对页前仍会误报“题目结构解析失败”。
+        let raw = """
+        {"questionCount":1,"questions":[{"question":"12 + 7 = ?","myAnswer":"18","myAnswerPresent":true,"standardAnswer":"19","knowledgeSummary":"20以内加法","subject":"math","answerType":"numeric","errorType":"careless","knowledgeTags":["加法"]}]}
+        """
+        let envelope = try JSONDecoder().decode(AIQuestionEnvelope.self, from: Data(raw.utf8))
+        let questions = try XCTUnwrap(envelope.questions)
+
+        XCTAssertEqual(questions.map(\.question), ["12 + 7 = ?"])
+        XCTAssertEqual(questions.map(\.myAnswer), ["18"])
+        XCTAssertEqual(questions.count, Set(questions.map(\.id)).count)
+    }
 }

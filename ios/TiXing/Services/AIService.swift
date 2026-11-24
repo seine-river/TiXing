@@ -141,11 +141,13 @@ struct AIService {
             .text(prompt)
         ], maxTokens: 8192)
         let json = JSONExtractor.firstJSON(in: raw)
-        guard let data = json.data(using: .utf8),
-              let envelope = try? JSONDecoder().decode(AIQuestionEnvelope.self, from: data) else {
+        do {
+            let envelope = try decode(json, as: AIQuestionEnvelope.self)
+            return envelope.questions ?? envelope.items ?? []
+        } catch {
+            // decode 已在 os_log 输出具体 Codable 错误；界面只保留儿童/家长可读提示。
             throw AIError.parsing("题目结构解析失败")
         }
-        return envelope.questions ?? envelope.items ?? []
     }
 
     func answerVoice(question: String, grade: Grade) async throws -> AIVoiceAnswer {
