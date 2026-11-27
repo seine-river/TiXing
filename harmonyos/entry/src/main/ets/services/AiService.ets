@@ -5,6 +5,7 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { Subject, AnswerType, ErrorType } from '../models/Enums';
 import { MediaService } from './MediaService';
 import { AiConfig } from '../common/AiConfig';
+import { JsonExtractor } from '../common/JsonExtractor';
 import { VoiceAskRecord } from '../models/VoiceAsk';
 
 const CONFIG_GUIDE: string =
@@ -121,6 +122,7 @@ interface AiLessonSceneRaw {
   narration?: string;
   subtitle?: string;
   screen?: AiLessonScreenRaw;
+  visual?: AiLessonVisualRaw;
   animation?: string;
 }
 
@@ -781,17 +783,39 @@ export class AiService {
     hilog.info(LOG_DOMAIN, LOG_TAG,
       'parseLesson start: rawLength=%{public}d', raw.length);
     try {
-      const jsonStr: string = AiService.extractJson(raw);
+      const jsonCandidates: string[] = JsonExtractor.candidates(raw);
       hilog.info(LOG_DOMAIN, LOG_TAG,
-        'parseLesson json extracted: jsonLength=%{public}d, objectStart=%{public}d, objectEnd=%{public}d',
-        jsonStr.length, raw.indexOf('{'), raw.lastIndexOf('}'));
-      const parseCandidates: string[] = [jsonStr, AiService.quoteNumericVisualNodes(jsonStr)];
+        'parseLesson json extracted: candidateCount=%{public}d, rawLength=%{public}d',
+        jsonCandidates.length, raw.length);
+      const parseCandidates: string[] = [];
+      if (jsonCandidates.length === 0) {
+        parseCandidates.push(raw);
+      }
+      for (const candidate of jsonCandidates) {
+        parseCandidates.push(candidate);
+        const normalized: string = JsonExtractor.removeTrailingCommas(
+          JsonExtractor.normalizeControlCharacters(candidate));
+        parseCandidates.push(normalized);
+        parseCandidates.push(AiService.quoteNumericVisualNodes(normalized));
+        const closedScreen: string = JsonExtractor.closeScreenBeforeAnimation(normalized);
+        parseCandidates.push(closedScreen);
+        parseCandidates.push(AiService.quoteNumericVisualNodes(closedScreen));
+        const quotedKeys: string = JsonExtractor.quoteUnquotedKeys(normalized);
+        parseCandidates.push(quotedKeys);
+        parseCandidates.push(AiService.quoteNumericVisualNodes(quotedKeys));
+      }
       let obj: AiLessonRaw | undefined = undefined;
       let parseError: Object | undefined = undefined;
       for (const candidate of parseCandidates) {
         try {
-          obj = JSON.parse(candidate) as AiLessonRaw;
-          break;
+          const parsed: AiLessonRaw = JSON.parse(candidate) as AiLessonRaw;
+          if (parsed.scenes !== undefined) {
+            obj = parsed;
+            break;
+          }
+          if (obj === undefined) {
+            obj = parsed;
+          }
         } catch (e) {
           parseError = e;
         }
@@ -821,12 +845,12 @@ export class AiService {
             scene.screen.highlight = rawScreen.highlight !== undefined ? rawScreen.highlight : '';
             scene.screen.studentAnswer = rawScreen.studentAnswer !== undefined ? rawScreen.studentAnswer : '';
             scene.screen.standardAnswer = rawScreen.standardAnswer !== undefined ? rawScreen.standardAnswer : '';
-          if (rawScreen.steps !== undefined) {
-            scene.screen.steps = rawScreen.steps;
-          }
-          if (rawScreen.visual !== undefined) {
-            scene.screen.visual = AiService.parseLessonVisual(rawScreen.visual);
-          }
+            if (rawScreen.steps !== undefined) {
+              scene.screen.steps = rawScreen.steps;
+            }
+            if (rawScreen.visual !== undefined) {
+              scene.screen.visual = AiService.parseLessonVisual(rawScreen.visual);
+            }
           if (rawScreen.type !== undefined && AiService.normalizeLessonScreenType(rawScreen.type) === 'text') {
             hilog.warn(LOG_DOMAIN, LOG_TAG,
               'parseLesson unknown screen type: sceneId=%{public}s, type=%{public}s',
@@ -836,6 +860,10 @@ export class AiService {
           hilog.warn(LOG_DOMAIN, LOG_TAG,
             'parseLesson scene missing screen: sceneId=%{public}s, subtitle=%{public}s',
             scene.id, scene.subtitle);
+        }
+        // GLM 偶发把 visual 放在 scene 层级，而不是 screen 内部；两种结构都兼容。
+        if (rawScene.visual !== undefined) {
+          scene.screen.visual = AiService.parseLessonVisual(rawScene.visual);
         }
         if (scene.narration.length > 0) {
           lesson.scenes.push(scene);
@@ -1359,22 +1387,7 @@ export class AiService {
   }
 
   private static extractJson(raw: string): string {
-    const objectStart: number = raw.indexOf('{');
-    const arrayStart: number = raw.indexOf('[');
-    let start: number = -1;
-    let endChar: string = '';
-    if (arrayStart >= 0 && (objectStart < 0 || arrayStart < objectStart)) {
-      start = arrayStart;
-      endChar = ']';
-    } else {
-      start = objectStart;
-      endChar = '}';
-    }
-    const end: number = raw.lastIndexOf(endChar);
-    if (start >= 0 && end > start) {
-      return raw.substring(start, end + 1);
-    }
-    return raw;
+    return JsonExtractor.first(raw);
   }
 
   private static mapAnswerType(s: string): AnswerType {

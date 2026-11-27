@@ -7,6 +7,8 @@ final class LessonPlayerModel: NSObject, ObservableObject {
     @Published var elapsed: Int = 0
     @Published var playing = false
     @Published var finished = false
+    @Published var isSeeking = false
+    @Published var seekFraction: Double = 0
     @Published var audioErrorMessage: String?
     let lesson: AILesson
     let actualTotalDuration: Int
@@ -16,6 +18,7 @@ final class LessonPlayerModel: NSObject, ObservableObject {
     private var transitionTask: Task<Void, Never>?
     private var commandToken = 0
     private var speechGeneration = 0
+    private var wasPlayingBeforeSeek = false
 
     init(lesson: AILesson) {
         self.lesson = lesson
@@ -93,6 +96,57 @@ final class LessonPlayerModel: NSObject, ObservableObject {
         audioErrorMessage = nil
         stopTimer()
         stopSpeakingImmediately()
+    }
+
+    func beginSeeking() {
+        guard !lesson.scenes.isEmpty else { return }
+        wasPlayingBeforeSeek = playing
+        isSeeking = true
+        seekFraction = completedFraction
+        if playing {
+            pause()
+        }
+    }
+
+    func updateSeeking(to fraction: Double) {
+        guard isSeeking else { return }
+        seekFraction = min(1, max(0, fraction))
+    }
+
+    func endSeeking() {
+        guard isSeeking else { return }
+        let target = Int((seekFraction * Double(actualTotalDuration)).rounded())
+        let shouldResume = wasPlayingBeforeSeek
+        isSeeking = false
+        seek(to: target, resume: shouldResume)
+    }
+
+    func seek(to seconds: Int, resume: Bool) {
+        guard !lesson.scenes.isEmpty else { return }
+        stop()
+        let target = min(max(0, seconds), actualTotalDuration)
+        if target >= actualTotalDuration {
+            index = lesson.scenes.count - 1
+            elapsed = effectiveDuration(of: lesson.scenes[index])
+            finished = true
+            playing = false
+            return
+        }
+
+        var remaining = target
+        for (sceneIndex, scene) in lesson.scenes.enumerated() {
+            let duration = effectiveDuration(of: scene)
+            if remaining < duration || sceneIndex == lesson.scenes.count - 1 {
+                index = sceneIndex
+                elapsed = min(remaining, duration)
+                finished = false
+                break
+            }
+            remaining -= duration
+        }
+        if resume {
+            self.resume()
+        }
     }
 
     var completedSeconds: Int {
@@ -273,7 +327,6 @@ struct LessonVideoView: View {
     @State private var detailText: String?
     @State private var timer: Timer?
     @State private var generating = false
-    @State private var usingCachedLesson = false
     private let mistakeID: String
 
     init(mistakeID: String) {
@@ -366,13 +419,6 @@ struct LessonVideoView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                     controls(model)
-                    if usingCachedLesson {
-                        Text("已保存本地")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Theme.primary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                chapters(model)
             }
             .padding(14)
             .padding(.bottom, 66)
@@ -417,18 +463,34 @@ struct LessonVideoView: View {
 
     private func controls(_ model: LessonPlayerModel) -> some View {
         VStack(spacing: 9) {
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.chip)
-                    Capsule()
-                        .fill(Theme.primary)
-                        .frame(width: max(0, proxy.size.width * model.completedFraction))
-                }
+            HStack {
+                Text("\(model.isSeeking ? Int((model.seekFraction * Double(model.actualTotalDuration)).rounded()) : model.completedSeconds) 秒")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.textSecondary)
+                Spacer()
+                Text("共 \(model.actualTotalDuration) 秒")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.textSecondary)
             }
-            .frame(height: 8)
-            .animation(.linear(duration: 1), value: model.completedSeconds)
+
+            Slider(
+                value: Binding(
+                    get: { model.isSeeking ? model.seekFraction : model.completedFraction },
+                    set: { model.updateSeeking(to: $0) }
+                ),
+                in: 0...1,
+                onEditingChanged: { editing in
+                    if editing {
+                        model.beginSeeking()
+                    } else {
+                        model.endSeeking()
+                    }
+                }
+            )
+            .tint(Theme.primary)
+            .frame(height: 28)
             .accessibilityLabel("讲解进度")
-            .accessibilityValue("\(model.completedSeconds)/\(model.actualTotalDuration)秒")
+            .accessibilityValue("\(model.isSeeking ? Int((model.seekFraction * Double(model.actualTotalDuration)).rounded()) : model.completedSeconds) 秒，共 \(model.actualTotalDuration) 秒")
 
             HStack(spacing: 10) {
                 Button {
@@ -467,6 +529,21 @@ struct LessonVideoView: View {
                     .foregroundStyle(Theme.primary)
                     .contentShape(Circle())
             }
+
+            NavigationLink {
+                ReviewView(focusedMistakeID: mistakeID)
+            } label: {
+                Label("立即复习", systemImage: "pencil.and.list.clipboard")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(Capsule().fill(Theme.buttonGradient))
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded {
+                player?.pause()
+            })
 
             Button {
                 generate(force: true)
@@ -509,46 +586,16 @@ struct LessonVideoView: View {
         return model.playing ? "pause.fill" : "play.fill"
     }
 
-    private func chapters(_ model: LessonPlayerModel) -> some View {
-        AppCard {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("讲解章节").font(.system(size: 14, weight: .bold))
-                ForEach(Array(model.lesson.scenes.enumerated()), id: \.element.id) { index, scene in
-                    Button {
-                        model.start(at: index)
-                    } label: {
-                        HStack(spacing: 9) {
-                            Text("\(index + 1)")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(index == model.index ? .white : Theme.primary)
-                                .frame(width: 26, height: 26)
-                                .background(Circle().fill(index == model.index ? Theme.primary : Theme.softPrimary))
-                            Text(scene.subtitle)
-                                .font(.system(size: 14, weight: index == model.index ? .bold : .regular))
-                                .foregroundStyle(index == model.index ? Theme.textPrimary : Theme.textRegular)
-                            Spacer()
-                            Text("\(scene.duration)秒")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Theme.textSecondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
     private func generate(force: Bool) {
         guard !generating else { return }
         generating = true
         player?.stop()
         player = nil
-        usingCachedLesson = false
 
         let fingerprint = lessonSourceFingerprint()
         if !force, let cached = LessonCacheService.load(
             mistakeID: mistakeID, sourceFingerprint: fingerprint) {
-            applyLesson(cached, fromCache: true)
+            applyLesson(cached)
             generating = false
             return
         }
@@ -571,7 +618,7 @@ struct LessonVideoView: View {
                     mistakeID: mistakeID, sourceFingerprint: fingerprint, lesson: value)
                 stage = "马上开始播放..."
                 progress = 97
-                applyLesson(value, fromCache: false)
+                applyLesson(value)
             } catch {
                 errorText = error.localizedDescription
                 detailText = String(describing: error)
@@ -582,9 +629,8 @@ struct LessonVideoView: View {
         }
     }
 
-    private func applyLesson(_ value: AILesson, fromCache: Bool) {
+    private func applyLesson(_ value: AILesson) {
         lesson = value
-        usingCachedLesson = fromCache
         let model = LessonPlayerModel(lesson: value)
         player = model
         loading = false

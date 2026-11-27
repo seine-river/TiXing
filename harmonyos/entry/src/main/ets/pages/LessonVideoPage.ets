@@ -3,6 +3,7 @@ import { Student } from '../models/Student';
 import { dbHelper } from '../repository/DatabaseHelper';
 import { AiService, AiServiceError, AiLesson, AiLessonScene, AiLessonVisual } from '../services/AiService';
 import { LessonCacheService } from '../services/LessonCacheService';
+import { LessonSeekTarget, LessonTimeline } from '../usecases/LessonTimeline';
 import { AppColors, AppSizes, generateId, subjectLabel } from '../common/Constants';
 import { PageHeader } from '../components/CommonComponents';
 import { EmptyBlock } from '../components/BasicWidgets';
@@ -50,14 +51,16 @@ struct LessonVideoPage {
   @State sceneElapsed: number = 0;
   @State isPlaying: boolean = false;
   @State isFinished: boolean = false;
+  @State isSeeking: boolean = false;
+  @State seekSeconds: number = 0;
   @State audioEnabled: boolean = true;
   @State audioAvailable: boolean = false;
-  @State usingCachedLesson: boolean = false;
 
   private mistakeId: string = '';
   private timerId: number = -1;
   private loadingTimerId: number = -1;
   private generating: boolean = false;
+  private wasPlayingBeforeSeek: boolean = false;
   private ttsEngine: textToSpeech.TextToSpeechEngine | undefined = undefined;
   private alive: boolean = true;
 
@@ -134,7 +137,6 @@ struct LessonVideoPage {
     this.loadError = '';
     this.errorDetail = '';
     this.stopPlayback(false);
-    this.usingCachedLesson = false;
 
     if (!forceGeneration) {
       const cached: AiLesson | undefined =
@@ -145,7 +147,6 @@ struct LessonVideoPage {
       }
       if (cached !== undefined && this.alive) {
         this.lesson = cached;
-        this.usingCachedLesson = true;
         this.setLoadingStage('已找到本地讲解，正在准备播放...', 82);
         await this.initializeAudioWithTimeout();
         if (!this.alive) {
@@ -635,8 +636,94 @@ struct LessonVideoPage {
   }
 
   private completedFraction(): number {
-    const total: number = Math.max(1, this.lesson.totalDuration);
+    const total: number = this.totalSeconds();
     return Math.min(1, Math.max(0, this.completedSeconds() / total));
+  }
+
+  private totalSeconds(): number {
+    return LessonTimeline.totalDuration(this.lesson.scenes);
+  }
+
+  private clampSeekSeconds(seconds: number): number {
+    return Math.min(Math.max(0, Math.round(seconds)), this.totalSeconds());
+  }
+
+  private handleSeekChange(value: number, mode: SliderChangeMode): void {
+    const seconds: number = this.clampSeekSeconds(value);
+    if (mode === SliderChangeMode.Begin) {
+      this.beginSeek(seconds);
+    } else if (mode === SliderChangeMode.Moving) {
+      this.updateSeek(seconds);
+    } else if (mode === SliderChangeMode.Click) {
+      if (!this.isSeeking) {
+        this.beginSeek(seconds);
+      }
+      this.updateSeek(seconds);
+      this.finishSeek();
+    } else if (mode === SliderChangeMode.End && this.isSeeking) {
+      this.updateSeek(seconds);
+      this.finishSeek();
+    }
+  }
+
+  private beginSeek(seconds: number): void {
+    if (this.lesson.scenes.length === 0) {
+      return;
+    }
+    this.wasPlayingBeforeSeek = this.isPlaying;
+    this.isSeeking = true;
+    this.seekSeconds = seconds;
+    if (this.isPlaying) {
+      this.pausePlayback();
+    }
+  }
+
+  private updateSeek(seconds: number): void {
+    if (this.isSeeking) {
+      this.seekSeconds = seconds;
+    }
+  }
+
+  private finishSeek(): void {
+    if (!this.isSeeking) {
+      return;
+    }
+    const seconds: number = this.seekSeconds;
+    const resume: boolean = this.wasPlayingBeforeSeek;
+    this.isSeeking = false;
+    this.applySeek(seconds, resume);
+  }
+
+  private applySeek(seconds: number, resume: boolean): void {
+    if (this.lesson.scenes.length === 0) {
+      return;
+    }
+    const target: LessonSeekTarget = LessonTimeline.resolve(seconds, this.lesson.scenes);
+    this.stopTimer();
+    if (this.ttsEngine !== undefined) {
+      try {
+        this.ttsEngine.stop();
+      } catch (e) {
+        const detail: string = e instanceof Error
+          ? `name=${e.name}, message=${e.message}`
+          : this.exceptionDetail(e);
+        this.logLongError('lesson TTS seek stop failed', detail);
+      }
+    }
+    this.isPlaying = false;
+    this.isFinished = target.finished;
+    this.currentIndex = target.sceneIndex;
+    this.sceneElapsed = target.sceneElapsed;
+    hilog.info(LOG_DOMAIN, LOG_TAG,
+      'lesson seek applied: index=%{public}d, elapsed=%{public}d, finished=%{public}b, resume=%{public}b',
+      this.currentIndex, this.sceneElapsed, this.isFinished, resume);
+    if (target.finished) {
+      this.stopPlayback(true);
+      return;
+    }
+    if (resume) {
+      this.resumePlayback();
+    }
   }
 
   private fractionPercent(visual: AiLessonVisual, index: number): number {
@@ -858,6 +945,27 @@ struct LessonVideoPage {
         this.VideoStage()
         this.ControlBar()
 
+      Row() {
+        Button('📝 立即复习')
+          .layoutWeight(1)
+          .height(46)
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .backgroundColor(AppColors.SOLID_PRIMARY)
+          .fontColor(Color.White)
+          .borderRadius(23)
+          .shadow({ radius: 10, color: AppColors.SHADOW_PRIMARY, offsetY: 4 })
+          .onClick(() => {
+            this.pausePlayback();
+            this.getUIContext().getRouter().pushUrl({
+              url: 'pages/ReviewPage',
+              params: { mistakeId: this.mistake.id }
+            });
+          })
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 12 })
+
       Button('🔄 重新生成讲解')
         .height(38)
         .fontSize(13)
@@ -872,41 +980,6 @@ struct LessonVideoPage {
           this.generateLesson(true);
         })
 
-        this.SceneList()
-
-        Row({ space: 8 }) {
-          Text(this.audioAvailable ? '🔊 语音讲解' : '🔇 当前设备语音不可用')
-            .fontSize(11)
-            .fontColor(AppColors.TEXT_SECONDARY)
-            .layoutWeight(1)
-          if (this.usingCachedLesson) {
-            Text('已保存本地')
-              .fontSize(11)
-              .fontColor(AppColors.PRIMARY)
-          }
-          Text(this.audioEnabled ? '关闭语音' : '开启语音')
-            .fontSize(12)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(AppColors.PRIMARY)
-            .padding({ top: 6, bottom: 6 })
-            .onClick(() => {
-              this.audioEnabled = !this.audioEnabled;
-              if (!this.audioEnabled && this.ttsEngine !== undefined) {
-                try {
-                  this.ttsEngine.stop();
-                } catch (e) {
-                }
-              } else if (this.audioEnabled && this.ttsEngine === undefined) {
-                this.initializeAudio().then((): void => {
-                  if (this.isPlaying && this.currentIndex < this.lesson.scenes.length) {
-                    this.speakScene(this.lesson.scenes[this.currentIndex]);
-                  }
-                });
-              }
-            })
-        }
-        .width('100%')
-        .padding({ left: 16, right: 16, top: 10, bottom: 20 })
       }
       .width('100%')
     }
@@ -1342,20 +1415,38 @@ struct LessonVideoPage {
   @Builder
   ControlBar() {
     Column({ space: 10 }) {
-      Stack({ alignContent: Alignment.Start }) {
-        Column()
-          .width('100%')
-          .height(8)
-          .backgroundColor(AppColors.BG_CHIP)
-        Column()
-          .width(`${(this.completedFraction() * 100).toFixed(2)}%`)
-          .height(8)
-          .backgroundColor(AppColors.PRIMARY)
+      Row() {
+        Text(`${this.isSeeking ? this.seekSeconds : this.completedSeconds()} 秒`)
+          .fontSize(11)
+          .fontColor(AppColors.TEXT_SECONDARY)
+        Blank()
+        Text(`共 ${this.totalSeconds()} 秒`)
+          .fontSize(11)
+          .fontColor(AppColors.TEXT_SECONDARY)
       }
         .width('100%')
-        .height(8)
-        .borderRadius(4)
-        .clip(true)
+
+      Slider({
+        value: this.isSeeking ? this.seekSeconds : this.completedSeconds(),
+        min: 0,
+        max: this.totalSeconds(),
+        step: 1,
+        style: SliderStyle.InSet
+      })
+        .trackThickness(6)
+        .blockSize({ width: 20, height: 20 })
+        .selectedColor(AppColors.PRIMARY)
+        .trackColor(AppColors.BG_CHIP)
+        .blockColor(AppColors.PRIMARY)
+        .showSteps(false)
+        .showTips(false)
+        .width('100%')
+        .height(34)
+        .accessibilityText('讲解进度，拖动可以快进或后退')
+        .accessibilityDescription(`${this.isSeeking ? this.seekSeconds : this.completedSeconds()} 秒，共 ${this.totalSeconds()} 秒`)
+        .onChange((value: number, mode: SliderChangeMode) => {
+          this.handleSeekChange(value, mode);
+        })
 
       Row({ space: 10 }) {
         Button('⏮')
@@ -1409,58 +1500,4 @@ struct LessonVideoPage {
     .margin({ left: 16, right: 16, top: 12 })
   }
 
-  @Builder
-  SceneList() {
-    Column() {
-      Text('讲解章节')
-        .fontSize(14)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(AppColors.TEXT_PRIMARY)
-        .width('100%')
-        .margin({ bottom: 8 })
-
-      ForEach(this.lesson.scenes, (scene: AiLessonScene, index: number) => {
-        Row({ space: 10 }) {
-          Text(`${index + 1}`)
-            .fontSize(12)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(index === this.currentIndex ? Color.White : AppColors.PRIMARY)
-            .width(28)
-            .height(28)
-            .textAlign(TextAlign.Center)
-            .backgroundColor(index === this.currentIndex ? AppColors.SOLID_PRIMARY : AppColors.SOFT_PRIMARY)
-            .borderRadius(14)
-          Column() {
-            Text(scene.subtitle)
-              .fontSize(14)
-              .fontColor(index === this.currentIndex ? AppColors.TEXT_PRIMARY : AppColors.TEXT_REGULAR)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .width('100%')
-            Text(`${scene.duration}秒 · ${scene.screen.type}`)
-              .fontSize(11)
-              .fontColor(AppColors.TEXT_PLACEHOLDER)
-              .margin({ top: 2 })
-          }
-          .layoutWeight(1)
-          Text(index === this.currentIndex && this.isPlaying ? '▶' : '›')
-            .fontSize(16)
-            .fontColor(AppColors.TEXT_PLACEHOLDER)
-        }
-        .width('100%')
-        .padding({ top: 8, bottom: 8 })
-        .borderRadius(14)
-        .backgroundColor(index === this.currentIndex ? AppColors.SOFT_PRIMARY : Color.Transparent)
-        .onClick(() => {
-          this.startPlayback(index);
-        })
-      }, (scene: AiLessonScene) => scene.id + scene.subtitle)
-    }
-    .width('100%')
-    .padding(14)
-    .backgroundColor(AppColors.BG_CARD)
-    .borderRadius(AppSizes.CORNER_RADIUS_LG)
-    .shadow({ radius: 10, color: AppColors.SHADOW_SOFT, offsetY: 3 })
-    .margin({ left: 16, right: 16, top: 12 })
-  }
 }

@@ -11,6 +11,7 @@ import { LessonCacheService } from '../services/LessonCacheService';
 import { AppColors, AppSizes, AppStrings, generateId, isAnswerEqual } from '../common/Constants';
 import { Toast } from '../common/Toast';
 import { PageHeader } from '../components/CommonComponents';
+import { ReviewPageParams } from '../common/RouteParams';
 
 function enabledSubjects(settings: ReminderSettings): Subject[] {
   const list: Subject[] = [];
@@ -48,8 +49,11 @@ struct ReviewPage {
   @State currentLessonCached: boolean = false;
   private alive: boolean = true;
   private profileDirty: boolean = false;
+  private focusedMistakeId: string = '';
 
   aboutToAppear(): void {
+    const params = this.getUIContext().getRouter().getParams() as ReviewPageParams;
+    this.focusedMistakeId = params?.mistakeId ?? '';
     this.startTime = Date.now();
     this.loadReviewList();
   }
@@ -78,11 +82,20 @@ struct ReviewPage {
    * 复习队列（T034/FR-012）：按当前学生 + 每日上限 + 科目开关消费。
    */
   async loadReviewList(): Promise<void> {
-    const settings: ReminderSettings = await dbHelper.queryReminderSettings('stu_default');
-    const subjects: Subject[] = enabledSubjects(settings);
-    this.reviewList = await dbHelper.queryTodayReviewMistakes('stu_default', settings.dailyLimit, subjects);
+    if (this.focusedMistakeId.length > 0) {
+      const focused: Mistake | undefined = await dbHelper.queryMistakeById(this.focusedMistakeId);
+      this.reviewList = focused === undefined ? [] : [focused];
+    } else {
+      const settings: ReminderSettings = await dbHelper.queryReminderSettings('stu_default');
+      const subjects: Subject[] = enabledSubjects(settings);
+      this.reviewList = await dbHelper.queryTodayReviewMistakes('stu_default', settings.dailyLimit, subjects);
+    }
     this.totalCount = this.reviewList.length;
     await this.refreshLessonCacheState();
+  }
+
+  private isFocusedReview(): boolean {
+    return this.focusedMistakeId.length > 0;
   }
 
   onBackPress(): boolean {
@@ -121,13 +134,13 @@ struct ReviewPage {
       if (this.isFinished) {
         this.SummaryView()
       } else {
-        PageHeader({ title: AppStrings.PAGE_REVIEW })
+        PageHeader({ title: this.isFocusedReview() ? '立即复习' : AppStrings.PAGE_REVIEW })
         if (this.reviewList.length === 0) {
           Column() {
             Text('📭')
               .fontSize(48)
               .margin({ bottom: 12 })
-            Text(AppStrings.NO_REVIEW_TODAY)
+            Text(this.isFocusedReview() ? '错题不存在或已被删除' : AppStrings.NO_REVIEW_TODAY)
               .fontSize(16)
               .fontColor(AppColors.TEXT_SECONDARY)
           }
@@ -485,7 +498,7 @@ struct ReviewPage {
           .fontColor(AppColors.TEXT_REGULAR)
           .margin({ top: 24 })
 
-        Button('返回首页')
+        Button(this.isFocusedReview() ? '返回上一页' : '返回首页')
           .width('70%')
           .height(48)
           .fontSize(16)

@@ -88,6 +88,17 @@ struct MistakeDetailView: View {
                 }
                 .buttonStyle(.plain)
 
+                NavigationLink {
+                    ReviewView(focusedMistakeID: mistake.id)
+                } label: {
+                    Label("立即复习这道题", systemImage: "pencil.and.list.clipboard")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 46)
+                        .background(Capsule().fill(Theme.buttonGradient))
+                }
+                .buttonStyle(.plain)
+
                 if let path = mistake.imagePath, let image = UIImage(contentsOfFile: path) {
                     card("📷 原始照片") {
                         Image(uiImage: image)

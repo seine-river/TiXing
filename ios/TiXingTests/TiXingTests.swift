@@ -198,6 +198,55 @@ final class TiXingTests: XCTestCase {
         try? FileManager.default.removeItem(at: directory)
     }
 
+    @MainActor
+    func testLessonSeekMapsGlobalSecondsToSceneAndElapsed() {
+        let scenes = (0..<3).map { index in
+            AILessonScene(
+                id: "scene-\(index)",
+                duration: [5, 4, 3][index],
+                narration: "第\(index)句讲解。",
+                subtitle: "第\(index)章",
+                screen: AILessonScreen(type: "steps", title: "第\(index)章", steps: []),
+                visual: nil,
+                animation: nil)
+        }
+        let player = LessonPlayerModel(lesson: AILesson(
+            title: "分数讲解",
+            totalDuration: 999,
+            gradeLevel: "三年级",
+            tone: "亲切",
+            scenes: scenes))
+
+        player.seek(to: 7, resume: false)
+        XCTAssertEqual(player.index, 1)
+        XCTAssertEqual(player.elapsed, 2)
+        XCTAssertEqual(player.completedSeconds, 7)
+        XCTAssertFalse(player.playing)
+        XCTAssertFalse(player.finished)
+
+        player.seek(to: 9, resume: false)
+        XCTAssertEqual(player.index, 2)
+        XCTAssertEqual(player.elapsed, 0)
+
+        player.seek(to: 999, resume: false)
+        XCTAssertEqual(player.index, 2)
+        XCTAssertEqual(player.elapsed, 3)
+        XCTAssertTrue(player.finished)
+
+        player.seek(to: 0, resume: false)
+        XCTAssertEqual(player.index, 0)
+        XCTAssertEqual(player.elapsed, 0)
+        XCTAssertFalse(player.finished)
+
+        player.beginSeeking()
+        XCTAssertTrue(player.isSeeking)
+        player.updateSeeking(to: 0.75)
+        player.endSeeking()
+        XCTAssertFalse(player.isSeeking)
+        XCTAssertEqual(player.index, 2)
+        XCTAssertEqual(player.elapsed, 0)
+    }
+
     func testAIQuestionDecodingGeneratesIDsWhenModelOmitsID() throws {
         // GLM 返回的 questions 条目没有客户端 id；解码时必须自动生成，
         // 否则 AI 已成功识别，进入核对页前仍会误报“题目结构解析失败”。

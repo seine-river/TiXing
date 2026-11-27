@@ -13,6 +13,7 @@ import {
 } from '../main/ets/models/VoiceAsk';
 import { CuriosityAggregator } from '../main/ets/usecases/CuriosityAggregator';
 import { TelemetrySanitizer } from '../main/ets/services/telemetry/TelemetrySanitizer';
+import { AiLessonScene } from '../main/ets/services/AiService';
 import { WavAudioParser } from '../main/ets/common/WavAudio';
 import {
   MistakeStatus, AnswerType, GradingMethod, InputMethod, Subject, ErrorType,
@@ -25,6 +26,8 @@ import { SubjectDetector } from '../main/ets/usecases/SubjectDetector';
 import {
   subjectLabel, statusLabel, statusColor, formatDate, generateId
 } from '../main/ets/common/Constants';
+import { LessonSeekTarget, LessonTimeline } from '../main/ets/usecases/LessonTimeline';
+import { JsonExtractor } from '../main/ets/common/JsonExtractor';
 
 export default function coreAlgorithmTest() {
   describe('TelemetrySanitizer', () => {
@@ -478,6 +481,92 @@ export default function coreAlgorithmTest() {
       const b = generateId();
       expect(a.length > 0).assertTrue();
       expect(a !== b).assertTrue();
+    });
+  });
+
+  describe('LessonTimeline', () => {
+    const scenes: AiLessonScene[] = [5, 4, 3].map((duration: number) => {
+      const scene: AiLessonScene = new AiLessonScene();
+      scene.id = `scene-${duration}`;
+      scene.duration = duration;
+      return scene;
+    });
+
+    it('totalDuration_uses_scene_sum_not_model_total', 0, () => {
+      expect(LessonTimeline.totalDuration(scenes)).assertEqual(12);
+    });
+
+    it('resolve_maps_global_seconds_to_scene_and_elapsed', 0, () => {
+      const start: LessonSeekTarget = LessonTimeline.resolve(0, scenes);
+      expect(start.sceneIndex).assertEqual(0);
+      expect(start.sceneElapsed).assertEqual(0);
+      expect(start.finished).assertFalse();
+
+      const middle: LessonSeekTarget = LessonTimeline.resolve(7, scenes);
+      expect(middle.sceneIndex).assertEqual(1);
+      expect(middle.sceneElapsed).assertEqual(2);
+
+      const boundary: LessonSeekTarget = LessonTimeline.resolve(9, scenes);
+      expect(boundary.sceneIndex).assertEqual(2);
+      expect(boundary.sceneElapsed).assertEqual(0);
+    });
+
+    it('resolve_clamps_to_start_and_finished_end', 0, () => {
+      const beforeStart: LessonSeekTarget = LessonTimeline.resolve(-10, scenes);
+      expect(beforeStart.sceneIndex).assertEqual(0);
+      expect(beforeStart.sceneElapsed).assertEqual(0);
+      expect(beforeStart.finished).assertFalse();
+
+      const beyondEnd: LessonSeekTarget = LessonTimeline.resolve(999, scenes);
+      expect(beyondEnd.sceneIndex).assertEqual(2);
+      expect(beyondEnd.sceneElapsed).assertEqual(3);
+      expect(beyondEnd.finished).assertTrue();
+    });
+  });
+
+  describe('JsonExtractor', () => {
+    it('candidates_splits_multiple_top_level_objects', 0, () => {
+      const raw: string = '说明 {"a":1} 另一段 {"scenes":[]} 结束';
+      const list: string[] = JsonExtractor.candidates(raw);
+      expect(list.length).assertEqual(2);
+      expect(list[0]).assertEqual('{"a":1}');
+      expect(list[1]).assertEqual('{"scenes":[]}');
+    });
+
+    it('candidates_ignores_braces_inside_strings', 0, () => {
+      const raw: string = '{"text":"括号 { 和 } 不应该截断","scenes":[]}';
+      const list: string[] = JsonExtractor.candidates(raw);
+      expect(list.length).assertEqual(1);
+      expect(list[0]).assertEqual(raw);
+    });
+
+    it('first_prefers_longest_json_candidate', 0, () => {
+      const raw: string = '前言 {bad} 正文 {"scenes":[{"id":"intro"}]} 结束';
+      expect(JsonExtractor.first(raw)).assertEqual('{"scenes":[{"id":"intro"}]}');
+    });
+
+    it('normalizes_control_characters_and_trailing_commas', 0, () => {
+      const broken: string = '{"title":"第一行\n第二行","scenes":[],}';
+      const repaired: string = JsonExtractor.removeTrailingCommas(
+        JsonExtractor.normalizeControlCharacters(broken));
+      const parsed: Record<string, Object> = JSON.parse(repaired) as Record<string, Object>;
+      expect(parsed['title']).assertEqual('第一行\n第二行');
+    });
+
+    it('quotes_javascript_style_object_keys', 0, () => {
+      const repaired: string = JsonExtractor.quoteUnquotedKeys('{title:"讲解",scenes:[]}');
+      const parsed: Record<string, Object> = JSON.parse(repaired) as Record<string, Object>;
+      expect(parsed['title']).assertEqual('讲解');
+    });
+
+    it('closes_screen_before_misplaced_animation', 0, () => {
+      const broken: string = '{"scenes":[{"id":"steps","screen":{"type":"steps",' +
+        '"visual":{"type":"arrow_flow","nodes":["谁","做什么"]},"animation":"arrow_step"},' +
+        '{"id":"check","screen":{"type":"tip","text":"检查"}}]}';
+      const repaired: string = JsonExtractor.closeScreenBeforeAnimation(broken);
+      const parsed: Record<string, Object> = JSON.parse(repaired) as Record<string, Object>;
+      const scenes: Object[] = parsed['scenes'] as Object[];
+      expect(scenes.length).assertEqual(2);
     });
   });
 }

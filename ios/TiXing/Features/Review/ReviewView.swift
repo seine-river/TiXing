@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ReviewView: View {
     @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
     @State private var queue: [Mistake] = []
     @State private var index = 0
     @State private var answer = ""
@@ -10,13 +11,18 @@ struct ReviewView: View {
     @State private var startTime = Date()
     @State private var correctCount = 0
     @State private var earnedPoints = 0
+    private let focusedMistakeID: String?
+
+    init(focusedMistakeID: String? = nil) {
+        self.focusedMistakeID = focusedMistakeID
+    }
 
     var body: some View {
         Group {
             if finished {
                 summary
             } else if queue.isEmpty {
-                EmptyBlock(message: "今天没有需要复习的错题")
+                EmptyBlock(message: focusedMistakeID == nil ? "今天没有需要复习的错题" : "错题不存在或已被删除")
                     .padding(30)
             } else if index < queue.count {
                 questionView(queue[index])
@@ -25,11 +31,15 @@ struct ReviewView: View {
             }
         }
         .background(Theme.background.ignoresSafeArea())
-        .navigationTitle("复习错题")
+        .navigationTitle(focusedMistakeID == nil ? "复习错题" : "立即复习")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if queue.isEmpty {
-                queue = store.todayReviewQueue
+                if let focusedMistakeID {
+                    queue = store.mistake(id: focusedMistakeID).map { [$0] } ?? []
+                } else {
+                    queue = store.todayReviewQueue
+                }
                 startTime = Date()
             }
         }
@@ -179,7 +189,9 @@ struct ReviewView: View {
                 Text(correctCount == queue.count ? "太棒了，继续保持！🌟" : "别灰心，每道错题都是进步的台阶 🌱")
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.textSecondary)
-                Button("返回首页") { finished = true }
+                Button(focusedMistakeID == nil ? "返回首页" : "返回上一页") {
+                    dismiss()
+                }
                     .buttonStyle(PrimaryButtonStyle())
             }
             .padding(20)

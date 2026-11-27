@@ -59,8 +59,17 @@ struct MistakeDetailPage {
 
   onPageShow(): void {
     if (this.loadedMistakeId.length > 0) {
-      this.refreshLessonCacheState();
+      this.refreshAfterReview();
     }
+  }
+
+  private async refreshAfterReview(): Promise<void> {
+    const m: Mistake | undefined = await dbHelper.queryMistakeById(this.loadedMistakeId);
+    if (m !== undefined) {
+      this.mistake = m;
+    }
+    this.reviewLogs = await dbHelper.queryReviewLogs(this.loadedMistakeId);
+    await this.refreshLessonCacheState();
   }
 
   private async refreshLessonCacheState(): Promise<void> {
@@ -263,6 +272,26 @@ struct MistakeDetailPage {
             .borderRadius(AppSizes.CORNER_RADIUS_LG)
             .shadow({ radius: 10, color: AppColors.SHADOW_SOFT, offsetY: 3 })
             .margin({ left: 16, right: 16, top: 10 })
+
+            Row() {
+              Button('📝 立即复习这道题')
+                .layoutWeight(1)
+                .height(46)
+                .fontSize(15)
+                .fontWeight(FontWeight.Bold)
+                .backgroundColor(AppColors.SOLID_PRIMARY)
+                .fontColor(Color.White)
+                .borderRadius(23)
+                .shadow({ radius: 10, color: AppColors.SHADOW_PRIMARY, offsetY: 4 })
+                .onClick(() => {
+                  this.getUIContext().getRouter().pushUrl({
+                    url: 'pages/ReviewPage',
+                    params: { mistakeId: this.mistake.id }
+                  });
+                })
+            }
+            .width('100%')
+            .padding({ left: 16, right: 16, top: 10 })
 
             // 原始照片（录入时拍摄的错题原图）
             if (this.mistake.imageUrl.length > 0) {
